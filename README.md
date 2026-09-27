@@ -12,6 +12,8 @@ The concept note is in [`portfolio_intelligence_ai_platform.md`](portfolio_intel
 
 ## Run the prototype
 
+**Option 0: one file.** [`dist/PortfolioIQ.html`](dist/PortfolioIQ.html) is the whole prototype in a single self-contained HTML file (≈225 KB, no internet needed). Email it, put it on a USB stick, double-click to open. Rebuild it after changes with `node scripts/build-single-html.js`.
+
 **Option 1: no installation (works on locked-down laptops).** Double-click `app/index.html`. Everything works, including the AI Analyst, which runs on the built-in governed engine.
 
 **Option 2: with the local server (needed to connect an approved LLM).**
