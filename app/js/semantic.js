@@ -322,6 +322,15 @@
         });
       }
     }));
+    // weekly / fortnightly submissions: fresh bounces jumping ahead of the monthly file
+    if (PIQ.hf) PIQ.hf.hotspots().filter((r) => r.change - r.indChange > 0.1).slice(0, 2).forEach((r) => {
+      out.push({
+        sev: 'serious', kind: 'fresh', p: r.p, s: r.s,
+        title: `Fresh EMI bounces on ${D.P[r.p].name} in ${D.S[r.s].name} up ${(r.change * 100).toFixed(0)}% in the last 2 weeks`,
+        detail: `Weekly data: bounce rate ${(r.was * 100).toFixed(1)}% → ${(r.now * 100).toFixed(1)}% while the industry moved ${(r.indChange * 100).toFixed(0)}%. This will reach the next monthly file as higher DPD.`,
+        score: r.change / 2
+      });
+    });
     const ccM = value('member', 'dpd30', { p: 'CC', m: t }), ccP = peerValue('mid-pvt', 'dpd30', { p: 'CC', m: t });
     if (ccP && ccM < ccP) out.push({ sev: 'good', kind: 'positive', p: 'CC', s: null, title: 'Credit card 30+ DPD is better than PVT · Mid-size peers', detail: `${(ccM * 100).toFixed(2)}% vs peer ${(ccP * 100).toFixed(2)}% — room to grow share selectively.`, score: 0 });
     const rank = { critical: 0, serious: 1, warning: 2, good: 3 };

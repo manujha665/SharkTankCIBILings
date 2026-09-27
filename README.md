@@ -32,13 +32,15 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 - **Lender categories (8):** PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC.
 - **Delinquency buckets:** a 30+ / 90+ / 180+ switch in the filter bar (default 30+).
 
-## What's inside (10 modules)
+## What's inside (12 modules)
 
 | Module | What it shows | Why it matters in the pitch |
 |---|---|---|
 | **Command Centre** | Monday-morning view: the headline number, "is it me or the market", auto alerts, top 3 actions | Opens the story in 30 seconds |
 | **Industry Intelligence** | Market trends by product, state, lender type and risk band; standard vs self-service modes with saved views | Replaces static industry reports |
 | **Peer Benchmarking** | You vs a peer group vs industry across 8 lender categories (PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC); custom peer builder; state × band heatmap | Privacy guardrails enforced live |
+| **Fresh Signals (weekly)** ⭐ | What weekly & fortnightly submissions add: latest DPD vs the monthly file, fresh EMI bounces, repayments vs dues, current balances, first-payment defaults, bounce hotspots, uses by team | Stress seen weeks before the monthly file |
+| **Overlap Intelligence** ⭐ | Retail × Microfinance (8 Cr MFI base → 50% retail footprint → 25% live-to-live; products, states, MFI lender count, stress spill-over, member exposure) and Commercial × Retail (MSME promoters' retail loans as early warning) | Only a bureau can see these |
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
 | **What should I do?** ⭐ | Ranked, quantified recommendations, each linked to a simulation | Turns insight into decisions |
 | **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state | "Surgical, not blanket" policy |

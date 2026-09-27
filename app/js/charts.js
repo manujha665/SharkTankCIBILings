@@ -139,7 +139,8 @@
         if (!xs.includes(a.x) && !opts.xNumeric) return;
         const ax = X(a.x);
         svgEl('line', { x1: ax, x2: ax, y1: M.t - 4, y2: M.t + ih, class: 'viz-annot' }, g);
-        svgEl('text', { x: ax + 5, y: M.t + 8, class: 'viz-annot-text', text: a.label }, g);
+        const nearRight = ax > M.l + iw * 0.7;
+        svgEl('text', { x: nearRight ? ax - 5 : ax + 5, y: M.t + 8, 'text-anchor': nearRight ? 'end' : 'start', class: 'viz-annot-text', text: a.label }, g);
       });
       series.forEach((s, si) => {
         let d = '', pen = false;
@@ -225,7 +226,7 @@
       const items = opts.items;
       if (opts.refName) legend(container, [{ name: opts.valueName || 'Value', color: opts.color }, { name: opts.refName, color: 'var(--ink-2)' }], 'rect');
       const W = Math.max(280, container.clientWidth);
-      const rowH = 34, M = { t: 6, r: 70, b: 6, l: Math.min(170, Math.max(...items.map((i) => textW(i.label, 12))) + 16) };
+      const rowH = 34, M = { t: 6, r: Math.max(70, Math.max(...items.map((i) => textW(opts.fmt(i.value), 12))) + 14), b: 6, l: Math.min(190, Math.max(...items.map((i) => textW(i.label, 12))) + 16) };
       const H = M.t + M.b + rowH * items.length;
       const iw = W - M.l - M.r;
       const vals = items.map((i) => i.value).concat(items.map((i) => i.ref || 0));

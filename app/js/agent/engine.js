@@ -335,6 +335,69 @@
     };
   });
 
+  def('fresh_signals', 'Weekly / fortnightly submission data: latest 30+ DPD vs the last monthly file, fresh EMI bounce rate, repayments vs dues, first-payment default on new loans, current balance trend, and fresh-bounce hotspots.', {
+    product: P_PRODUCT, state: P_STATE, cadence: { type: 'string', enum: ['weekly', 'fortnightly'] }
+  }, [], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', cadence = a.cadence || 'weekly';
+    const L = PIQ.hf.latest({ p, s }, cadence), m = L.mem, i = L.ind;
+    const monthly = S.value('member', 'dpd30', { p, s, m: S.latest() });
+    const per = cadence === 'weekly' ? 'week' : 'fortnight';
+    const hs = PIQ.hf.hotspots().filter((r) => r.change - r.indChange > 0.08).slice(0, 3);
+    return {
+      answer: {
+        paras: [`${cadence === 'weekly' ? 'Weekly' : 'Fortnightly'} data for your ${pName(p)} in ${sName(s)} (to ${F().day(m.now.x)}): 30+ DPD is **${F().pct(m.now.dpd30)}**, against **${F().pct(monthly)}** in the ${C.dataAsOf} monthly file.`],
+        bullets: [
+          `Fresh EMI bounce rate **${F().pct(m.now.bounce, 1)}** this ${per} vs ${F().pct(m.prevBounce, 1)} over the prior four (industry ${F().pct(i.now.bounce, 1)}).`,
+          `Repayments vs dues **${F().pct(m.now.collEff, 1)}** (prior ${F().pct(m.prevColl, 1)}); first-payment default on new loans ${F().pct(m.now.fpd, 1)} (industry ${F().pct(i.now.fpd, 1)}).`,
+          hs.length ? `Fresh-bounce hotspots: ${hs.map((r) => `${D.P[r.p].name} · ${D.S[r.s].name} (${F().chg(r.change, 0)} vs market ${F().chg(r.indChange, 0)})`).join('; ')}.` : 'No fresh-bounce hotspots versus the market.'
+        ],
+        chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: m.series.map((x) => ({ x: x.x, y: x.bounce })) }, { name: 'Industry', color: 'var(--s3)', points: i.series.map((x) => ({ x: x.x, y: x.bounce })) }], xLabel: (x) => F().day(x), yFmt: (v) => F().pct(v, 1), yTickFmt: (v) => (v * 100).toFixed(0) + '%', height: 200, endLabels: true }),
+        sources: src('hifreq', 'member'), filters: `${pLong(p)} · ${sName(s)} · ${cadence} · fresh EMI bounce rate`,
+        followups: ['Why did my personal loan delinquency go up in Uttar Pradesh?', 'What should I do about it?'],
+        link: { view: 'fresh', params: { p, s } }
+      },
+      facts: { latestDpd30: F().pct(m.now.dpd30), monthlyFileDpd30: F().pct(monthly), bounceNow: F().pct(m.now.bounce, 1), bouncePrior: F().pct(m.prevBounce, 1), industryBounce: F().pct(i.now.bounce, 1), collectionEfficiency: F().pct(m.now.collEff, 1), fpd: F().pct(m.now.fpd, 1), hotspots: hs.map((r) => D.P[r.p].name + ' ' + D.S[r.s].name) }
+    };
+  });
+
+  def('overlap', 'Cross-segment overlap: (a) retail x microfinance — MFI borrowers with retail footprint / live retail loans, their delinquency, products, states and the member\'s exposure; (b) commercial x retail — MSME promoters holding retail loans and the early-warning lead of their retail slips.', {
+    segment: { type: 'string', enum: ['retail_mfi', 'msme_retail'] }
+  }, [], (a) => {
+    const seg = a.segment || 'retail_mfi';
+    if (seg === 'msme_retail') {
+      const r = PIQ.overlap.msmeRetail();
+      const top = r.member[0];
+      return {
+        answer: {
+          paras: [`**${F().pct(r.funnel[1].pct, 0)}** of live MSME borrowers are linked to individuals (directors, partners, proprietors, guarantors), and in **${F().pct(r.funnel[2].pct, 0)}** a promoter holds a live retail loan.`, `Promoters slip first: in **${F().pct(r.stats.precededPct, 0)}** of MSMEs that turned 90+, a promoter's retail loan went 30+ in the prior six months, with a median lead of **${r.stats.medianLeadMonths} months**.`],
+          bullets: [`Promoter retail 30+ is ${F().pct(r.byStatus[3].rate, 1)} when the entity is 90+ vs ${F().pct(r.byStatus[0].rate, 1)} when it is current.`, `Your watchlist: **${top.name}** has the highest share of MSME borrowers whose promoters slipped on retail credit in the last 90 days (${F().pct(top.pct, 1)}, ${F().cr(top.exposure)} exposure).`],
+          chart: (el) => PIQ.charts.bars(el, { items: r.member.slice(0, 6).map((x) => ({ label: x.name, value: x.pct })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)' }),
+          sources: src('overlap', 'member'), filters: 'Commercial × retail · MSME promoters',
+          followups: ['What is driving the change in MSME in Tamil Nadu?', 'How many microfinance borrowers also have retail loans?'],
+          link: { view: 'overlaps', params: {} }
+        },
+        facts: { linked: F().pct(r.funnel[1].pct, 0), promoterRetail: F().pct(r.funnel[2].pct, 0), precededDefaults: F().pct(r.stats.precededPct, 0), medianLeadMonths: r.stats.medianLeadMonths, topWatchState: top.name }
+      };
+    }
+    const r = PIQ.overlap.retailMfi();
+    const exp = r.member.reduce((acc, x) => acc + x.exposure, 0);
+    return {
+      answer: {
+        paras: [`Of **${r.base.toFixed(0)} crore** live microfinance borrowers, **${F().pct(r.funnel[1].pct, 0)}** (${r.funnel[1].cr.toFixed(1)} Cr) have a retail footprint (enquiries, live or closed retail loans) and **${F().pct(r.funnel[2].pct, 0)}** (${r.funnel[2].cr.toFixed(1)} Cr) hold a live MFI and a live retail loan at the same time.`],
+        bullets: [
+          `Retail 30+ DPD of overlap borrowers **${F().pct(r.del.retailOverlap, 1)}** vs ${F().pct(r.del.retailOthers, 1)} for other borrowers (${(r.del.retailOverlap / r.del.retailOthers).toFixed(1)}×); their MFI 30+ is ${F().pct(r.del.mfiOverlap, 1)} vs ${F().pct(r.del.mfiOnly, 1)} for MFI-only borrowers.`,
+          `Most-held retail products: ${r.products.slice(0, 4).map((x) => x.name + ' ' + F().pct(x.share, 0)).join(', ')}. Highest overlap: ${r.states.slice(0, 3).map((x) => x.name + ' ' + F().pct(x.rate, 0)).join(', ')}.`,
+          `Your exposure: **${F().cr(exp)}** of retail lending to live MFI borrowers; their 30+ DPD is 2–3× your other borrowers'.`
+        ],
+        chart: (el) => PIQ.charts.bars(el, { items: r.funnel.map((x) => ({ label: x.label, value: x.pct })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)' }),
+        sources: src('overlap', 'industry', 'member'), filters: 'Retail × microfinance · bureau-wide',
+        followups: ['How risky are my retail borrowers who also have MFI loans?', 'Do MSME promoters\' retail loans give early warning?'],
+        link: { view: 'overlaps', params: {} }
+      },
+      facts: { mfiBaseCr: r.base, anyRetailPct: F().pct(r.funnel[1].pct, 0), liveLivePct: F().pct(r.funnel[2].pct, 0), retailDpdOverlap: F().pct(r.del.retailOverlap, 1), retailDpdOthers: F().pct(r.del.retailOthers, 1), memberExposure: F().cr(exp) }
+    };
+  });
+
   def('alerts', 'Early-warning alerts detected automatically across portfolio and applications.', {}, [], () => {
     const al = S.alerts();
     return {
@@ -526,6 +589,10 @@
       return call('define', { term });
     }
     if (/upload|my file|sourcing channel|\bchannel|\bdsa\b/.test(t)) return call('uploaded_insight', {});
+    if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
+      return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });
+    if (/weekly|fortnight|fresh bounce|\bbounces?\b|repayment|first.?payment|\bfpd\b|monthly file|current balance/.test(t))
+      return call('fresh_signals', { product: p, state: st, cadence: /fortnight/.test(t) ? 'fortnightly' : 'weekly' });
     if (/worry|alert|early.?warning|attention|concern|red flag/.test(t)) return call('alerts', {});
     if (/board|summary|summari[sz]e|brief/.test(t)) return call('board_summary', {});
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });

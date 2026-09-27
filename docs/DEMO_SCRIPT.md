@@ -36,6 +36,12 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 - Scroll to **Last 7 days' logins**: expected PD is 5.2% vs 4.6% before; the DSA / connector pool's PD jumped from 6.3% to 7.7%, and more logins come from high-risk PIN codes. *"This is what next quarter's delinquency looks like, today."*
 - *"No bureau product shows a lender this today. We already receive the enquiries; we just aren't showing them back."*
 
+## Optional (+90 sec) — Fresh Signals and Overlap Intelligence
+
+- **Fresh Signals**, with Product = Personal Loan and State = Uttar Pradesh: *"The monthly file says 8.2%. Weekly submissions say 9.4% as of last Sunday. Fresh bounces are at 14.9% and climbing, so next month's file is already written."* Point at the hotspot table and the "how it gets used" cards.
+- **Overlap Intelligence → Retail × Microfinance**: *"Of 8 crore microfinance borrowers, half are already visible in retail credit and a quarter are servicing both. Their retail delinquency is 2.7× everyone else's, and MFI stress reaches retail about a quarter later."* Then point at Sahyadri's own exposure table.
+- Switch to **Commercial × Retail**: *"In 41% of MSME defaults, a promoter slipped on a personal loan or card first, about four months earlier. That's how we would have caught Tamil Nadu."*
+
 ## 4:30 — AI Analyst (75 sec)
 
 Click **✦ Ask PortfolioIQ** (the drawer works from any page) and ask, in order:

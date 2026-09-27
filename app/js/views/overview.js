@@ -62,16 +62,16 @@
     const ah = h('div', 'card-head', ac);
     const at = h('div', null, ah);
     h('h3', null, at, 'Early-warning alerts');
-    h('div', 'sub', at, 'Detected automatically on 30+ DPD and daily applications — nobody had to ask');
-    S.alerts().slice(0, 4).forEach((a) => {
+    h('div', 'sub', at, 'Detected automatically on 30+ DPD, weekly bounces and daily applications — nobody had to ask');
+    S.alerts().slice(0, 6).forEach((a) => {
       const row = h('div', 'alert', ac);
       h('div', 'sev ' + a.sev, row, a.sev === 'good' ? '✓' : '!');
       const tx = h('div', null, row);
-      h('div', 'sev-label', tx, a.sev === 'good' ? 'Opportunity' : a.sev + ' · ' + (a.kind === 'logins' ? 'applications' : 'portfolio'));
+      h('div', 'sev-label', tx, a.sev === 'good' ? 'Opportunity' : a.sev + ' · ' + (a.kind === 'logins' ? 'applications' : a.kind === 'fresh' ? 'weekly data' : 'portfolio'));
       h('div', 'alert-title', tx, a.title);
       h('div', 'alert-detail', tx, a.detail);
       const btn = h('button', 'btn sm', row, 'Open');
-      btn.addEventListener('click', () => PIQ.go(a.kind === 'logins' ? 'logins' : a.kind === 'positive' ? 'benchmark' : 'why', { p: a.p, s: a.s || undefined }));
+      btn.addEventListener('click', () => PIQ.go(a.kind === 'logins' ? 'logins' : a.kind === 'fresh' ? 'fresh' : a.kind === 'positive' ? 'benchmark' : 'why', { p: a.p, s: a.s || undefined }));
     });
 
     // KPI tiles

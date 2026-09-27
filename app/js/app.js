@@ -7,6 +7,8 @@
     { id: 'overview', name: 'Command Centre', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
+    { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
+    { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },
     { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },

@@ -32,17 +32,13 @@
       'How are fintechs and MFIs performing on personal loans?',
       'Compare PSU, PVT and SFB on delinquency',
       'Is the industry taking more risk in personal loans?',
-      'What is the risk band mix of the LAP market?',
-      'How have industry originations changed this year?',
       'What is the 180+ DPD trend in MSME loans?'
     ] },
     { cat: 'Risk trends', qs: [
       'How is portfolio risk changing?',
       'Which segments show deterioration?',
       'Which state has the highest personal loan delinquency?',
-      'How does near-prime delinquency compare across states?',
-      'Show me the early-warning alerts',
-      'Is agri loan risk rising?'
+      'Show me the early-warning alerts'
     ] },
     { cat: 'Collection trends', qs: [
       'How are collection trends changing?',
@@ -65,8 +61,7 @@
       'Which products are gaining share?',
       'How fast is my book growing versus the market?',
       'Which states are growing fastest in personal loans?',
-      'How fast are gold loans growing?',
-      'What is my balance in Maharashtra?'
+      'How fast are gold loans growing?'
     ] },
     { cat: 'Applications & logins', qs: [
       'What is happening with my applications this week?',
@@ -83,6 +78,13 @@
       'How does Gujarat compare with the national market?',
       'Compare Bihar and Odisha on microfinance delinquency',
       'What is the trend in personal loans in Maharashtra?'
+    ] },
+    { cat: 'Fresh signals & overlaps', qs: [
+      'What do this week\'s fresh bounces show?',
+      'Is the latest weekly DPD worse than the monthly file?',
+      'How many microfinance borrowers also have retail loans?',
+      'How risky are my retail borrowers who also have MFI loans?',
+      'Do MSME promoters\' retail loans give early warning?'
     ] },
     { cat: 'Your data & definitions', qs: [
       'Which sourcing channel is performing worst in my uploaded file?',

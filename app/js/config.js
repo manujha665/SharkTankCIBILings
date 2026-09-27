@@ -20,6 +20,15 @@
     // LLM: when the page is served by server.js and an approved LLM is configured there,
     // the AI Analyst uses it for language; all numbers still come from governed tools.
     llmEndpoint: '/api/llm',
+    // Cross-segment overlap (bureau-wide). MFI figures from the team's working estimate; others illustrative.
+    overlap: {
+      mfiLiveBorrowersCr: 8.0,     // live microfinance borrowers (crore)
+      mfiAnyRetailPct: 0.5,        // any retail footprint: enquiry + live + closed retail trade lines
+      mfiLiveLivePct: 0.25,        // live MFI loan AND live retail loan
+      msmeLiveEntitiesCr: 1.2,     // live MSME / commercial borrowers (crore, illustrative)
+      msmeLinkedPct: 0.78,         // entities whose directors / partners / proprietors / guarantors are matched to consumer records
+      msmePromoterRetailPct: 0.64  // of linked entities, share with a promoter holding a live retail loan
+    },
     dataAsOf: 'Aug 2026',
     loginsAsOf: '26 Sep 2026'
   };
