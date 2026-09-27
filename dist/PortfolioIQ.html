@@ -555,6 +555,13 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     AGRI: [0.55, 0.18, 0.03, 0, 0.03, 0.01, 0.2, 0], MFL: [0.02, 0.35, 0.12, 0.01, 0.18, 0.32, 0, 0]
   };
   const BASE_DPD = [0.006, 0.013, 0.026, 0.052, 0.095]; // by band, for risk = 1
+  // Monthly drift in industry balance share by band (SP, PP, PR, NP, SB): unsecured and
+  // mass-market lending tilts towards weaker bands over 24 months; housing moves the other way.
+  const BAND_DRIFT = {
+    PL: [-0.009, -0.005, 0, 0.014, 0.022], CC: [-0.007, -0.004, 0, 0.011, 0.018], TW: [-0.006, -0.003, 0, 0.01, 0.016],
+    MFL: [-0.004, -0.004, 0, 0.012, 0.02], MSME: [-0.007, -0.004, 0, 0.013, 0.02], GL: [-0.004, -0.002, 0, 0.009, 0.014],
+    HL: [0.002, 0.001, 0, -0.002, -0.003], LAP: [-0.002, -0.001, 0, 0.004, 0.006], AL: [-0.002, -0.001, 0, 0.005, 0.008], AGRI: [-0.002, 0, 0, 0.005, 0.009]
+  };
 
   const norm = (o) => { const t = Object.values(o).reduce((a, b) => a + b, 0); const r = {}; for (const k in o) r[k] = o[k] / t; return r; };
   const byId = (arr) => Object.fromEntries(arr.map((x) => [x.id, x]));
@@ -594,7 +601,8 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
         BANDS.forEach((bd, bi) => {
           LENDERS.forEach((ld, li) => {
             const tl = ld.id === 'FIN' && (bd.id === 'NP' || bd.id === 'SB') ? 1 + 0.01 * t : 1;
-            const bal = total * stW[prod.id][st.id] * bandW[prod.id][bd.id] * lenderW[prod.id][ld.id] * tl * noise(0.02);
+            const drift = Math.max(0.3, 1 + BAND_DRIFT[prod.id][bi] * t);
+            const bal = total * stW[prod.id][st.id] * bandW[prod.id][bd.id] * drift * lenderW[prod.id][ld.id] * tl * noise(0.02);
             const tf = Math.max(0.5, 1 + cyc * bd.sens * ld.trend);
             const d30 = Math.min(0.45, BASE_DPD[bi] * prod.risk * st.risk * ld.risk * tf * noise(0.035));
             const acc = (bal * 1e7) / (prod.ticket * 1e5);
@@ -617,7 +625,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
   // ---------------- Member (Sahyadri Bank) ----------------
   const memberBase = { HL: 22000, LAP: 9000, AL: 6000, TW: 1500, PL: 12000, CC: 2400, GL: 3500, MSME: 11000, AGRI: 4000, MFL: 1800 };
   const memberGrowth = { PL: 0.2, MSME: 0.17, CC: 0.16, GL: 0.15, LAP: 0.13, HL: 0.11, AL: 0.11, TW: 0.1, AGRI: 0.08, MFL: 0.01 };
-  const memberMult = { HL: 0.9, LAP: 1.0, AL: 0.95, TW: 1.05, PL: 1.04, CC: 0.93, GL: 0.9, MSME: 1.05, AGRI: 1.0, MFL: 1.08 };
+  const memberMult = { HL: 0.9, LAP: 1.0, AL: 0.95, TW: 1.05, PL: 1.0, CC: 0.9, GL: 0.9, MSME: 1.0, AGRI: 1.0, MFL: 1.08 };
   const footprint = norm({ MH: 0.3, GJ: 0.12, KA: 0.08, TN: 0.06, UP: 0.09, TG: 0.05, DL: 0.05, RJ: 0.04, MP: 0.04, KL: 0.02, AP: 0.03, WB: 0.02, HR: 0.02, PB: 0.01, BR: 0.01, OD: 0.01, CG: 0.01, JH: 0.005, UK: 0.005, HP: 0.002, GA: 0.01, JK: 0.003, NE: 0.005, UT: 0.005 });
   const memW = {};
   PRODUCTS.forEach((p) => { const o = {}; SIDS.forEach((s) => (o[s] = footprint[s] * ((tilt[p.id] || {})[s] || 1))); memW[p.id] = norm(o); });
@@ -633,7 +641,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
         const shares = { SP: bw[0] + 0.04, PP: bw[1] + 0.01, PR: bw[2], NP: bw[3] - 0.03, SB: bw[4] - 0.02 };
         if (prod.id === 'PL' && since > 0) {
           const k = Math.min(since, 7) / 7;
-          const npUp = (hot ? 0.075 : 0.022) * k, sbUp = (hot ? 0.06 : 0.016) * k;
+          const npUp = (hot ? 0.11 : 0.03) * k, sbUp = (hot ? 0.09 : 0.022) * k;
           shares.NP += npUp; shares.SB += sbUp;
           shares.SP -= (npUp + sbUp) * 0.55; shares.PP -= (npUp + sbUp) * 0.3; shares.PR -= (npUp + sbUp) * 0.15;
         }
@@ -643,14 +651,22 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
           let mult = memberMult[prod.id];
           if (prod.id === 'PL' && since > 2 && (bd.id === 'NP' || bd.id === 'SB')) {
             const k = Math.min(since - 2, 5) / 5;
-            mult *= 1 + k * (st.id === 'GJ' ? 0.42 : st.id === 'UP' ? 0.26 : 0.06);
+            mult *= 1 + k * (st.id === 'GJ' ? 1.35 : st.id === 'UP' ? 0.95 : 0.15);
+          }
+          // second story: MSME in Tamil Nadu — collections / servicing breakdown from May 2026, all bands
+          const msmeTN = prod.id === 'MSME' && st.id === 'TN' && t >= POLICY_T + 3;
+          if (msmeTN) {
+            const k = Math.min(t - POLICY_T - 2, 4) / 4;
+            mult *= 1 + 1.1 * k;
           }
           const bal = total * memW[prod.id][st.id] * Math.max(0.01, shares[bd.id]) * noise(0.02);
           const d30 = Math.min(0.45, ir.d30 * mult * noise(0.03));
           const acc = (bal * 1e7) / (prod.ticket * 1e5);
           const cureDen = acc * d30 * 0.62;
-          const cure = ir.cure * (mult > 1.1 ? 0.88 : 1.03) * noise(0.03);
-          const d90 = d30 * 0.45 * noise(0.04);
+          const cure = ir.cure * (msmeTN ? 0.72 : mult > 1.1 ? 0.84 : 1.03) * noise(0.03);
+          // weak vintages roll forward faster: 90+ share of 30+ rises in the stressed segments
+          const roll = mult > 1.3 ? 0.62 : mult > 1.1 ? 0.52 : 0.45;
+          const d90 = d30 * roll * noise(0.04);
           member.put({ m, p: prod.id, s: st.id, b: bd.id }, {
             bal, acc,
             orig: bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05),
@@ -705,22 +721,61 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
   const appBand = { SP: 0.22, PP: 0.2, PR: 0.24, NP: 0.19, SB: 0.15 };
   const approvalByBand = { SP: 0.86, PP: 0.8, PR: 0.66, NP: 0.42, SB: 0.14 };
   const highEnqByBand = { SP: 0.05, PP: 0.08, PR: 0.13, NP: 0.22, SB: 0.34 };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS]], ['apps', 'appr', 'hiEnq']);
+  // Applications are split by PIN-code risk tier and sourcing pool; each cell carries an expected
+  // probability of default (12-month 90+), so any slice's average PD = pdN / apps.
+  const PINS = [
+    { id: 'H', name: 'High-risk PIN codes', pd: 1.45 }, { id: 'M', name: 'Medium-risk PIN codes', pd: 1.0 }, { id: 'L', name: 'Low-risk PIN codes', pd: 0.8 }
+  ];
+  const POOLS = [
+    { id: 'BR', name: 'Branch', pd: 0.95 }, { id: 'DSA', name: 'DSA / connector', pd: 1.2 }, { id: 'DIG', name: 'Digital (own app & web)', pd: 1.0 },
+    { id: 'FP', name: 'Fintech partner', pd: 1.15 }, { id: 'ETB', name: 'Existing customer (pre-approved)', pd: 0.6 }
+  ];
+  const PIN_BY_BAND = { SP: [0.08, 0.32, 0.6], PP: [0.1, 0.34, 0.56], PR: [0.14, 0.36, 0.5], NP: [0.2, 0.38, 0.42], SB: [0.28, 0.4, 0.32] };
+  const PIN_SURGE = [0.5, 0.33, 0.17];
+  const POOL_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
+  const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
+  const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
+  const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN']);
+  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
+  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
+    const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
+    for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
+      const apps = tot * pinW[a] * poolW[c];
+      const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
+      const o = (base + a * LS[5] + c * LS[6]) * 4;
+      LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
+      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+    }
+  };
   DAYS.forEach((d, i) => {
     const dow = new Date(d + 'T00:00:00Z').getUTCDay();
     const season = dow === 0 ? 0.55 : dow === 6 ? 0.8 : 1;
     const recent = i >= 25; // last 5 days
-    PRODUCTS.forEach((prod) => {
-      SIDS.forEach((s) => {
-        BANDS.forEach((bd) => {
+    PRODUCTS.forEach((prod, pi) => {
+      SIDS.forEach((s, si) => {
+        BANDS.forEach((bd, bi) => {
           const weak = bd.id === 'NP' || bd.id === 'SB';
           const indApps = IND_APPS[prod.id] * stW[prod.id][s] * appBand[bd.id] * season * (recent ? 1.04 : 1) * (1 + 0.002 * i) * noise(0.06);
           const surge = prod.id === 'PL' && recent && (s === 'UP' || s === 'GJ') && weak;
           const memApps = MEM_APPS[prod.id] * memW[prod.id][s] * appBand[bd.id] * (prod.id === 'PL' && weak ? 1.15 : 1) * season * (surge ? 1.95 : 1) * noise(0.08);
           const indAppr = approvalByBand[bd.id] * (weak ? 0.97 : 1) * noise(0.03);
           const memAppr = Math.min(0.95, approvalByBand[bd.id] * (prod.id === 'PL' && weak ? 1.22 : 1) * noise(0.04));
-          logins.put({ who: 'ind', d, p: prod.id, s, b: bd.id }, { apps: indApps, appr: indApps * indAppr, hiEnq: indApps * highEnqByBand[bd.id] * noise(0.05) });
-          logins.put({ who: 'mem', d, p: prod.id, s, b: bd.id }, { apps: memApps, appr: memApps * memAppr, hiEnq: memApps * highEnqByBand[bd.id] * (surge ? 1.75 : 1) * noise(0.06) });
+          const pdBase = Math.min(0.4, PD_BY_BAND[bi] * prod.risk * S[s].risk);
+          // riskier states have more applications from high-risk PIN codes
+          const r = S[s].risk, pw = PIN_BY_BAND[bd.id], pwt = [pw[0] * r * r, pw[1], pw[2] / r], pws = pwt[0] + pwt[1] + pwt[2];
+          const pinW = pwt.map((x) => x / pws);
+          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitPool(POOL_IND, bi), pdBase, false);
+          if (surge) {
+            // the surge: normal flow plus an extra wave that is DSA-led and from high-risk PIN codes
+            const normal = memApps / 1.95;
+            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitPool(POOL_MEM, bi), pdBase, false);
+            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, POOL_SURGE, pdBase, true);
+          } else {
+            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitPool(POOL_MEM, bi), pdBase, false);
+            // milder book-wide wave: in the last 7 days DSA / fintech-partner PL sourcing pushes weak-band logins everywhere
+            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, POOL_SURGE, pdBase, true);
+          }
         });
       });
     });
@@ -757,7 +812,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, POOLS,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores
@@ -1012,6 +1067,41 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     return D.BANDS.map((b) => ({ key: b.id, name: b.name, y: agg('logins', Object.assign({}, f, { who, d: days, b: b.id })).apps / tot }));
   }
 
+  // Quality of recent logins: score bands, expected PD, PIN-code risk tier and sourcing pool.
+  // who: 'mem' | 'ind'; days: array of dates. PD = expected 12-month 90+ probability (apps-weighted).
+  const PD_BUCKETS = [[0, 0.01, '< 1%'], [0.01, 0.03, '1–3%'], [0.03, 0.06, '3–6%'], [0.06, 0.1, '6–10%'], [0.1, 1, '10%+']];
+  function loginQuality(who, f, days) {
+    const base = Object.assign({}, f, { who, d: days });
+    const tot = agg('logins', base);
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0 }; };
+    const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
+    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
+      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
+      if (!a.apps) return;
+      const pd = a.pdN / a.apps;
+      buckets.find((k) => pd >= k.lo && pd < k.hi).apps += a.apps;
+    })));
+    buckets.forEach((k) => (k.share = k.apps / tot.apps));
+    return {
+      who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
+      pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
+      bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
+      pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
+      pools: D.POOLS.map((x) => {
+        const o = Object.assign({ id: x.id, name: x.name }, part('src', x.id));
+        const hp = agg('logins', Object.assign({}, base, { src: x.id, pin: 'H' })).apps;
+        o.highPin = o.apps ? hp / o.apps : 0;
+        return o;
+      }),
+      pdBuckets: buckets
+    };
+  }
+  // Convenience: last 7 days vs the prior 23 days for the member, and the industry's last 7 days
+  function loginQuality7(f) {
+    const last = D.DAYS.slice(-7), prior = D.DAYS.slice(0, -7);
+    return { mem: loginQuality('mem', f, last), memPrior: loginQuality('mem', f, prior), ind: loginQuality('ind', f, last) };
+  }
+
   // ---------------- Alerts (early warning runs on 30+ DPD, the earliest bucket) ----------------
   let alertCache = null;
   function alerts() {
@@ -1046,7 +1136,11 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
         out.push({
           sev: 'serious', kind: 'logins', p: pd.id, s: st.id,
           title: `Near-prime & subprime ${pd.name} applications in ${st.name} up ${(c.mem.change * 100).toFixed(0)}% in the last 5 days`,
-          detail: `Industry moved ${(c.ind.change * 100).toFixed(0)}%. ${(c.mem.recent.hiEnqShare * 100).toFixed(0)}% of these applicants made 3+ enquiries in 30 days (industry ${(c.ind.recent.hiEnqShare * 100).toFixed(0)}%).`,
+          detail: (() => {
+            const q = loginQuality7({ p: pd.id, s: st.id, b: ['NP', 'SB'] });
+            const hp = (x) => (x.pins[0].share * 100).toFixed(0) + '%';
+            return `Industry moved ${(c.ind.change * 100).toFixed(0)}%. ${(c.mem.recent.hiEnqShare * 100).toFixed(0)}% made 3+ enquiries in 30 days (industry ${(c.ind.recent.hiEnqShare * 100).toFixed(0)}%); ${hp(q.mem)} come from high-risk PIN codes (industry ${hp(q.ind)}); expected PD ${(q.mem.pd * 100).toFixed(1)}% vs ${(q.ind.pd * 100).toFixed(1)}%.`;
+          })(),
           score: c.mem.change / 20
         });
       }
@@ -1063,7 +1157,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,
-    loginDaily, loginCompare, loginMix, alerts
+    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, PD_BUCKETS, alerts
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -1342,7 +1436,9 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       let yMin = Math.min(...all), yMax = Math.max(...all);
       if (opts.zero) yMin = Math.min(0, yMin);
       const padY = (yMax - yMin) * 0.12 || Math.abs(yMax) * 0.1 || 1;
+      const dataMin = yMin;
       if (!opts.zero) yMin -= padY;
+      if (dataMin >= 0 && yMin < 0) yMin = 0; // never invent a negative axis for non-negative data
       yMax += padY * 0.6;
       const ticks = niceTicks(yMin, yMax, 4);
       const tf = opts.yTickFmt || opts.yFmt || ((v) => v);
@@ -1993,7 +2089,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, ml, state, card, stat, sourceText, pageHead, productStateFilters, select, seg, stateName, prodLong } = PIQ.ui;
-  const S = PIQ.sem, D = PIQ.data;
+  const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
   let metric = 'dpd30', lender = 'ALL', mode = 'standard';
 
   function render(root) {
@@ -2062,12 +2158,26 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     const bandColors = ['var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)', 'var(--r5)'];
     const months = D.MONTHS.filter((_, i) => i % 2 === 1);
     const stacks = D.BANDS.map((b, i) => ({ name: b.name, color: bandColors[i], values: months.map((m) => S.value('industry', 'bal', { p, s, l: lender, b: b.id, m })) }));
+    const weakShare = (src, m) => (S.value(src, 'bal', { p, s, l: src === 'industry' ? lender : null, b: ['NP', 'SB'], m }) / S.value(src, 'bal', { p, s, l: src === 'industry' ? lender : null, m }));
+    const w0 = weakShare('industry', D.MONTHS[0]), w1 = weakShare('industry', t);
     const c3 = card(g, {
-      title: 'Balance mix by risk band', sub: 'Is the market taking more risk?',
+      title: 'Balance mix by risk band',
+      sub: `Near-prime + subprime ${w1 > w0 ? 'up' : 'down'} from ${fmt.pct(w0, 1)} to ${fmt.pct(w1, 1)} of balance in 24 months — the market is ${w1 - w0 > 0.02 ? 'taking materially more risk' : w1 - w0 < -0.02 ? 'de-risking' : 'broadly stable'}`,
       source: sourceText(['industry']),
       table: () => ({ cols: [{ name: 'Month' }].concat(D.BANDS.map((b) => ({ name: b.name, r: 1 }))), rows: months.map((m, i) => { const tot = stacks.reduce((a, x) => a + x.values[i], 0); return [ml(m)].concat(stacks.map((x) => fmt.pct(x.values[i] / tot, 1))); }) })
     });
-    PIQ.charts.stacked(c3.viz, { x: months, xLabel: ml, stacks, height: 240 });
+    // Start the stack with the weakest band so the growth in risk sits on the baseline and reads clearly
+    g.insertBefore(c3.el, c2.el); // pair the two short cards, then the two long state lists
+    PIQ.charts.stacked(c3.viz, { x: months, xLabel: ml, stacks: stacks.slice().reverse(), height: 220 });
+    const wl = PIQ.ui.h('div', 'viz', c3.body);
+    wl.style.marginTop = '12px';
+    PIQ.charts.line(wl, {
+      series: [
+        { name: 'Industry', color: 'var(--s3)', points: D.MONTHS.map((m) => ({ x: m, y: weakShare('industry', m) })) },
+        { name: C.member.name, color: 'var(--s1)', points: D.MONTHS.map((m) => ({ x: m, y: weakShare('member', m) })) }
+      ],
+      xLabel: ml, yFmt: (v) => fmt.pct(v, 1), yTickFmt: (v) => (v * 100).toFixed(0) + '%', height: 150, endLabels: true, aria: 'Near-prime plus subprime share of balance'
+    });
 
     // Heat table: state x band 30+ DPD
     const c4 = card(g, { title: `${M.short} heatmap: state × risk band`, sub: ml(t) + ' · darker = higher', source: sourceText(['industry']) });
@@ -2527,6 +2637,72 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     });
     PIQ.charts.dots(c2.viz, { rows: mixRows, series: [{ key: 'memR', name: 'You · last 5 days', color: 'var(--s1)' }, { key: 'memP', name: 'You · prior 25 days', color: 'var(--s2)' }, { key: 'indR', name: 'Industry · last 5 days', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v, 0) });
 
+    // ---------- Last 7 days' logins: quality check ----------
+    const q = S.loginQuality7({ p, s });
+    S.log('loginQuality7', { p, s });
+    const qs = h('div', 'section-title', root, `Last 7 days' logins · quality check (${fmt.day(D.DAYS[D.DAYS.length - 7])} – ${fmt.day(D.DAYS[D.DAYS.length - 1])}, all risk bands)`);
+    qs.style.marginTop = '26px';
+    const qt = h('div', 'grid g4', root);
+    const pp = (x, d) => fmt.pct(x, d == null ? 1 : d);
+    stat(qt, { label: 'Expected probability of default', value: pp(q.mem.pd), delta: 'Prior 23 days ' + pp(q.memPrior.pd) + ' · industry ' + pp(q.ind.pd), deltaTone: q.mem.pd > q.ind.pd * 1.1 ? 'bad' : '' });
+    stat(qt, { label: 'From high-risk PIN codes', value: pp(q.mem.pins[0].share, 0), delta: 'Prior ' + pp(q.memPrior.pins[0].share, 0) + ' · industry ' + pp(q.ind.pins[0].share, 0), deltaTone: q.mem.pins[0].share > q.ind.pins[0].share * 1.15 ? 'bad' : '' });
+    const weak = (o) => o.bands[3].share + o.bands[4].share;
+    stat(qt, { label: 'Near-prime + subprime logins', value: pp(weak(q.mem), 0), delta: 'Prior ' + pp(weak(q.memPrior), 0) + ' · industry ' + pp(weak(q.ind), 0), deltaTone: weak(q.mem) > weak(q.ind) * 1.15 ? 'bad' : '' });
+    const topPool = q.mem.pools.slice().sort((a, b) => b.share - a.share)[0];
+    stat(qt, { label: 'Largest sourcing pool', value: topPool.name.split(' (')[0], delta: pp(topPool.share, 0) + ' of logins · PD ' + pp(topPool.pd), deltaTone: topPool.pd > q.ind.pd * 1.2 ? 'bad' : '' });
+
+    const worst = q.mem.pools.map((x, i) => ({ x, prior: q.memPrior.pools[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
+    if (q.mem.pd > q.memPrior.pd * 1.08) {
+      const cl = h('div', 'callout danger', root);
+      cl.style.marginTop = '16px';
+      h('h4', null, cl, `Recent logins are riskier: expected PD ${pp(q.mem.pd)} vs ${pp(q.memPrior.pd)} in the prior 23 days (industry ${pp(q.ind.pd)})`);
+      h('p', null, cl, `The biggest contributor is the ${worst.x.name} pool: ${pp(worst.x.share, 0)} of logins (was ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (was ${pp(worst.prior.pd)}), and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review this pool's approvals before they book.`);
+    }
+
+    const g2 = h('div', 'grid g2', root);
+    g2.style.marginTop = '16px';
+    const bandRows = D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } }));
+    const cb = card(g2, {
+      title: 'Score banding of logins', sub: 'Share of applications by bureau score band',
+      source: sourceText(['logins']),
+      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }, { name: 'Your expected PD', r: 1 }], rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share), pp(q.memPrior.bands[i].share), pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd)]) })
+    });
+    PIQ.charts.dots(cb.viz, { rows: bandRows, series: [{ key: 'm', name: 'You · last 7 days', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior 23 days', color: 'var(--s2)' }, { key: 'ind', name: 'Industry · last 7 days', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v, 0) });
+
+    const cp = card(g2, {
+      title: 'Probability of default: distribution of last 7 days\' logins', sub: 'Share of applications by expected 12-month PD (90+) · tick = industry',
+      source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and sourcing pool'),
+      table: () => ({ cols: [{ name: 'PD bucket' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }], rows: q.mem.pdBuckets.map((k, i) => [k.label, pp(k.share), pp(q.memPrior.pdBuckets[i].share), pp(q.ind.pdBuckets[i].share)]) })
+    });
+    PIQ.charts.bars(cp.viz, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · last 7 days', refName: 'Industry' });
+
+    const cpin = card(g2, {
+      title: 'Where logins come from: PIN-code risk tier', sub: 'PIN codes graded by the locality\'s bureau delinquency history · tick = industry',
+      source: sourceText(['logins'], 'PIN-code risk tiers from bureau-wide 90+ rates'),
+      table: () => ({ cols: [{ name: 'PIN tier' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }, { name: 'Your expected PD', r: 1 }], rows: D.PINS.map((x, i) => [x.name, pp(q.mem.pins[i].share), pp(q.memPrior.pins[i].share), pp(q.ind.pins[i].share), pp(q.mem.pins[i].pd)]) })
+    });
+    PIQ.charts.bars(cpin.viz, { items: D.PINS.map((x, i) => ({ label: x.name, value: q.mem.pins[i].share, ref: q.ind.pins[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · last 7 days', refName: 'Industry' });
+    const pinNote = h('div', 'small muted', cpin.body, `Your prior 23 days: ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.memPrior.pins[i].share, 0)).join(' · ')}. Expected PD by tier (you, last 7 days): ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.mem.pins[i].pd)).join(' · ')}.`);
+    pinNote.style.marginTop = '8px';
+
+    const cpool = card(g2, { title: 'Which pool are the applications coming from?', sub: 'Last 7 days vs your prior 23 days (in brackets) and the industry · ⚠ = expected PD up 20%+', source: sourceText(['logins']) });
+    const pt = h('table', 'tbl', h('div', 'table-wrap', cpool.viz));
+    const ph = h('tr', null, h('thead', null, pt));
+    ['Pool', 'Share (prior)', 'Industry', 'Exp. PD (prior)', 'High-risk PIN', '3+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
+    const pb = h('tbody', null, pt);
+    q.mem.pools.forEach((x, i) => {
+      const pr = q.memPrior.pools[i], ind = q.ind.pools[i];
+      const r = h('tr', null, pb);
+      const nm = h('td', null, r, (x.pd > pr.pd * 1.2 && x.share > 0.1 ? '⚠ ' : '') + x.name.split(' (')[0].replace('Existing customer', 'Existing cust.'));
+      nm.title = x.name;
+      if (x.pd > pr.pd * 1.2 && x.share > 0.1) nm.className = 'bad';
+      h('td', 'r', r, pp(x.share, 0) + ' (' + pp(pr.share, 0) + ')');
+      h('td', 'r', r, pp(ind.share, 0));
+      h('td', 'r ' + (x.pd > pr.pd * 1.2 ? 'bad' : ''), r, pp(x.pd) + ' (' + pp(pr.pd) + ')');
+      h('td', 'r ' + (x.highPin > ind.highPin * 1.25 ? 'bad' : ''), r, pp(x.highPin, 0));
+      h('td', 'r', r, pp(x.hiEnq, 0));
+    });
+
     // State table
     const sc = card(root, { title: 'By state: where is the surge?', sub: 'Last 5 days vs weekday-matched baseline · states where you have volume, biggest gap to market first', source: sourceText(['logins']) });
     sc.el.style.marginTop = '16px';
@@ -2936,7 +3112,6 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       'How is portfolio risk changing?',
       'Which segments show deterioration?',
       'Which state has the highest personal loan delinquency?',
-      'How is subprime performing in personal loans?',
       'How does near-prime delinquency compare across states?',
       'Show me the early-warning alerts',
       'Is agri loan risk rising?'
@@ -2967,16 +3142,17 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     ] },
     { cat: 'Applications & logins', qs: [
       'What is happening with my applications this week?',
-      'Are my recent logins in line with the industry?',
       'Where is the surge in applications coming from?',
       'How many of my applicants have multiple enquiries?',
-      'How does my approval rate compare with the industry?',
+      'How many applications came from high-risk PIN codes?',
+      'What is the probability of default of my last 7 days\' logins?',
+      'Which pool are my recent applications coming from?',
+      'What is the score banding of my last 7 days\' logins?',
       'Show me housing loan application trends'
     ] },
     { cat: 'Geographic intelligence', qs: [
       'What is happening in Tamil Nadu?',
       'How does Gujarat compare with the national market?',
-      'Which regions are showing significant changes?',
       'Compare Bihar and Odisha on microfinance delinquency',
       'What is the trend in personal loans in Maharashtra?'
     ] },
@@ -3291,6 +3467,43 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     };
   });
 
+  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, and sourcing pool (branch, DSA, digital, fintech partner, existing customer).', {
+    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'pool', 'score'] }
+  }, [], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
+    const q = S.loginQuality7({ p, s });
+    const pp = (x, d) => F().pct(x, d == null ? 1 : d);
+    const paras = [`Last 7 days of ${pName(p)} logins in ${sName(s)}: expected PD **${pp(q.mem.pd)}** vs ${pp(q.memPrior.pd)} in your prior 23 days and ${pp(q.ind.pd)} for the industry.`];
+    const bullets = [];
+    let chart = null;
+    if (focus === 'all' || focus === 'pin') {
+      bullets.push(`**PIN-code risk:** ${D.PINS.map((x, i) => `${x.name.replace(' PIN codes', '')} ${pp(q.mem.pins[i].share, 0)}`).join(' · ')} (industry high-risk ${pp(q.ind.pins[0].share, 0)}, your prior ${pp(q.memPrior.pins[0].share, 0)})`);
+      if (focus === 'pin') chart = (el) => PIQ.charts.dots(el, { rows: D.PINS.map((x, i) => ({ label: x.name, values: { m: q.mem.pins[i].share, pr: q.memPrior.pins[i].share, ind: q.ind.pins[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
+    }
+    if (focus === 'all' || focus === 'score') {
+      bullets.push(`**Score bands:** ${q.mem.bands.map((b) => `${b.name} ${pp(b.share, 0)}`).join(' · ')} (near-prime + subprime ${pp(q.mem.bands[3].share + q.mem.bands[4].share, 0)} vs industry ${pp(q.ind.bands[3].share + q.ind.bands[4].share, 0)})`);
+      if (focus === 'score') chart = (el) => PIQ.charts.dots(el, { rows: D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
+    }
+    if (focus === 'all' || focus === 'pool') {
+      const pools = q.mem.pools.map((x, i) => ({ x, pr: q.memPrior.pools[i] })).sort((u, v) => v.x.share - u.x.share);
+      bullets.push(`**Sourcing pools:** ${pools.map(({ x, pr }) => `${x.name} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''})`).join(' · ')}`);
+      if (focus === 'pool') chart = (el) => PIQ.charts.bars(el, { items: pools.map(({ x }, i) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.pools.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
+    }
+    if (focus === 'all' || focus === 'pd') {
+      bullets.push(`**PD distribution:** ${q.mem.pdBuckets.map((k) => `${k.label} ${pp(k.share, 0)}`).join(' · ')} (PD above 10%: industry ${pp(q.ind.pdBuckets[4].share, 0)})`);
+      if (focus === 'pd' || focus === 'all') chart = chart || ((el) => PIQ.charts.bars(el, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' }));
+    }
+    return {
+      answer: {
+        paras, bullets, chart,
+        sources: src('logins', 'scores'), filters: `${pLong(p)} · ${sName(s)} · last 7 days vs prior 23 days · to ${C.loginsAsOf}`,
+        followups: ['Which pool are my recent applications coming from?', 'How many applications came from high-risk PIN codes?', 'What should I do about it?'],
+        link: { view: 'logins', params: { p, s } }
+      },
+      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), pools: q.mem.pools.map((x) => ({ pool: x.name, share: pp(x.share, 0), pd: pp(x.pd) })), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
+    };
+  });
+
   def('alerts', 'Early-warning alerts detected automatically across portfolio and applications.', {}, [], () => {
     const al = S.alerts();
     return {
@@ -3485,6 +3698,8 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     if (/worry|alert|early.?warning|attention|concern|red flag/.test(t)) return call('alerts', {});
     if (/board|summary|summari[sz]e|brief/.test(t)) return call('board_summary', {});
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
+    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
+      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });
     if (/what should i do|recommend|action|what to do|where should|what do you suggest|how (do|can) i fix|\bgrow my/.test(t) || /what should .* do/.test(t))
       return call('recommend', { product: /credit card|card/.test(t) && /grow/.test(t) ? 'CC' : p, state: e.states[0] || 'ALL', focus: /collection/.test(t) ? 'collections' : /grow/.test(t) ? 'growth' : 'all' });

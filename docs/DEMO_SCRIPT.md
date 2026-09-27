@@ -10,17 +10,17 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 
 ## 0:30 — Command Centre (60 sec)
 
-- The page opens on the **whole portfolio** (all 10 products, all states). Point at the hero: **2.10%, up 15 bps since February, while the industry was flat (+2 bps).**
+- The page opens on the **whole portfolio** (all 10 products, all states). Point at the hero: **2.24%, up 32 bps since February, double the industry's +16 bps.**
 - Read the verdict: **"Mostly you — this is within your control."** Point at the "30+ DPD by product" card: personal loans stand out.
 - Flip the **30+ / 90+ / 180+** switch once to show the deeper buckets tell the same story.
-- Switch **Product** to **Personal Loan**: **3.21%, up 78 bps; industry up 31.** Split bar: 44% mix, 29% market, 27% member-specific.
-- Point at the alerts: *"Nobody asked for these. The platform found them."* Call out the application surge in UP and Gujarat.
+- Switch **Product** to **Personal Loan**: **3.96%, up 160 bps; industry up 60.** Point at the trend line: *"We used to be 60 bps better than our peers. We've just crossed above them."* Flip to **90+**: already above the industry.
+- Point at the alerts: *"Nobody asked for these. The platform found them."* Three are critical: personal loans in UP (8.2% vs 5.7% for the market) and Gujarat (6.2% vs 3.6%), and a different story, MSME in Tamil Nadu (5.9% vs 4.6%). Then call out the application surge in UP and Gujarat.
 
 ## 1:30 — Why did it change? The hero feature (75 sec)
 
 - Click **Why did it change? →**
-- Walk the waterfall: *"Start at 2.43%. The mix shift added 34 bps. The market added 23. Your own segments added 21. That's where you ended up."*
-- Switch **State** to **Gujarat**: *"Here the market barely moved, only 14 bps. This one is entirely yours."* Then switch to **Uttar Pradesh**: *"Here it's both."*
+- Walk the waterfall: *"Start at 2.36%. The mix shift added 60 bps. The market added 23. Your own segments added 77. That's where you ended up."*
+- Switch **State** to **Gujarat**: *"2.1% to 6.2%, while the market moved 35 bps. Sixty per cent of that is you."* Then switch to **Uttar Pradesh**: *"Here it's both."*
 - Line: *"Same symptom, two different diseases, and two different treatments."*
 
 ## 2:45 — What should I do? → Simulator (60 sec)
@@ -32,7 +32,8 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 ## 3:45 — Login & Application Pulse (45 sec)
 
 - *"Delinquency is a lagging indicator. This is the leading one."*
-- Show near-prime and subprime applications up ~95% in 5 days vs ~5% for the market, and nearly half of those applicants with 3+ enquiries in 30 days.
+- Show near-prime and subprime applications up ~95% in 5 days vs ~5% for the market, and more than half of those applicants with 3+ enquiries in 30 days.
+- Scroll to **Last 7 days' logins**: expected PD is 5.2% vs 4.6% before; the DSA / connector pool's PD jumped from 6.3% to 7.7%, and more logins come from high-risk PIN codes. *"This is what next quarter's delinquency looks like, today."*
 - *"No bureau product shows a lender this today. We already receive the enquiries; we just aren't showing them back."*
 
 ## 4:30 — AI Analyst (75 sec)
@@ -48,7 +49,7 @@ Point at the **Source / Filters / Tools** chips: *"Every number is traceable. Th
 ## 5:45 — Bring Your Data (40 sec)
 
 - **Use the sample file** → **Validate** → **Generate insights**.
-- *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 1.49× the market."*
+- *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 2.36× the market."*
 - Mention: the file never leaves the member's tenant.
 
 ## 6:25 — Board Brief + close (35 sec)

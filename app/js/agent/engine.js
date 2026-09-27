@@ -298,6 +298,43 @@
     };
   });
 
+  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, and sourcing pool (branch, DSA, digital, fintech partner, existing customer).', {
+    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'pool', 'score'] }
+  }, [], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
+    const q = S.loginQuality7({ p, s });
+    const pp = (x, d) => F().pct(x, d == null ? 1 : d);
+    const paras = [`Last 7 days of ${pName(p)} logins in ${sName(s)}: expected PD **${pp(q.mem.pd)}** vs ${pp(q.memPrior.pd)} in your prior 23 days and ${pp(q.ind.pd)} for the industry.`];
+    const bullets = [];
+    let chart = null;
+    if (focus === 'all' || focus === 'pin') {
+      bullets.push(`**PIN-code risk:** ${D.PINS.map((x, i) => `${x.name.replace(' PIN codes', '')} ${pp(q.mem.pins[i].share, 0)}`).join(' · ')} (industry high-risk ${pp(q.ind.pins[0].share, 0)}, your prior ${pp(q.memPrior.pins[0].share, 0)})`);
+      if (focus === 'pin') chart = (el) => PIQ.charts.dots(el, { rows: D.PINS.map((x, i) => ({ label: x.name, values: { m: q.mem.pins[i].share, pr: q.memPrior.pins[i].share, ind: q.ind.pins[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
+    }
+    if (focus === 'all' || focus === 'score') {
+      bullets.push(`**Score bands:** ${q.mem.bands.map((b) => `${b.name} ${pp(b.share, 0)}`).join(' · ')} (near-prime + subprime ${pp(q.mem.bands[3].share + q.mem.bands[4].share, 0)} vs industry ${pp(q.ind.bands[3].share + q.ind.bands[4].share, 0)})`);
+      if (focus === 'score') chart = (el) => PIQ.charts.dots(el, { rows: D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
+    }
+    if (focus === 'all' || focus === 'pool') {
+      const pools = q.mem.pools.map((x, i) => ({ x, pr: q.memPrior.pools[i] })).sort((u, v) => v.x.share - u.x.share);
+      bullets.push(`**Sourcing pools:** ${pools.map(({ x, pr }) => `${x.name} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''})`).join(' · ')}`);
+      if (focus === 'pool') chart = (el) => PIQ.charts.bars(el, { items: pools.map(({ x }, i) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.pools.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
+    }
+    if (focus === 'all' || focus === 'pd') {
+      bullets.push(`**PD distribution:** ${q.mem.pdBuckets.map((k) => `${k.label} ${pp(k.share, 0)}`).join(' · ')} (PD above 10%: industry ${pp(q.ind.pdBuckets[4].share, 0)})`);
+      if (focus === 'pd' || focus === 'all') chart = chart || ((el) => PIQ.charts.bars(el, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' }));
+    }
+    return {
+      answer: {
+        paras, bullets, chart,
+        sources: src('logins', 'scores'), filters: `${pLong(p)} · ${sName(s)} · last 7 days vs prior 23 days · to ${C.loginsAsOf}`,
+        followups: ['Which pool are my recent applications coming from?', 'How many applications came from high-risk PIN codes?', 'What should I do about it?'],
+        link: { view: 'logins', params: { p, s } }
+      },
+      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), pools: q.mem.pools.map((x) => ({ pool: x.name, share: pp(x.share, 0), pd: pp(x.pd) })), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
+    };
+  });
+
   def('alerts', 'Early-warning alerts detected automatically across portfolio and applications.', {}, [], () => {
     const al = S.alerts();
     return {
@@ -492,6 +529,8 @@
     if (/worry|alert|early.?warning|attention|concern|red flag/.test(t)) return call('alerts', {});
     if (/board|summary|summari[sz]e|brief/.test(t)) return call('board_summary', {});
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
+    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
+      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });
     if (/what should i do|recommend|action|what to do|where should|what do you suggest|how (do|can) i fix|\bgrow my/.test(t) || /what should .* do/.test(t))
       return call('recommend', { product: /credit card|card/.test(t) && /grow/.test(t) ? 'CC' : p, state: e.states[0] || 'ALL', focus: /collection/.test(t) ? 'collections' : /grow/.test(t) ? 'growth' : 'all' });

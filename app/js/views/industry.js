@@ -2,7 +2,7 @@
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, ml, state, card, stat, sourceText, pageHead, productStateFilters, select, seg, stateName, prodLong } = PIQ.ui;
-  const S = PIQ.sem, D = PIQ.data;
+  const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
   let metric = 'dpd30', lender = 'ALL', mode = 'standard';
 
   function render(root) {
@@ -71,12 +71,26 @@
     const bandColors = ['var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)', 'var(--r5)'];
     const months = D.MONTHS.filter((_, i) => i % 2 === 1);
     const stacks = D.BANDS.map((b, i) => ({ name: b.name, color: bandColors[i], values: months.map((m) => S.value('industry', 'bal', { p, s, l: lender, b: b.id, m })) }));
+    const weakShare = (src, m) => (S.value(src, 'bal', { p, s, l: src === 'industry' ? lender : null, b: ['NP', 'SB'], m }) / S.value(src, 'bal', { p, s, l: src === 'industry' ? lender : null, m }));
+    const w0 = weakShare('industry', D.MONTHS[0]), w1 = weakShare('industry', t);
     const c3 = card(g, {
-      title: 'Balance mix by risk band', sub: 'Is the market taking more risk?',
+      title: 'Balance mix by risk band',
+      sub: `Near-prime + subprime ${w1 > w0 ? 'up' : 'down'} from ${fmt.pct(w0, 1)} to ${fmt.pct(w1, 1)} of balance in 24 months — the market is ${w1 - w0 > 0.02 ? 'taking materially more risk' : w1 - w0 < -0.02 ? 'de-risking' : 'broadly stable'}`,
       source: sourceText(['industry']),
       table: () => ({ cols: [{ name: 'Month' }].concat(D.BANDS.map((b) => ({ name: b.name, r: 1 }))), rows: months.map((m, i) => { const tot = stacks.reduce((a, x) => a + x.values[i], 0); return [ml(m)].concat(stacks.map((x) => fmt.pct(x.values[i] / tot, 1))); }) })
     });
-    PIQ.charts.stacked(c3.viz, { x: months, xLabel: ml, stacks, height: 240 });
+    // Start the stack with the weakest band so the growth in risk sits on the baseline and reads clearly
+    g.insertBefore(c3.el, c2.el); // pair the two short cards, then the two long state lists
+    PIQ.charts.stacked(c3.viz, { x: months, xLabel: ml, stacks: stacks.slice().reverse(), height: 220 });
+    const wl = PIQ.ui.h('div', 'viz', c3.body);
+    wl.style.marginTop = '12px';
+    PIQ.charts.line(wl, {
+      series: [
+        { name: 'Industry', color: 'var(--s3)', points: D.MONTHS.map((m) => ({ x: m, y: weakShare('industry', m) })) },
+        { name: C.member.name, color: 'var(--s1)', points: D.MONTHS.map((m) => ({ x: m, y: weakShare('member', m) })) }
+      ],
+      xLabel: ml, yFmt: (v) => fmt.pct(v, 1), yTickFmt: (v) => (v * 100).toFixed(0) + '%', height: 150, endLabels: true, aria: 'Near-prime plus subprime share of balance'
+    });
 
     // Heat table: state x band 30+ DPD
     const c4 = card(g, { title: `${M.short} heatmap: state × risk band`, sub: ml(t) + ' · darker = higher', source: sourceText(['industry']) });

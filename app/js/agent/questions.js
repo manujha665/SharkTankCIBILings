@@ -40,7 +40,6 @@
       'How is portfolio risk changing?',
       'Which segments show deterioration?',
       'Which state has the highest personal loan delinquency?',
-      'How is subprime performing in personal loans?',
       'How does near-prime delinquency compare across states?',
       'Show me the early-warning alerts',
       'Is agri loan risk rising?'
@@ -71,16 +70,17 @@
     ] },
     { cat: 'Applications & logins', qs: [
       'What is happening with my applications this week?',
-      'Are my recent logins in line with the industry?',
       'Where is the surge in applications coming from?',
       'How many of my applicants have multiple enquiries?',
-      'How does my approval rate compare with the industry?',
+      'How many applications came from high-risk PIN codes?',
+      'What is the probability of default of my last 7 days\' logins?',
+      'Which pool are my recent applications coming from?',
+      'What is the score banding of my last 7 days\' logins?',
       'Show me housing loan application trends'
     ] },
     { cat: 'Geographic intelligence', qs: [
       'What is happening in Tamil Nadu?',
       'How does Gujarat compare with the national market?',
-      'Which regions are showing significant changes?',
       'Compare Bihar and Odisha on microfinance delinquency',
       'What is the trend in personal loans in Maharashtra?'
     ] },

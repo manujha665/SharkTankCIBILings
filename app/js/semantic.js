@@ -244,6 +244,41 @@
     return D.BANDS.map((b) => ({ key: b.id, name: b.name, y: agg('logins', Object.assign({}, f, { who, d: days, b: b.id })).apps / tot }));
   }
 
+  // Quality of recent logins: score bands, expected PD, PIN-code risk tier and sourcing pool.
+  // who: 'mem' | 'ind'; days: array of dates. PD = expected 12-month 90+ probability (apps-weighted).
+  const PD_BUCKETS = [[0, 0.01, '< 1%'], [0.01, 0.03, '1–3%'], [0.03, 0.06, '3–6%'], [0.06, 0.1, '6–10%'], [0.1, 1, '10%+']];
+  function loginQuality(who, f, days) {
+    const base = Object.assign({}, f, { who, d: days });
+    const tot = agg('logins', base);
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0 }; };
+    const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
+    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
+      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
+      if (!a.apps) return;
+      const pd = a.pdN / a.apps;
+      buckets.find((k) => pd >= k.lo && pd < k.hi).apps += a.apps;
+    })));
+    buckets.forEach((k) => (k.share = k.apps / tot.apps));
+    return {
+      who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
+      pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
+      bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
+      pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
+      pools: D.POOLS.map((x) => {
+        const o = Object.assign({ id: x.id, name: x.name }, part('src', x.id));
+        const hp = agg('logins', Object.assign({}, base, { src: x.id, pin: 'H' })).apps;
+        o.highPin = o.apps ? hp / o.apps : 0;
+        return o;
+      }),
+      pdBuckets: buckets
+    };
+  }
+  // Convenience: last 7 days vs the prior 23 days for the member, and the industry's last 7 days
+  function loginQuality7(f) {
+    const last = D.DAYS.slice(-7), prior = D.DAYS.slice(0, -7);
+    return { mem: loginQuality('mem', f, last), memPrior: loginQuality('mem', f, prior), ind: loginQuality('ind', f, last) };
+  }
+
   // ---------------- Alerts (early warning runs on 30+ DPD, the earliest bucket) ----------------
   let alertCache = null;
   function alerts() {
@@ -278,7 +313,11 @@
         out.push({
           sev: 'serious', kind: 'logins', p: pd.id, s: st.id,
           title: `Near-prime & subprime ${pd.name} applications in ${st.name} up ${(c.mem.change * 100).toFixed(0)}% in the last 5 days`,
-          detail: `Industry moved ${(c.ind.change * 100).toFixed(0)}%. ${(c.mem.recent.hiEnqShare * 100).toFixed(0)}% of these applicants made 3+ enquiries in 30 days (industry ${(c.ind.recent.hiEnqShare * 100).toFixed(0)}%).`,
+          detail: (() => {
+            const q = loginQuality7({ p: pd.id, s: st.id, b: ['NP', 'SB'] });
+            const hp = (x) => (x.pins[0].share * 100).toFixed(0) + '%';
+            return `Industry moved ${(c.ind.change * 100).toFixed(0)}%. ${(c.mem.recent.hiEnqShare * 100).toFixed(0)}% made 3+ enquiries in 30 days (industry ${(c.ind.recent.hiEnqShare * 100).toFixed(0)}%); ${hp(q.mem)} come from high-risk PIN codes (industry ${hp(q.ind)}); expected PD ${(q.mem.pd * 100).toFixed(1)}% vs ${(q.ind.pd * 100).toFixed(1)}%.`;
+          })(),
           score: c.mem.change / 20
         });
       }
@@ -295,6 +334,6 @@
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,
-    loginDaily, loginCompare, loginMix, alerts
+    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, PD_BUCKETS, alerts
   };
 })(typeof window !== 'undefined' ? window : globalThis);

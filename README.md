@@ -42,7 +42,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
 | **What should I do?** ⭐ | Ranked, quantified recommendations, each linked to a simulation | Turns insight into decisions |
 | **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state | "Surgical, not blanket" policy |
-| **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), risk-band mix, enquiry intensity | Earliest warning signal; no competitor shows it |
+| **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a last-7-days quality check: score banding, expected probability of default, PIN-code risk tier (high / medium / low) and sourcing pool | Earliest warning signal; no competitor shows it |
 | **AI Analyst** | Chat with 67-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
 | **Bring Your Data** | Upload a CSV (e.g. sourcing channel), map fields, join to industry, get like-for-like insights | Extends the platform beyond bureau fields |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
@@ -52,14 +52,14 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 
 *Sahyadri Bank* (a fictional mid-size private bank with a ₹93,000 Cr book across 10 products) loosened its personal loan cut-off from 700 to 680 in Feb 2026.
 
-0. **Whole portfolio** (the default view): 30+ DPD rose **+15 bps** (1.95% → 2.10%) while the industry was flat (+2 bps). The top contributing segments are all personal loans in UP and Gujarat.
-1. **Personal loans**: 30+ DPD rose **+78 bps** (2.43% → 3.21%) while the industry rose +31 bps.
-2. **Why?** 44% mix shift, 29% market, 27% member-specific. It's mostly within the bank's control.
+0. **Whole portfolio** (the default view): 30+ DPD rose **+32 bps** (1.91% → 2.24%), double the industry's +16 bps; 52% of it is member-specific. The top contributing segments are all personal loans in UP and Gujarat.
+1. **Personal loans**: 30+ DPD rose **+160 bps** (2.36% → 3.96%) vs +60 bps for the industry. Sahyadri is now worse than its PVT peers (3.81%), and on **90+ DPD it has crossed above the industry** (2.14% vs 2.05%). The hotspots are stark: **UP 8.2% vs industry 5.7%**, **Gujarat 6.2% vs 3.6%**. A second story sits in **MSME, Tamil Nadu: 5.9% vs 4.6%** (a collections breakdown).
+2. **Why?** 38% mix shift, 14% market, 48% member-specific. It's mostly within the bank's control.
 3. **Uttar Pradesh**: the market is deteriorating *and* the bank added risk. **Gujarat**: the market is flat; the deterioration is the bank's own.
-4. **Logins**: near-prime and subprime applications in UP & Gujarat are up ~95% in 5 days, with high enquiry intensity. That's the next wave, visible now.
+4. **Logins**: near-prime and subprime applications in UP & Gujarat are up ~95% in 5 days, with high enquiry intensity. The **last 7 days' logins** carry an expected PD of 5.2% vs 4.6% before (UP personal loans: 8.8%), driven by the **DSA / connector pool** and **high-risk PIN codes**. That's the next wave, visible now.
 5. **What to do**: restore 700 in UP & Gujarat only (the simulator shows net contribution rises), add checks on the application surge, and audit sourcing in Gujarat.
-6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **1.49×** the market. Root cause found.
-7. **Credit cards** are a strength (109 bps better than PVT · Mid-size peers), so there's room to grow.
+6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **2.36×** the market. Root cause found.
+7. **Credit cards** are a strength (203 bps better than PVT · Mid-size peers), so there's room to grow.
 
 ## Architecture
 

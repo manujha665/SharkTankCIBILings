@@ -103,7 +103,9 @@
       let yMin = Math.min(...all), yMax = Math.max(...all);
       if (opts.zero) yMin = Math.min(0, yMin);
       const padY = (yMax - yMin) * 0.12 || Math.abs(yMax) * 0.1 || 1;
+      const dataMin = yMin;
       if (!opts.zero) yMin -= padY;
+      if (dataMin >= 0 && yMin < 0) yMin = 0; // never invent a negative axis for non-negative data
       yMax += padY * 0.6;
       const ticks = niceTicks(yMin, yMax, 4);
       const tf = opts.yTickFmt || opts.yFmt || ((v) => v);

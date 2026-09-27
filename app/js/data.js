@@ -158,6 +158,13 @@
     AGRI: [0.55, 0.18, 0.03, 0, 0.03, 0.01, 0.2, 0], MFL: [0.02, 0.35, 0.12, 0.01, 0.18, 0.32, 0, 0]
   };
   const BASE_DPD = [0.006, 0.013, 0.026, 0.052, 0.095]; // by band, for risk = 1
+  // Monthly drift in industry balance share by band (SP, PP, PR, NP, SB): unsecured and
+  // mass-market lending tilts towards weaker bands over 24 months; housing moves the other way.
+  const BAND_DRIFT = {
+    PL: [-0.009, -0.005, 0, 0.014, 0.022], CC: [-0.007, -0.004, 0, 0.011, 0.018], TW: [-0.006, -0.003, 0, 0.01, 0.016],
+    MFL: [-0.004, -0.004, 0, 0.012, 0.02], MSME: [-0.007, -0.004, 0, 0.013, 0.02], GL: [-0.004, -0.002, 0, 0.009, 0.014],
+    HL: [0.002, 0.001, 0, -0.002, -0.003], LAP: [-0.002, -0.001, 0, 0.004, 0.006], AL: [-0.002, -0.001, 0, 0.005, 0.008], AGRI: [-0.002, 0, 0, 0.005, 0.009]
+  };
 
   const norm = (o) => { const t = Object.values(o).reduce((a, b) => a + b, 0); const r = {}; for (const k in o) r[k] = o[k] / t; return r; };
   const byId = (arr) => Object.fromEntries(arr.map((x) => [x.id, x]));
@@ -197,7 +204,8 @@
         BANDS.forEach((bd, bi) => {
           LENDERS.forEach((ld, li) => {
             const tl = ld.id === 'FIN' && (bd.id === 'NP' || bd.id === 'SB') ? 1 + 0.01 * t : 1;
-            const bal = total * stW[prod.id][st.id] * bandW[prod.id][bd.id] * lenderW[prod.id][ld.id] * tl * noise(0.02);
+            const drift = Math.max(0.3, 1 + BAND_DRIFT[prod.id][bi] * t);
+            const bal = total * stW[prod.id][st.id] * bandW[prod.id][bd.id] * drift * lenderW[prod.id][ld.id] * tl * noise(0.02);
             const tf = Math.max(0.5, 1 + cyc * bd.sens * ld.trend);
             const d30 = Math.min(0.45, BASE_DPD[bi] * prod.risk * st.risk * ld.risk * tf * noise(0.035));
             const acc = (bal * 1e7) / (prod.ticket * 1e5);
@@ -220,7 +228,7 @@
   // ---------------- Member (Sahyadri Bank) ----------------
   const memberBase = { HL: 22000, LAP: 9000, AL: 6000, TW: 1500, PL: 12000, CC: 2400, GL: 3500, MSME: 11000, AGRI: 4000, MFL: 1800 };
   const memberGrowth = { PL: 0.2, MSME: 0.17, CC: 0.16, GL: 0.15, LAP: 0.13, HL: 0.11, AL: 0.11, TW: 0.1, AGRI: 0.08, MFL: 0.01 };
-  const memberMult = { HL: 0.9, LAP: 1.0, AL: 0.95, TW: 1.05, PL: 1.04, CC: 0.93, GL: 0.9, MSME: 1.05, AGRI: 1.0, MFL: 1.08 };
+  const memberMult = { HL: 0.9, LAP: 1.0, AL: 0.95, TW: 1.05, PL: 1.0, CC: 0.9, GL: 0.9, MSME: 1.0, AGRI: 1.0, MFL: 1.08 };
   const footprint = norm({ MH: 0.3, GJ: 0.12, KA: 0.08, TN: 0.06, UP: 0.09, TG: 0.05, DL: 0.05, RJ: 0.04, MP: 0.04, KL: 0.02, AP: 0.03, WB: 0.02, HR: 0.02, PB: 0.01, BR: 0.01, OD: 0.01, CG: 0.01, JH: 0.005, UK: 0.005, HP: 0.002, GA: 0.01, JK: 0.003, NE: 0.005, UT: 0.005 });
   const memW = {};
   PRODUCTS.forEach((p) => { const o = {}; SIDS.forEach((s) => (o[s] = footprint[s] * ((tilt[p.id] || {})[s] || 1))); memW[p.id] = norm(o); });
@@ -236,7 +244,7 @@
         const shares = { SP: bw[0] + 0.04, PP: bw[1] + 0.01, PR: bw[2], NP: bw[3] - 0.03, SB: bw[4] - 0.02 };
         if (prod.id === 'PL' && since > 0) {
           const k = Math.min(since, 7) / 7;
-          const npUp = (hot ? 0.075 : 0.022) * k, sbUp = (hot ? 0.06 : 0.016) * k;
+          const npUp = (hot ? 0.11 : 0.03) * k, sbUp = (hot ? 0.09 : 0.022) * k;
           shares.NP += npUp; shares.SB += sbUp;
           shares.SP -= (npUp + sbUp) * 0.55; shares.PP -= (npUp + sbUp) * 0.3; shares.PR -= (npUp + sbUp) * 0.15;
         }
@@ -246,14 +254,22 @@
           let mult = memberMult[prod.id];
           if (prod.id === 'PL' && since > 2 && (bd.id === 'NP' || bd.id === 'SB')) {
             const k = Math.min(since - 2, 5) / 5;
-            mult *= 1 + k * (st.id === 'GJ' ? 0.42 : st.id === 'UP' ? 0.26 : 0.06);
+            mult *= 1 + k * (st.id === 'GJ' ? 1.35 : st.id === 'UP' ? 0.95 : 0.15);
+          }
+          // second story: MSME in Tamil Nadu — collections / servicing breakdown from May 2026, all bands
+          const msmeTN = prod.id === 'MSME' && st.id === 'TN' && t >= POLICY_T + 3;
+          if (msmeTN) {
+            const k = Math.min(t - POLICY_T - 2, 4) / 4;
+            mult *= 1 + 1.1 * k;
           }
           const bal = total * memW[prod.id][st.id] * Math.max(0.01, shares[bd.id]) * noise(0.02);
           const d30 = Math.min(0.45, ir.d30 * mult * noise(0.03));
           const acc = (bal * 1e7) / (prod.ticket * 1e5);
           const cureDen = acc * d30 * 0.62;
-          const cure = ir.cure * (mult > 1.1 ? 0.88 : 1.03) * noise(0.03);
-          const d90 = d30 * 0.45 * noise(0.04);
+          const cure = ir.cure * (msmeTN ? 0.72 : mult > 1.1 ? 0.84 : 1.03) * noise(0.03);
+          // weak vintages roll forward faster: 90+ share of 30+ rises in the stressed segments
+          const roll = mult > 1.3 ? 0.62 : mult > 1.1 ? 0.52 : 0.45;
+          const d90 = d30 * roll * noise(0.04);
           member.put({ m, p: prod.id, s: st.id, b: bd.id }, {
             bal, acc,
             orig: bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05),
@@ -308,22 +324,61 @@
   const appBand = { SP: 0.22, PP: 0.2, PR: 0.24, NP: 0.19, SB: 0.15 };
   const approvalByBand = { SP: 0.86, PP: 0.8, PR: 0.66, NP: 0.42, SB: 0.14 };
   const highEnqByBand = { SP: 0.05, PP: 0.08, PR: 0.13, NP: 0.22, SB: 0.34 };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS]], ['apps', 'appr', 'hiEnq']);
+  // Applications are split by PIN-code risk tier and sourcing pool; each cell carries an expected
+  // probability of default (12-month 90+), so any slice's average PD = pdN / apps.
+  const PINS = [
+    { id: 'H', name: 'High-risk PIN codes', pd: 1.45 }, { id: 'M', name: 'Medium-risk PIN codes', pd: 1.0 }, { id: 'L', name: 'Low-risk PIN codes', pd: 0.8 }
+  ];
+  const POOLS = [
+    { id: 'BR', name: 'Branch', pd: 0.95 }, { id: 'DSA', name: 'DSA / connector', pd: 1.2 }, { id: 'DIG', name: 'Digital (own app & web)', pd: 1.0 },
+    { id: 'FP', name: 'Fintech partner', pd: 1.15 }, { id: 'ETB', name: 'Existing customer (pre-approved)', pd: 0.6 }
+  ];
+  const PIN_BY_BAND = { SP: [0.08, 0.32, 0.6], PP: [0.1, 0.34, 0.56], PR: [0.14, 0.36, 0.5], NP: [0.2, 0.38, 0.42], SB: [0.28, 0.4, 0.32] };
+  const PIN_SURGE = [0.5, 0.33, 0.17];
+  const POOL_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
+  const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
+  const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
+  const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN']);
+  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
+  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
+    const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
+    for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
+      const apps = tot * pinW[a] * poolW[c];
+      const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
+      const o = (base + a * LS[5] + c * LS[6]) * 4;
+      LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
+      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+    }
+  };
   DAYS.forEach((d, i) => {
     const dow = new Date(d + 'T00:00:00Z').getUTCDay();
     const season = dow === 0 ? 0.55 : dow === 6 ? 0.8 : 1;
     const recent = i >= 25; // last 5 days
-    PRODUCTS.forEach((prod) => {
-      SIDS.forEach((s) => {
-        BANDS.forEach((bd) => {
+    PRODUCTS.forEach((prod, pi) => {
+      SIDS.forEach((s, si) => {
+        BANDS.forEach((bd, bi) => {
           const weak = bd.id === 'NP' || bd.id === 'SB';
           const indApps = IND_APPS[prod.id] * stW[prod.id][s] * appBand[bd.id] * season * (recent ? 1.04 : 1) * (1 + 0.002 * i) * noise(0.06);
           const surge = prod.id === 'PL' && recent && (s === 'UP' || s === 'GJ') && weak;
           const memApps = MEM_APPS[prod.id] * memW[prod.id][s] * appBand[bd.id] * (prod.id === 'PL' && weak ? 1.15 : 1) * season * (surge ? 1.95 : 1) * noise(0.08);
           const indAppr = approvalByBand[bd.id] * (weak ? 0.97 : 1) * noise(0.03);
           const memAppr = Math.min(0.95, approvalByBand[bd.id] * (prod.id === 'PL' && weak ? 1.22 : 1) * noise(0.04));
-          logins.put({ who: 'ind', d, p: prod.id, s, b: bd.id }, { apps: indApps, appr: indApps * indAppr, hiEnq: indApps * highEnqByBand[bd.id] * noise(0.05) });
-          logins.put({ who: 'mem', d, p: prod.id, s, b: bd.id }, { apps: memApps, appr: memApps * memAppr, hiEnq: memApps * highEnqByBand[bd.id] * (surge ? 1.75 : 1) * noise(0.06) });
+          const pdBase = Math.min(0.4, PD_BY_BAND[bi] * prod.risk * S[s].risk);
+          // riskier states have more applications from high-risk PIN codes
+          const r = S[s].risk, pw = PIN_BY_BAND[bd.id], pwt = [pw[0] * r * r, pw[1], pw[2] / r], pws = pwt[0] + pwt[1] + pwt[2];
+          const pinW = pwt.map((x) => x / pws);
+          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitPool(POOL_IND, bi), pdBase, false);
+          if (surge) {
+            // the surge: normal flow plus an extra wave that is DSA-led and from high-risk PIN codes
+            const normal = memApps / 1.95;
+            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitPool(POOL_MEM, bi), pdBase, false);
+            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, POOL_SURGE, pdBase, true);
+          } else {
+            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitPool(POOL_MEM, bi), pdBase, false);
+            // milder book-wide wave: in the last 7 days DSA / fintech-partner PL sourcing pushes weak-band logins everywhere
+            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, POOL_SURGE, pdBase, true);
+          }
         });
       });
     });
@@ -360,7 +415,7 @@
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, POOLS,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores
