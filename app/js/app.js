@@ -10,6 +10,7 @@
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
     { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },
+    { id: 'actions', name: 'Action Board', ico: '📌', tag: 'new' },
     { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },
     { id: 'logins', name: 'Login & Application Pulse', ico: '⚡', tag: 'new' },
@@ -39,6 +40,7 @@
       h('span', 'ico', a, n.ico);
       h('span', null, a, n.name);
       if (n.id === 'overview' && alerts) h('span', 'nav-badge', a, String(alerts));
+      if (n.id === 'actions') { const c = PIQ.actions.openCount(); if (c) { const bd = h('span', 'nav-badge count', a, String(c)); bd.title = c + ' open actions'; } }
       if (n.tag) h('span', 'nav-new', a, n.tag);
       a.addEventListener('click', () => go(n.id));
     });
@@ -81,6 +83,7 @@
 
   function go(id, params) {
     current = id;
+    PIQ.currentView = id;
     PIQ.routeParams = params || {};
     if (params && params.p) state.p = params.p;
     if (params && params.s) state.s = params.s;
@@ -90,6 +93,7 @@
     window.scrollTo(0, 0);
   }
   PIQ.go = go;
+  PIQ.actions.onChange(() => buildSide());
   onState(() => { PIQ.routeParams = {}; render(); });
 
   // Drawer: the AI analyst available from every page

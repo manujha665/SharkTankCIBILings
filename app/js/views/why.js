@@ -98,6 +98,7 @@
       btns.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       const label = { simulator: 'Simulate →', upload: 'Check channel data →', logins: 'See applications →', benchmark: 'Benchmark →' }[r.action.view] || 'Open →';
       const b = h('button', 'btn primary sm', btns, label);
+      PIQ.actions.pinButton(btns, () => ({ text: r.title, detail: r.why + ' Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; '), extra: { priority: i < 2 ? 'High' : 'Medium' } }), '📌 Add to actions');
       b.addEventListener('click', () => PIQ.go(r.action.view, r.action.params));
     });
   }

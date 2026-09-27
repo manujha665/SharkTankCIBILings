@@ -398,6 +398,22 @@
     };
   });
 
+  def('action_board', 'The user\'s Action Board: actions pinned from any module, with priority, owner, due date and status.', {}, [], () => {
+    const open = PIQ.actions.all().filter((x) => x.status !== 'Done');
+    const order = { High: 0, Medium: 1, Low: 2 };
+    open.sort((a, b) => order[a.priority] - order[b.priority]);
+    return {
+      answer: {
+        paras: [open.length ? `You have **${open.length}** open action${open.length === 1 ? '' : 's'} on your Action Board:` : 'Your Action Board is empty. Pin anything with 📌, or right-click a card and choose "Send to Action Board".'],
+        bullets: open.slice(0, 8).map((x) => `**${x.priority}** · ${x.text}${x.owner ? ' (owner: ' + x.owner + ')' : ''}${x.due ? ' · due ' + x.due : ''}`),
+        sources: ['Action Board'], filters: 'Open and in-progress actions',
+        followups: ['What should I do about it?', 'Give me a summary for my board'],
+        link: { view: 'actions', params: {} }
+      },
+      facts: { open: open.map((x) => ({ action: x.text, priority: x.priority, owner: x.owner, due: x.due, status: x.status })) }
+    };
+  });
+
   def('alerts', 'Early-warning alerts detected automatically across portfolio and applications.', {}, [], () => {
     const al = S.alerts();
     return {
@@ -589,6 +605,7 @@
       return call('define', { term });
     }
     if (/upload|my file|sourcing channel|\bchannel|\bdsa\b/.test(t)) return call('uploaded_insight', {});
+    if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
       return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });
     if (/weekly|fortnight|fresh bounce|\bbounces?\b|repayment|first.?payment|\bfpd\b|monthly file|current balance/.test(t))

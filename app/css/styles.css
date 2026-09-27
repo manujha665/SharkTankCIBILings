@@ -305,6 +305,34 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 .empty { padding: 30px; text-align: center; color: var(--ink-3); }
 .suppressed { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: rgba(250, 178, 25, 0.1); border: 1px solid rgba(250, 178, 25, 0.35); font-size: 13px; }
 
+/* ---------- Action Board ---------- */
+.pin-btn { padding: 4px 8px; }
+.nav-badge.count { background: var(--accent); }
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 120; background: var(--nav); color: #fff; border-radius: 10px; padding: 10px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); transition: all 0.18s ease; font-size: 13px; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast button { background: rgba(255, 255, 255, 0.14); color: #fff; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.ctx-menu { position: fixed; z-index: 130; display: none; min-width: 240px; max-width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 6px; }
+.ctx-menu .ctx-head { font-size: 11px; color: var(--ink-3); padding: 6px 10px 8px; border-bottom: 1px solid var(--grid); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink); }
+.ctx-menu button:hover, .ctx-menu button:focus { background: var(--surface-2); outline: none; }
+.action-board { display: grid; gap: 12px; margin-top: 4px; }
+.action-item.done { opacity: 0.6; }
+.action-item.done .action-text { text-decoration: line-through; }
+.action-top { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; }
+.action-top input[type='checkbox'] { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); }
+.action-text { font-weight: 600; font-size: 14.5px; outline: none; border-radius: 4px; padding: 1px 3px; margin: -1px -3px; }
+.action-text:focus { background: var(--surface-2); box-shadow: 0 0 0 1px var(--border); }
+.action-detail { color: var(--ink-2); font-size: 12.5px; margin-top: 3px; }
+.action-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.action-btns { display: flex; gap: 6px; align-items: center; }
+.action-fields { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0 34px; }
+.afield { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.afield.wide { flex: 1; min-width: 200px; }
+.afield input, .afield select, select.mini { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.tag.prio-high { background: rgba(208, 59, 59, 0.12); color: var(--bad-ink); }
+.tag.prio-medium { background: rgba(250, 178, 25, 0.15); }
+.tag.prio-low { background: var(--surface-2); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -335,7 +363,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 
 /* ---------- print (board brief) ---------- */
 @media print {
-  .side, .top, .fab, .drawer, .no-print { display: none !important; }
+  .side, .top, .fab, .drawer, .no-print, .toast, .ctx-menu, .pin-btn, .action-btns { display: none !important; }
   .app { display: block; }
   body { background: #fff; }
   .content { padding: 0; }

@@ -60,7 +60,18 @@
       h('em', null, li, 'Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; ') + '.');
     });
 
-    h('h2', null, b, '4. Method & sources');
+    h('h2', null, b, '4. Action tracker');
+    const acts = PIQ.actions.all().filter((x) => x.status !== 'Done');
+    if (!acts.length) h('p', 'small', b, 'No open actions on the Action Board yet. Pin items from any dashboard with 📌 and they appear here.');
+    else {
+      const tbl = h('table', 'tbl', b);
+      const hr = h('tr', null, h('thead', null, tbl));
+      ['Action', 'Priority', 'Owner', 'Due', 'Status'].forEach((x) => h('th', null, hr, x));
+      const tb = h('tbody', null, tbl);
+      acts.slice(0, 12).forEach((x) => { const r = h('tr', null, tb); [x.text, x.priority, x.owner || '—', x.due || '—', x.status].forEach((v) => h('td', null, r, v)); });
+    }
+
+    h('h2', null, b, '5. Method & sources');
     h('p', 'small', b, 'All figures come from the governed semantic layer: Industry Credit Dataset, Member Portfolio Dataset, Anonymised Peer Aggregates (min. 5 institutions, max. 25% single-institution share) and the Enquiry & Application Feed. The decomposition uses a midpoint mix/rate split; the market effect applies the industry\'s relative change in each segment. This brief was generated automatically. No analyst time was needed. Synthetic demo data.');
   }
   PIQ.views.brief = { title: 'Board Brief', render };

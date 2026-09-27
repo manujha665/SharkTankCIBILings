@@ -96,6 +96,7 @@
     h('h3', null, t, o.title);
     if (o.sub) h('div', 'sub', t, o.sub);
     const tools = h('div', 'card-tools', head);
+    if (PIQ.actions && o.pin !== false) PIQ.actions.pinButton(tools, () => ({ text: o.title + (state.p !== 'ALL' || state.s !== 'ALL' ? ' (' + [state.p !== 'ALL' ? PIQ.data.P[state.p].name : null, state.s !== 'ALL' ? PIQ.data.S[state.s].name : null].filter(Boolean).join(' · ') + ')' : ''), detail: [o.sub, o.pinDetail ? o.pinDetail() : ''].filter(Boolean).join(' — ') }));
     const body = h('div', 'card-body', c);
     const viz = h('div', 'viz', body);
     let tblBox;

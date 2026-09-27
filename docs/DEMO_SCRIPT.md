@@ -58,6 +58,12 @@ Point at the **Source / Filters / Tools** chips: *"Every number is traceable. Th
 - *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 2.36× the market."*
 - Mention: the file never leaves the member's tenant.
 
+## 6:05 — Action Board (20 sec)
+
+- As you go through the demo, press **📌** on two or three things (a recommendation, an alert, an AI answer), or right-click and choose **Send to Action Board**.
+- Open **Action Board**: *"Everything I flagged across six screens, with where it came from. Assign an owner and a date, and it flows straight into the board pack. Insight to action in one click."*
+- Tip: before the demo, open the Action Board and **Clear** it (or remove old items) so it fills up live.
+
 ## 6:25 — Board Brief + close (35 sec)
 
 - Open **Board Brief**: *"And the monthly deck writes itself."*

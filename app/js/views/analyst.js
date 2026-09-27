@@ -38,6 +38,7 @@
     const fu = h('div', 'follow', wrap);
     if (a.link) { const bt = h('button', 'chip', fu, '↗ Open in dashboard'); bt.addEventListener('click', () => { document.getElementById('drawer').classList.remove('open'); PIQ.go(a.link.view, a.link.params); }); }
     (a.actions || []).forEach((x) => { const bt = h('button', 'chip', fu, '↗ ' + x.label); bt.addEventListener('click', () => { document.getElementById('drawer').classList.remove('open'); PIQ.go(x.view, x.params); }); });
+    if (!a.refusal && (a.paras || []).length) { const pb = h('button', 'chip', fu, '📌 Save to actions'); pb.addEventListener('click', () => { const clean = (x) => String(x).replace(/\*\*/g, '').replace(/^\d+\.\s*/, ''); const lead = clean((a.paras || [])[0] || ''); const title = /:\s*$/.test(lead) && a.bullets && a.bullets.length ? clean(a.bullets[0]).split(/(?<=\.)\s/)[0] : lead.split(/(?<=[.!?])\s/)[0]; PIQ.actions.add(title, (a.paras || []).concat(a.bullets || []).map(clean).join(' ')); }); }
     (a.followups || []).forEach((q) => { const bt = h('button', 'chip', fu, q); bt.addEventListener('click', () => ask(q)); });
   }
 

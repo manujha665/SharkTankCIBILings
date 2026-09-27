@@ -313,6 +313,34 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 .empty { padding: 30px; text-align: center; color: var(--ink-3); }
 .suppressed { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 10px; background: rgba(250, 178, 25, 0.1); border: 1px solid rgba(250, 178, 25, 0.35); font-size: 13px; }
 
+/* ---------- Action Board ---------- */
+.pin-btn { padding: 4px 8px; }
+.nav-badge.count { background: var(--accent); }
+.toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 120; background: var(--nav); color: #fff; border-radius: 10px; padding: 10px 14px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); transition: all 0.18s ease; font-size: 13px; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.toast button { background: rgba(255, 255, 255, 0.14); color: #fff; border: 0; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.ctx-menu { position: fixed; z-index: 130; display: none; min-width: 240px; max-width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 6px; }
+.ctx-menu .ctx-head { font-size: 11px; color: var(--ink-3); padding: 6px 10px 8px; border-bottom: 1px solid var(--grid); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ctx-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink); }
+.ctx-menu button:hover, .ctx-menu button:focus { background: var(--surface-2); outline: none; }
+.action-board { display: grid; gap: 12px; margin-top: 4px; }
+.action-item.done { opacity: 0.6; }
+.action-item.done .action-text { text-decoration: line-through; }
+.action-top { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; }
+.action-top input[type='checkbox'] { width: 18px; height: 18px; margin-top: 3px; accent-color: var(--accent); }
+.action-text { font-weight: 600; font-size: 14.5px; outline: none; border-radius: 4px; padding: 1px 3px; margin: -1px -3px; }
+.action-text:focus { background: var(--surface-2); box-shadow: 0 0 0 1px var(--border); }
+.action-detail { color: var(--ink-2); font-size: 12.5px; margin-top: 3px; }
+.action-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.action-btns { display: flex; gap: 6px; align-items: center; }
+.action-fields { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 0 34px; }
+.afield { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.04em; }
+.afield.wide { flex: 1; min-width: 200px; }
+.afield input, .afield select, select.mini { padding: 6px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.tag.prio-high { background: rgba(208, 59, 59, 0.12); color: var(--bad-ink); }
+.tag.prio-medium { background: rgba(250, 178, 25, 0.15); }
+.tag.prio-low { background: var(--surface-2); }
+
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
   .g4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -343,7 +371,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 
 /* ---------- print (board brief) ---------- */
 @media print {
-  .side, .top, .fab, .drawer, .no-print { display: none !important; }
+  .side, .top, .fab, .drawer, .no-print, .toast, .ctx-menu, .pin-btn, .action-btns { display: none !important; }
   .app { display: block; }
   body { background: #fff; }
   .content { padding: 0; }
@@ -1279,6 +1307,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     h('h3', null, t, o.title);
     if (o.sub) h('div', 'sub', t, o.sub);
     const tools = h('div', 'card-tools', head);
+    if (PIQ.actions && o.pin !== false) PIQ.actions.pinButton(tools, () => ({ text: o.title + (state.p !== 'ALL' || state.s !== 'ALL' ? ' (' + [state.p !== 'ALL' ? PIQ.data.P[state.p].name : null, state.s !== 'ALL' ? PIQ.data.S[state.s].name : null].filter(Boolean).join(' · ') + ')' : ''), detail: [o.sub, o.pinDetail ? o.pinDetail() : ''].filter(Boolean).join(' — ') }));
     const body = h('div', 'card-body', c);
     const viz = h('div', 'viz', body);
     let tblBox;
@@ -2204,6 +2233,163 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 })(typeof window !== 'undefined' ? window : globalThis);
 
 </script>
+  <script>/* js/actions.js */
+/*
+ * Action Board store + capture tools.
+ *
+ * Anything on any page can be sent to the Action Board: via the 📌 buttons, or by right-clicking a
+ * card / tile / alert / callout / AI answer (selected text wins over the whole element). Each action
+ * keeps its source (module, filters, time) so the board can jump back to it.
+ *
+ * Storage: this browser (localStorage) in the prototype; in production the board lives in the
+ * member's tenant and is shared with the team.
+ */
+(function () {
+  const PIQ = window.PIQ;
+  const KEY = 'piq-actions-v1';
+  let items = [];
+  const subs = [];
+  try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { items = []; }
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) { /* storage unavailable: keep in memory */ }
+    subs.forEach((f) => f(items));
+  };
+  const uid = () => 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  function context() {
+    const st = PIQ.ui.state;
+    return { view: PIQ.currentView || 'overview', viewTitle: (PIQ.views[PIQ.currentView] || {}).title || '', p: st.p, s: st.s, dpd: st.dpd };
+  }
+  // text: the action; detail: supporting numbers / explanation
+  function add(text, detail, extra) {
+    text = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!text) return null;
+    const norm = (x) => x.toLowerCase().replace(/[\s.!]+$/, '');
+    const dup = items.find((x) => norm(x.text) === norm(text) && x.status !== 'Done');
+    if (dup) { toast('Already on your Action Board', true); return dup; }
+    const it = Object.assign({
+      id: uid(), text, detail: String(detail || '').replace(/\s+/g, ' ').trim().slice(0, 600),
+      created: new Date().toISOString(), status: 'Open', priority: 'Medium', owner: '', due: '', note: ''
+    }, context(), extra || {});
+    items.unshift(it);
+    save();
+    toast('📌 Sent to Action Board');
+    PIQ.sem.log('actions.add', { text: text.slice(0, 60), from: it.view });
+    return it;
+  }
+  const update = (id, patch) => { const it = items.find((x) => x.id === id); if (it) { Object.assign(it, patch); save(); } };
+  const remove = (id) => { items = items.filter((x) => x.id !== id); save(); };
+  const clearDone = () => { items = items.filter((x) => x.status !== 'Done'); save(); };
+  const openCount = () => items.filter((x) => x.status !== 'Done').length;
+
+  // ---------- toast ----------
+  let toastEl, toastT;
+  function toast(msg, muted) {
+    if (!toastEl) {
+      toastEl = document.createElement('div');
+      toastEl.className = 'toast';
+      toastEl.setAttribute('role', 'status');
+      document.body.appendChild(toastEl);
+    }
+    toastEl.innerHTML = '';
+    const sp = document.createElement('span'); sp.textContent = msg; toastEl.appendChild(sp);
+    if (!muted) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = 'View board';
+      b.addEventListener('click', () => { toastEl.classList.remove('show'); PIQ.go('actions'); });
+      toastEl.appendChild(b);
+    }
+    toastEl.classList.add('show');
+    clearTimeout(toastT);
+    toastT = setTimeout(() => toastEl.classList.remove('show'), 2800);
+  }
+
+  // ---------- extracting an action from any element ----------
+  const CAPTURABLE = '.reco, .alert, .callout, .msg.bot, .stat, .card, tr';
+  const txt = (el, sel) => { const n = el.querySelector(sel); return n ? n.textContent.trim() : ''; };
+  function describe(el) {
+    if (el.matches('tr')) {
+      const cells = [...el.children].map((c) => c.textContent.trim()).filter(Boolean);
+      const table = el.closest('.card');
+      const head = table ? txt(table, 'h3') : '';
+      return { text: (head ? head + ': ' : '') + cells.slice(0, 2).join(' · '), detail: cells.slice(2).join(' · ') };
+    }
+    if (el.matches('.reco')) return { text: txt(el, 'h4'), detail: [txt(el, 'p'), txt(el, '.impact')].filter(Boolean).join(' — ') };
+    if (el.matches('.alert')) return { text: txt(el, '.alert-title'), detail: txt(el, '.alert-detail') };
+    if (el.matches('.callout')) return { text: txt(el, 'h4'), detail: txt(el, 'p') };
+    if (el.matches('.msg.bot')) { const b = el.querySelector('.bot-bubble'); const t = b ? b.textContent.trim() : ''; return { text: t.split(/(?<=[.!?])\s/)[0], detail: t }; }
+    if (el.matches('.stat')) return { text: [txt(el, '.stat-label'), txt(el, '.stat-value')].filter(Boolean).join(': '), detail: txt(el, '.stat-delta') };
+    return { text: txt(el, 'h3') || txt(el, 'h4'), detail: txt(el, '.sub') };
+  }
+  function captureFrom(el, selection) {
+    const d = describe(el);
+    if (selection) return add(selection, d.text ? 'From: ' + d.text : '');
+    return add(d.text, d.detail);
+  }
+
+  // ---------- right-click menu ----------
+  let menu, openedAt = 0;
+  function hideMenu() { if (menu) menu.style.display = 'none'; }
+  function showMenu(x, y, el, selection) {
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.className = 'ctx-menu';
+      menu.setAttribute('role', 'menu');
+      document.body.appendChild(menu);
+      document.addEventListener('click', hideMenu);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideMenu(); });
+      // ignore the scroll some browsers fire as the menu opens; close on real scrolling only
+      window.addEventListener('scroll', () => { if (Date.now() - openedAt > 400) hideMenu(); }, true);
+    }
+    menu.innerHTML = '';
+    const d = describe(el);
+    const head = document.createElement('div');
+    head.className = 'ctx-head';
+    head.textContent = selection ? '“' + selection.slice(0, 60) + (selection.length > 60 ? '…' : '') + '”' : (d.text || 'This item').slice(0, 70);
+    menu.appendChild(head);
+    const item = (label, fn) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.setAttribute('role', 'menuitem'); b.textContent = label;
+      b.addEventListener('click', (e) => { e.stopPropagation(); hideMenu(); fn(); });
+      menu.appendChild(b);
+    };
+    item(selection ? '📌 Send selected text to Action Board' : '📌 Send to Action Board', () => captureFrom(el, selection));
+    if (selection) item('📌 Send whole item instead', () => captureFrom(el, ''));
+    item('⧉ Copy text', () => { try { navigator.clipboard.writeText(selection || [d.text, d.detail].filter(Boolean).join(' — ')); toast('Copied', true); } catch (e) { /* ignore */ } });
+    item('▤ Open Action Board', () => PIQ.go('actions'));
+    openedAt = Date.now();
+    menu.style.display = 'block';
+    const w = menu.offsetWidth, hgt = menu.offsetHeight;
+    menu.style.left = Math.min(x, window.innerWidth - w - 8) + 'px';
+    menu.style.top = Math.min(y, window.innerHeight - hgt - 8) + 'px';
+  }
+  document.addEventListener('contextmenu', (e) => {
+    const inApp = e.target.closest('#view, #drawer');
+    if (!inApp || e.target.closest('input, textarea, select, .action-board')) return; // keep native menu for form fields
+    const el = e.target.closest(CAPTURABLE);
+    if (!el) return;
+    e.preventDefault();
+    const sel = (window.getSelection && String(window.getSelection()).trim()) || '';
+    showMenu(e.clientX, e.clientY, el, sel.length > 3 ? sel : '');
+  });
+
+  // Small reusable 📌 button
+  function pinButton(parent, getPayload, label) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn sm pin-btn';
+    b.textContent = label || '📌';
+    b.title = 'Send to Action Board';
+    b.setAttribute('aria-label', 'Send to Action Board');
+    b.addEventListener('click', (e) => { e.stopPropagation(); const pl = getPayload(); add(pl.text, pl.detail, pl.extra); });
+    parent.appendChild(b);
+    return b;
+  }
+
+  PIQ.actions = { all: () => items, add, update, remove, clearDone, openCount, onChange: (f) => subs.push(f), pinButton, describe, toast };
+})();
+
+</script>
   <script>/* js/views/overview.js */
 /* Command Centre — the Monday-morning view: what changed, is it me or the market, what to do. */
 (function () {
@@ -2277,7 +2463,9 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       h('div', 'sev-label', tx, a.sev === 'good' ? 'Opportunity' : a.sev + ' · ' + (a.kind === 'logins' ? 'applications' : a.kind === 'fresh' ? 'weekly data' : 'portfolio'));
       h('div', 'alert-title', tx, a.title);
       h('div', 'alert-detail', tx, a.detail);
-      const btn = h('button', 'btn sm', row, 'Open');
+      const ab = h('div', null, row); ab.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+      const btn = h('button', 'btn sm', ab, 'Open');
+      PIQ.actions.pinButton(ab, () => ({ text: a.title, detail: a.detail, extra: { p: a.p || 'ALL', s: a.s || 'ALL', priority: a.sev === 'critical' ? 'High' : 'Medium' } }));
       btn.addEventListener('click', () => PIQ.go(a.kind === 'logins' ? 'logins' : a.kind === 'fresh' ? 'fresh' : a.kind === 'positive' ? 'benchmark' : 'why', { p: a.p, s: a.s || undefined }));
     });
 
@@ -2319,7 +2507,9 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       im.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-size:12.5px';
       r.impact.forEach(([k, v, t]) => { const s1 = h('span', null, im); h('span', 'muted', s1, k + ': '); h('strong', t, s1, v); });
       const btn = h('button', 'btn sm', box, { simulator: 'Simulate →', upload: 'Check channel data →', logins: 'See applications →', benchmark: 'Benchmark →' }[r.action.view] || 'Open →');
-      btn.style.cssText = 'margin-top:auto;align-self:flex-start';
+      const rowb = h('div', null, box); rowb.style.cssText = 'margin-top:auto;display:flex;gap:6px';
+      rowb.appendChild(btn);
+      PIQ.actions.pinButton(rowb, () => ({ text: r.title, detail: r.why + ' Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; '), extra: { priority: i < 2 ? 'High' : 'Medium' } }), '📌 Add to actions');
       btn.addEventListener('click', () => PIQ.go(r.action.view, r.action.params));
     });
   }
@@ -2676,6 +2866,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       btns.style.cssText = 'display:flex;flex-direction:column;gap:6px';
       const label = { simulator: 'Simulate →', upload: 'Check channel data →', logins: 'See applications →', benchmark: 'Benchmark →' }[r.action.view] || 'Open →';
       const b = h('button', 'btn primary sm', btns, label);
+      PIQ.actions.pinButton(btns, () => ({ text: r.title, detail: r.why + ' Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; '), extra: { priority: i < 2 ? 'High' : 'Medium' } }), '📌 Add to actions');
       b.addEventListener('click', () => PIQ.go(r.action.view, r.action.params));
     });
   }
@@ -3513,7 +3704,18 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       h('em', null, li, 'Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; ') + '.');
     });
 
-    h('h2', null, b, '4. Method & sources');
+    h('h2', null, b, '4. Action tracker');
+    const acts = PIQ.actions.all().filter((x) => x.status !== 'Done');
+    if (!acts.length) h('p', 'small', b, 'No open actions on the Action Board yet. Pin items from any dashboard with 📌 and they appear here.');
+    else {
+      const tbl = h('table', 'tbl', b);
+      const hr = h('tr', null, h('thead', null, tbl));
+      ['Action', 'Priority', 'Owner', 'Due', 'Status'].forEach((x) => h('th', null, hr, x));
+      const tb = h('tbody', null, tbl);
+      acts.slice(0, 12).forEach((x) => { const r = h('tr', null, tb); [x.text, x.priority, x.owner || '—', x.due || '—', x.status].forEach((v) => h('td', null, r, v)); });
+    }
+
+    h('h2', null, b, '5. Method & sources');
     h('p', 'small', b, 'All figures come from the governed semantic layer: Industry Credit Dataset, Member Portfolio Dataset, Anonymised Peer Aggregates (min. 5 institutions, max. 25% single-institution share) and the Enquiry & Application Feed. The decomposition uses a midpoint mix/rate split; the market effect applies the industry\'s relative change in each segment. This brief was generated automatically. No analyst time was needed. Synthetic demo data.');
   }
   PIQ.views.brief = { title: 'Board Brief', render };
@@ -3574,6 +3776,123 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     });
   }
   PIQ.views.governance = { title: 'Governance & Trust', render };
+})();
+
+</script>
+  <script>/* js/views/actions.js */
+/* Action Board — everything the user pinned from any module, with owner, due date and status. */
+(function () {
+  const PIQ = window.PIQ;
+  const { h, pageHead, prodName, stateName } = PIQ.ui;
+  const S = PIQ.sem, C = PIQ.config;
+  const STATUSES = ['Open', 'In progress', 'Done'], PRIORITIES = ['High', 'Medium', 'Low'];
+  let fStatus = 'active', fModule = 'ALL', fPriority = 'ALL';
+
+  const when = (iso) => { const d = new Date(iso); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); };
+  const ctx = (it) => [it.viewTitle || it.view, prodName(it.p), stateName(it.s), it.dpd ? S.METRICS[it.dpd].short : null].filter(Boolean).join(' · ');
+
+  function exportCsv(list) {
+    const cols = ['Action', 'Detail', 'Priority', 'Status', 'Owner', 'Due', 'Note', 'Source module', 'Product', 'State', 'Captured'];
+    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = list.map((x) => [x.text, x.detail, x.priority, x.status, x.owner, x.due, x.note, x.viewTitle || x.view, prodName(x.p), stateName(x.s), x.created].map(esc).join(','));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([cols.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' }));
+    a.download = 'portfolioiq_action_board.csv';
+    a.click();
+  }
+  function select(parent, options, value, onChange, cls) {
+    const s = h('select', cls || 'mini', parent);
+    options.forEach((o) => { const op = h('option', null, s, o.name || o); op.value = o.id || o; if ((o.id || o) === value) op.selected = true; });
+    s.addEventListener('change', () => onChange(s.value));
+    return s;
+  }
+
+  function render(root) {
+    const A = PIQ.actions;
+    const all = A.all();
+    pageHead(root, 'Action Board', 'Everything you flagged while going through the dashboards, in one place. Pin items with the 📌 buttons, or right-click any card, tile, alert or AI answer and choose "Send to Action Board". Highlight text first to send just that.');
+
+    const counts = STATUSES.map((s) => all.filter((x) => x.status === s).length);
+    const tiles = h('div', 'grid g4', root);
+    [['Open', counts[0]], ['In progress', counts[1]], ['Done', counts[2]], ['High priority, not done', all.filter((x) => x.priority === 'High' && x.status !== 'Done').length]].forEach(([l, v]) => { const c = h('div', 'card stat', tiles); h('div', 'stat-label', c, l); h('div', 'stat-value', c, String(v)); });
+
+    const bar = h('div', 'filters', root);
+    bar.style.marginTop = '16px';
+    const fld = (label) => { const f = h('div', 'field', bar); h('label', null, f, label); return f; };
+    select(fld('Status'), [{ id: 'active', name: 'Open + in progress' }, { id: 'ALL', name: 'All' }].concat(STATUSES.map((s) => ({ id: s, name: s }))), fStatus, (v) => { fStatus = v; PIQ.go('actions'); });
+    const mods = [...new Set(all.map((x) => x.view))];
+    select(fld('Source module'), [{ id: 'ALL', name: 'All modules' }].concat(mods.map((m) => ({ id: m, name: (PIQ.views[m] || {}).title || m }))), fModule, (v) => { fModule = v; PIQ.go('actions'); });
+    select(fld('Priority'), [{ id: 'ALL', name: 'All' }].concat(PRIORITIES.map((p) => ({ id: p, name: p }))), fPriority, (v) => { fPriority = v; PIQ.go('actions'); });
+    const btns = h('div', null, bar);
+    btns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;align-self:flex-end';
+    const addB = h('button', 'btn', btns, '+ Add action');
+    addB.addEventListener('click', () => { const t = prompt('New action'); if (t) { A.add(t, '', { view: 'actions', viewTitle: 'Added manually' }); PIQ.go('actions'); } });
+    const recB = h('button', 'btn', btns, '✦ Add recommended actions');
+    recB.title = 'Pull the platform\'s ranked recommendations onto the board';
+    recB.addEventListener('click', () => {
+      PIQ.insights.recommendations('ALL').forEach((r, i) => A.add(r.title, r.why + ' Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; '), { view: r.action.view, viewTitle: 'Recommendation', p: r.action.params.p || r.p || 'ALL', s: r.action.params.s || 'ALL', priority: i < 2 ? 'High' : 'Medium' }));
+      PIQ.go('actions');
+    });
+    const csv = h('button', 'btn', btns, '⇩ Export CSV');
+    const pr = h('button', 'btn', btns, '⎙ Print');
+    pr.addEventListener('click', () => window.print());
+
+    const list = all.filter((x) => (fStatus === 'ALL' || (fStatus === 'active' ? x.status !== 'Done' : x.status === fStatus)) && (fModule === 'ALL' || x.view === fModule) && (fPriority === 'ALL' || x.priority === fPriority))
+      .sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || (a.created < b.created ? 1 : -1));
+    csv.addEventListener('click', () => exportCsv(list));
+
+    const board = h('div', 'action-board', root);
+    if (!all.length) {
+      const e = h('div', 'card empty', board);
+      h('h3', null, e, 'Your Action Board is empty');
+      h('p', 'muted', e, 'Go through any dashboard and press 📌 on a card, recommendation, alert or AI answer, or right-click it and choose "Send to Action Board". Or start with the platform\'s own recommendations:');
+      const b = h('button', 'btn primary', e, '✦ Add recommended actions');
+      b.addEventListener('click', () => recB.click());
+      return;
+    }
+    if (!list.length) { h('div', 'card empty', board, 'Nothing matches these filters.'); }
+    list.forEach((it) => {
+      const c = h('div', 'card action-item' + (it.status === 'Done' ? ' done' : ''), board);
+      const top = h('div', 'action-top', c);
+      const chk = h('input', null, top);
+      chk.type = 'checkbox'; chk.checked = it.status === 'Done'; chk.title = 'Mark done';
+      chk.addEventListener('change', () => { A.update(it.id, { status: chk.checked ? 'Done' : 'Open' }); PIQ.go('actions'); });
+      const main = h('div', 'action-main', top);
+      const title = h('div', 'action-text', main, it.text);
+      title.contentEditable = 'true';
+      title.spellcheck = false;
+      title.addEventListener('blur', () => { const v = title.textContent.trim(); if (v && v !== it.text) A.update(it.id, { text: v }); });
+      if (it.detail) h('div', 'action-detail', main, it.detail);
+      const meta = h('div', 'action-meta', main);
+      h('span', 'tag prio-' + it.priority.toLowerCase(), meta, it.priority);
+      h('span', 'src-chip', meta, '⛁ ' + ctx(it));
+      h('span', 'muted small', meta, 'Captured ' + when(it.created));
+      const act = h('div', 'action-btns', top);
+      const open = h('button', 'btn sm', act, 'Open source →');
+      open.addEventListener('click', () => PIQ.go(PIQ.views[it.view] ? it.view : 'overview', { p: it.p, s: it.s }));
+      const del = h('button', 'icon-btn', act, '✕');
+      del.title = 'Remove'; del.setAttribute('aria-label', 'Remove action');
+      del.addEventListener('click', () => { A.remove(it.id); PIQ.go('actions'); });
+
+      const row = h('div', 'action-fields', c);
+      const f = (label) => { const w = h('label', 'afield', row); h('span', null, w, label); return w; };
+      select(f('Priority'), PRIORITIES, it.priority, (v) => { A.update(it.id, { priority: v }); PIQ.go('actions'); });
+      select(f('Status'), STATUSES, it.status, (v) => { A.update(it.id, { status: v }); PIQ.go('actions'); });
+      const own = h('input', null, f('Owner')); own.type = 'text'; own.placeholder = 'e.g. Head of Collections'; own.value = it.owner;
+      own.addEventListener('change', () => A.update(it.id, { owner: own.value }));
+      const due = h('input', null, f('Due')); due.type = 'date'; due.value = it.due;
+      due.addEventListener('change', () => A.update(it.id, { due: due.value }));
+      const note = h('input', null, f('Note')); note.type = 'text'; note.placeholder = 'Add a note'; note.value = it.note;
+      note.addEventListener('change', () => A.update(it.id, { note: note.value }));
+      note.parentNode.classList.add('wide');
+    });
+    const foot = h('div', 'small muted', root, `Saved in this browser for the prototype. In production the board lives in ${C.member.name}'s workspace, is shared with the team, and can push actions to email or the bank's task tools.`);
+    foot.style.marginTop = '12px';
+    const clr = h('button', 'btn sm', root, 'Clear done items');
+    clr.style.marginTop = '8px';
+    clr.addEventListener('click', () => { A.clearDone(); PIQ.go('actions'); });
+  }
+  PIQ.views.actions = { title: 'Action Board', render };
 })();
 
 </script>
@@ -4077,6 +4396,22 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     };
   });
 
+  def('action_board', 'The user\'s Action Board: actions pinned from any module, with priority, owner, due date and status.', {}, [], () => {
+    const open = PIQ.actions.all().filter((x) => x.status !== 'Done');
+    const order = { High: 0, Medium: 1, Low: 2 };
+    open.sort((a, b) => order[a.priority] - order[b.priority]);
+    return {
+      answer: {
+        paras: [open.length ? `You have **${open.length}** open action${open.length === 1 ? '' : 's'} on your Action Board:` : 'Your Action Board is empty. Pin anything with 📌, or right-click a card and choose "Send to Action Board".'],
+        bullets: open.slice(0, 8).map((x) => `**${x.priority}** · ${x.text}${x.owner ? ' (owner: ' + x.owner + ')' : ''}${x.due ? ' · due ' + x.due : ''}`),
+        sources: ['Action Board'], filters: 'Open and in-progress actions',
+        followups: ['What should I do about it?', 'Give me a summary for my board'],
+        link: { view: 'actions', params: {} }
+      },
+      facts: { open: open.map((x) => ({ action: x.text, priority: x.priority, owner: x.owner, due: x.due, status: x.status })) }
+    };
+  });
+
   def('alerts', 'Early-warning alerts detected automatically across portfolio and applications.', {}, [], () => {
     const al = S.alerts();
     return {
@@ -4268,6 +4603,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       return call('define', { term });
     }
     if (/upload|my file|sourcing channel|\bchannel|\bdsa\b/.test(t)) return call('uploaded_insight', {});
+    if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
       return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });
     if (/weekly|fortnight|fresh bounce|\bbounces?\b|repayment|first.?payment|\bfpd\b|monthly file|current balance/.test(t))
@@ -4458,6 +4794,7 @@ Rules:
     const fu = h('div', 'follow', wrap);
     if (a.link) { const bt = h('button', 'chip', fu, '↗ Open in dashboard'); bt.addEventListener('click', () => { document.getElementById('drawer').classList.remove('open'); PIQ.go(a.link.view, a.link.params); }); }
     (a.actions || []).forEach((x) => { const bt = h('button', 'chip', fu, '↗ ' + x.label); bt.addEventListener('click', () => { document.getElementById('drawer').classList.remove('open'); PIQ.go(x.view, x.params); }); });
+    if (!a.refusal && (a.paras || []).length) { const pb = h('button', 'chip', fu, '📌 Save to actions'); pb.addEventListener('click', () => { const clean = (x) => String(x).replace(/\*\*/g, '').replace(/^\d+\.\s*/, ''); const lead = clean((a.paras || [])[0] || ''); const title = /:\s*$/.test(lead) && a.bullets && a.bullets.length ? clean(a.bullets[0]).split(/(?<=\.)\s/)[0] : lead.split(/(?<=[.!?])\s/)[0]; PIQ.actions.add(title, (a.paras || []).concat(a.bullets || []).map(clean).join(' ')); }); }
     (a.followups || []).forEach((q) => { const bt = h('button', 'chip', fu, q); bt.addEventListener('click', () => ask(q)); });
   }
 
@@ -4571,6 +4908,7 @@ Rules:
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
     { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },
+    { id: 'actions', name: 'Action Board', ico: '📌', tag: 'new' },
     { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },
     { id: 'logins', name: 'Login & Application Pulse', ico: '⚡', tag: 'new' },
@@ -4600,6 +4938,7 @@ Rules:
       h('span', 'ico', a, n.ico);
       h('span', null, a, n.name);
       if (n.id === 'overview' && alerts) h('span', 'nav-badge', a, String(alerts));
+      if (n.id === 'actions') { const c = PIQ.actions.openCount(); if (c) { const bd = h('span', 'nav-badge count', a, String(c)); bd.title = c + ' open actions'; } }
       if (n.tag) h('span', 'nav-new', a, n.tag);
       a.addEventListener('click', () => go(n.id));
     });
@@ -4642,6 +4981,7 @@ Rules:
 
   function go(id, params) {
     current = id;
+    PIQ.currentView = id;
     PIQ.routeParams = params || {};
     if (params && params.p) state.p = params.p;
     if (params && params.s) state.s = params.s;
@@ -4651,6 +4991,7 @@ Rules:
     window.scrollTo(0, 0);
   }
   PIQ.go = go;
+  PIQ.actions.onChange(() => buildSide());
   onState(() => { PIQ.routeParams = {}; render(); });
 
   // Drawer: the AI analyst available from every page

@@ -70,7 +70,9 @@
       h('div', 'sev-label', tx, a.sev === 'good' ? 'Opportunity' : a.sev + ' · ' + (a.kind === 'logins' ? 'applications' : a.kind === 'fresh' ? 'weekly data' : 'portfolio'));
       h('div', 'alert-title', tx, a.title);
       h('div', 'alert-detail', tx, a.detail);
-      const btn = h('button', 'btn sm', row, 'Open');
+      const ab = h('div', null, row); ab.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+      const btn = h('button', 'btn sm', ab, 'Open');
+      PIQ.actions.pinButton(ab, () => ({ text: a.title, detail: a.detail, extra: { p: a.p || 'ALL', s: a.s || 'ALL', priority: a.sev === 'critical' ? 'High' : 'Medium' } }));
       btn.addEventListener('click', () => PIQ.go(a.kind === 'logins' ? 'logins' : a.kind === 'fresh' ? 'fresh' : a.kind === 'positive' ? 'benchmark' : 'why', { p: a.p, s: a.s || undefined }));
     });
 
@@ -112,7 +114,9 @@
       im.style.cssText = 'display:flex;flex-direction:column;gap:3px;font-size:12.5px';
       r.impact.forEach(([k, v, t]) => { const s1 = h('span', null, im); h('span', 'muted', s1, k + ': '); h('strong', t, s1, v); });
       const btn = h('button', 'btn sm', box, { simulator: 'Simulate →', upload: 'Check channel data →', logins: 'See applications →', benchmark: 'Benchmark →' }[r.action.view] || 'Open →');
-      btn.style.cssText = 'margin-top:auto;align-self:flex-start';
+      const rowb = h('div', null, box); rowb.style.cssText = 'margin-top:auto;display:flex;gap:6px';
+      rowb.appendChild(btn);
+      PIQ.actions.pinButton(rowb, () => ({ text: r.title, detail: r.why + ' Impact: ' + r.impact.map(([k, v]) => k + ' ' + v).join('; '), extra: { priority: i < 2 ? 'High' : 'Medium' } }), '📌 Add to actions');
       btn.addEventListener('click', () => PIQ.go(r.action.view, r.action.params));
     });
   }

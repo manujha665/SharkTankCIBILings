@@ -32,7 +32,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 - **Lender categories (8):** PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC.
 - **Delinquency buckets:** a 30+ / 90+ / 180+ switch in the filter bar (default 30+).
 
-## What's inside (12 modules)
+## What's inside (13 modules)
 
 | Module | What it shows | Why it matters in the pitch |
 |---|---|---|
@@ -47,6 +47,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a last-7-days quality check: score banding, expected probability of default, PIN-code risk tier (high / medium / low) and sourcing pool | Earliest warning signal; no competitor shows it |
 | **AI Analyst** | Chat with 67-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
 | **Bring Your Data** | Upload a CSV (e.g. sourcing channel), map fields, join to industry, get like-for-like insights | Extends the platform beyond bureau fields |
+| **Action Board** ⭐ | Pin anything from any module (📌 buttons or right-click → "Send to Action Board"; highlight text to send just that). Each action keeps its source module and filters, gets priority, owner, due date, status and notes; export to CSV, print, feeds the Board Brief | Insight → action in one click |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
 | **Governance & Trust** | Tenant isolation, peer privacy rules, metric catalogue, live audit trail | Answers the "can we trust AI?" question |
 
