@@ -8,13 +8,13 @@
 
   function render(root, params) {
     if (params && params.cutoff) cutoff = params.cutoff;
-    const p = state.p, s = state.s;
+    const p = state.p === 'ALL' ? 'PL' : state.p, s = state.s;
     const key = p + s;
     if (cutoff == null || (lastKey && lastKey !== key && !(params && params.cutoff))) cutoff = p === 'PL' ? C.previousCutoff.PL : C.currentCutoff[p] + 20;
     lastKey = key;
     const cur = C.currentCutoff[p];
     pageHead(root, 'Policy Simulator', 'Move the score cut-off and see the trade-off between growth and risk before you change policy. Uses your last 90 days of applications and the bad rates observed at each score.');
-    const bar = productStateFilters(root);
+    const bar = productStateFilters(root, { allProducts: false });
     const sw = h('div', 'slider-wrap', bar);
     const lab = h('label', null, sw);
     lab.style.cssText = 'font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em';
@@ -82,9 +82,10 @@
       });
 
       // State-level optimum
-      const st = card(body, { title: 'Surgical, not blanket: the best cut-off per state', sub: 'A single national cut-off leaves money on the table', source: sourceText(['scores']) });
+      const st = card(body, { title: 'Surgical, not blanket: the best cut-off per state', sub: 'A single national cut-off leaves money on the table · states with at least 2% of your applications', source: sourceText(['scores']) });
       st.el.style.marginTop = '16px';
-      const rows = D.STATES.map((x) => {
+      const prodApps = S.simulate(p, 'ALL', cur, A).apps;
+      const rows = D.STATES.filter((x) => S.simulate(p, x.id, cur, A).apps >= prodApps * 0.02).map((x) => {
         const c0 = S.simulate(p, x.id, cur, A);
         let bb = c0;
         for (let c = 640; c <= 780; c += 10) { const r = S.simulate(p, x.id, c, A); if (r.netCr > bb.netCr + 0.02) bb = r; }

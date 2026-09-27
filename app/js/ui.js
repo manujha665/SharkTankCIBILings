@@ -48,7 +48,8 @@
   const ml = (m) => PIQ.data.monthLabel(m);
 
   // --- global filter state (product + state) shared by all views ---
-  const state = { p: 'PL', s: 'ALL', peer: 'mid-pvt' };
+  // Default: the member's entire portfolio (all products, all states), 30+ DPD
+  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30' };
   const subs = [];
   function setState(patch) { Object.assign(state, patch); subs.forEach((f) => f(state)); }
   function onState(f) { subs.push(f); }
@@ -73,12 +74,17 @@
     });
     return g;
   }
+  const productOptions = (withAll) => (withAll === false ? [] : [{ id: 'ALL', name: 'All products' }]).concat(PIQ.data.PRODUCTS.map((p) => ({ id: p.id, name: p.name })));
+  const stateOptions = () => [{ id: 'ALL', name: 'All states' }].concat(PIQ.data.STATES.map((s) => ({ id: s.id, name: s.name })));
+  // opts: { state: false } hides the state picker; { dpd: true } shows the 30+/90+/180+ switch;
+  // { allProducts: false } forces a single product (e.g. the policy simulator)
   function productStateFilters(parent, opts) {
+    opts = opts || {};
     const bar = h('div', 'filters', parent);
-    const D = PIQ.data;
-    seg(bar, 'Product', D.PRODUCTS.map((p) => ({ id: p.id, name: p.name })), state.p, (v) => setState({ p: v }));
-    if (!opts || opts.state !== false)
-      select(bar, 'State', [{ id: 'ALL', name: 'All 6 states' }].concat(D.STATES.map((s) => ({ id: s.id, name: s.name }))), state.s, (v) => setState({ s: v }));
+    const pv = opts.allProducts === false && state.p === 'ALL' ? 'PL' : state.p;
+    select(bar, 'Product', productOptions(opts.allProducts), pv, (v) => setState({ p: v }));
+    if (opts.state !== false) select(bar, 'State', stateOptions(), state.s, (v) => setState({ s: v }));
+    if (opts.dpd) seg(bar, 'Delinquency', PIQ.sem.DPD_METRICS.map((id) => ({ id, name: PIQ.sem.METRICS[id].short.replace(' DPD', '') })), state.dpd, (v) => setState({ dpd: v }));
     return bar;
   }
 
@@ -151,7 +157,9 @@
     if (right) { const r = h('div', null, ph); r.style.marginLeft = 'auto'; right(r); }
     return ph;
   }
-  const stateName = (s) => (s === 'ALL' || !s ? 'All 6 states' : PIQ.data.S[s].name);
+  const stateName = (s) => (s === 'ALL' || !s ? 'All states' : PIQ.data.S[s].name);
+  const prodName = (p) => (p === 'ALL' || !p ? 'All products' : PIQ.data.P[p].name);
+  const prodLong = (p) => (p === 'ALL' || !p ? 'Total portfolio' : PIQ.data.P[p].long);
 
-  PIQ.ui = { h, html, fmt, ml, state, setState, onState, select, seg, productStateFilters, card, table, stat, tone, sourceText, pageHead, stateName };
+  PIQ.ui = { h, html, fmt, ml, state, setState, onState, select, seg, productStateFilters, productOptions, stateOptions, card, table, stat, tone, sourceText, pageHead, stateName, prodName, prodLong };
 })(window);

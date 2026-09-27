@@ -13,20 +13,22 @@
     const b = h('div', 'brief', root);
     const t = S.latest();
     h('div', 'muted small', b, `${C.productName} · Portfolio Intelligence Brief · generated automatically`);
-    h('h1', null, b, `${C.member.name}: Retail Unsecured Portfolio, ${ml(t)}`);
+    h('h1', null, b, `${C.member.name}: Portfolio Intelligence Brief, ${ml(t)}`);
     h('p', 'muted', b, `Prepared for the Risk Management Committee · ${C.member.user}, ${C.member.role} · Data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}.`);
 
-    const pl = PIQ.insights.snapshot('PL', 'ALL'), cc = PIQ.insights.snapshot('CC', 'ALL');
+    const pl = PIQ.insights.snapshot('PL', 'ALL'), cc = PIQ.insights.snapshot('CC', 'ALL'), all = PIQ.insights.snapshot('ALL', 'ALL');
+    const dAll = S.decompose({ p: 'ALL', s: 'ALL', t0: C.policyChangeMonth, t1: t });
     const dPL = S.decompose({ p: 'PL', s: 'ALL', t0: C.policyChangeMonth, t1: t, dim: 'sb' });
     const nar = PIQ.insights.narrateDecomposition(dPL);
 
     h('h2', null, b, '1. Headlines');
     const ul = h('ul', null, b);
     [
+      `Whole book (10 products, ${fmt.cr(all.bal)}): 30+ DPD ${fmt.pct(all.dpd30)}, ${fmt.bps(dAll.delta)} since ${ml(C.policyChangeMonth)} while the industry moved ${fmt.bps(dAll.indDelta)}; 90+ ${fmt.pct(all.dpd90)}, 180+ ${fmt.pct(all.dpd180)}. The rise is concentrated in personal loans.`,
       `Personal loan 30+ DPD is ${fmt.pct(pl.dpd30)}, ${fmt.bps(dPL.delta)} since the ${ml(C.policyChangeMonth)} cut-off change, against ${fmt.bps(dPL.indDelta)} for the industry. ${nar.verdict}`,
       `Mix shift explains ${fmt.bps(dPL.mix)}, market-wide deterioration ${fmt.bps(dPL.market)}, member-specific performance ${fmt.bps(dPL.own)}. The pressure is concentrated in Uttar Pradesh and Gujarat near-prime / subprime.`,
       `Credit cards remain a strength: 30+ DPD ${fmt.pct(cc.dpd30)} vs ${fmt.pct(cc.peer30)} for PVT · Mid-size peers.`,
-      `Balances grew ${fmt.chg(pl.growth)} (PL) and ${fmt.chg(cc.growth)} (CC) year on year vs industry ${fmt.chg(pl.indGrowth)} / ${fmt.chg(cc.indGrowth)}; 6-state PL market share ${fmt.pct(pl.share, 2)}.`
+      `Balances grew ${fmt.chg(pl.growth)} (PL) and ${fmt.chg(cc.growth)} (CC) year on year vs industry ${fmt.chg(pl.indGrowth)} / ${fmt.chg(cc.indGrowth)}; PL market share ${fmt.pct(pl.share, 2)}.`
     ].forEach((x) => h('li', null, ul, x));
 
     const g = h('div', 'grid g2', b);
@@ -51,7 +53,7 @@
 
     h('h2', null, b, '3. Recommended actions');
     const ol = h('ol', null, b);
-    PIQ.insights.recommendations('PL').forEach((r) => {
+    PIQ.insights.recommendations('ALL').forEach((r) => {
       const li = h('li', null, ol);
       h('strong', null, li, r.title + '. ');
       h('span', null, li, r.why + ' ');

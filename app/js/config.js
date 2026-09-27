@@ -12,8 +12,8 @@
       role: 'Chief Risk Officer'
     },
     // Policy score cut-offs currently live at the demo member (used by the simulator & recommendations)
-    currentCutoff: { PL: 680, CC: 720 },
-    previousCutoff: { PL: 700, CC: 720 },
+    currentCutoff: { PL: 680, CC: 720, HL: 700, LAP: 700, AL: 700, TW: 680, GL: 650, MSME: 700, AGRI: 650, MFL: 650 },
+    previousCutoff: { PL: 700, CC: 720, HL: 700, LAP: 700, AL: 700, TW: 680, GL: 650, MSME: 700, AGRI: 650, MFL: 650 },
     policyChangeMonth: '2026-02',
     // Privacy guardrails for peer benchmarking
     privacy: { minPeers: 5, maxShare: 0.25 },

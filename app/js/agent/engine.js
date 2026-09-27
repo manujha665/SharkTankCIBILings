@@ -13,8 +13,10 @@
   const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
   const F = () => PIQ.ui.fmt;
   const ml = (m) => D.monthLabel(m);
-  const sName = (s) => (!s || s === 'ALL' ? 'all 6 states' : D.S[s].name);
-  const pName = (p) => D.P[p].name.toLowerCase();
+  const sName = (s) => (!s || s === 'ALL' ? 'all states' : D.S[s].name);
+  const pName = (p) => (!p || p === 'ALL' ? 'total portfolio' : D.P[p].name.toLowerCase());
+  const pTitle = (p) => (!p || p === 'ALL' ? 'All products' : D.P[p].name);
+  const pLong = (p) => (!p || p === 'ALL' ? 'Total portfolio (all products)' : D.P[p].long);
   const mName = (m) => S.METRICS[m].name;
   const mLow = (m) => mName(m).replace(/^[A-Z][a-z]/, (c) => c.toLowerCase());
   // change in a metric: bps for delinquency, pp for cure rate, % for amounts
@@ -27,19 +29,19 @@
   function def(name, description, props, required, fn) {
     tools[name] = { name, description, schema: { type: 'object', properties: props, required: required || [], additionalProperties: false }, run: fn };
   }
-  const P_PRODUCT = { type: 'string', enum: ['PL', 'CC'], description: 'PL = unsecured personal loan, CC = credit card' };
-  const P_STATE = { type: 'string', enum: ['ALL', 'MH', 'TN', 'KA', 'UP', 'GJ', 'TG'], description: 'State code or ALL' };
+  const P_PRODUCT = { type: 'string', enum: ['ALL'].concat(D.PRODUCTS.map((x) => x.id)), description: 'ALL = whole portfolio; ' + D.PRODUCTS.map((x) => x.id + ' = ' + x.long).join('; ') };
+  const P_STATE = { type: 'string', enum: ['ALL'].concat(D.STATES.map((x) => x.id)), description: 'ALL or a state code: ' + D.STATES.map((x) => x.id + ' = ' + x.name).join('; ') };
   const P_METRIC = { type: 'string', enum: Object.keys(S.METRICS), description: 'bal, acc, orig, dpd30, dpd90, cure' };
 
   def('trend', 'Monthly trend of a metric for the industry and/or the member, optionally for one or more states, a risk band or a lender type.', {
     metric: P_METRIC, product: P_PRODUCT, states: { type: 'array', items: P_STATE }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] },
     lender: { type: 'string', enum: D.LENDERS.map((l) => l.id), description: 'Lender category: ' + D.LENDERS.map((l) => l.id + ' = ' + l.long).join('; ') }, who: { type: 'string', enum: ['industry', 'member', 'both'] }
   }, ['metric', 'product'], (a) => {
-    const metric = a.metric || 'dpd30', p = a.product || 'PL';
+    const metric = a.metric || 'dpd30', p = a.product || 'ALL';
     const states = a.states && a.states.length ? a.states : ['ALL'];
     const who = a.who || 'industry';
     const t = S.latest(), t12 = S.monthsAgo(12), t6 = S.monthsAgo(6);
-    const series = [], facts = { metric: mName(metric), product: D.P[p].long, asOf: ml(t) };
+    const series = [], facts = { metric: mName(metric), product: pLong(p), asOf: ml(t) };
     const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
     const paras = [];
     let ci = 0;
@@ -50,11 +52,11 @@
       if (who !== 'member') {
         const pts = S.series('industry', metric, f);
         const now = pts[pts.length - 1].y, y12 = pts[pts.length - 13].y, y6 = pts[pts.length - 7].y;
-        const label = (states.length > 1 ? sName(s).replace('all 6 states', 'All 6 states') : 'Industry') + (who === 'both' && states.length > 1 ? ' (industry)' : '');
+        const label = (states.length > 1 ? sName(s).replace('all states', 'All states') : 'Industry') + (who === 'both' && states.length > 1 ? ' (industry)' : '');
         series.push({ name: label, color: who === 'both' && states.length === 1 ? 'var(--s3)' : colors[ci++ % 4], points: pts });
         const ch = dfmt(metric, now, y12);
         const ch6 = dfmt(metric, now, y6);
-        paras.push(`**${lender}${band}${D.P[p].name} · ${sName(s)}**: industry ${mLow(metric)} is **${fmtM(metric, now)}** in ${ml(t)}, ${ch} year-on-year (${ch6} over 6 months).`);
+        paras.push(`**${lender}${band}${pTitle(p)} · ${sName(s)}**: industry ${mLow(metric)} is **${fmtM(metric, now)}** in ${ml(t)}, ${ch} year-on-year (${ch6} over 6 months).`);
         facts['industry_' + s] = { now: fmtM(metric, now), yoy: ch, sixMonth: ch6 };
       }
       if (who !== 'industry') {
@@ -75,7 +77,7 @@
         paras,
         chart: (el) => PIQ.charts.line(el, { series, xLabel: ml, yFmt: (v) => fmtM(metric, v), yTickFmt: F().metricTick(metric), height: 220, endLabels: series.length <= 3, zero: S.METRICS[metric].unit !== 'pct' }),
         sources: src(who === 'industry' ? 'industry' : 'member', 'industry'),
-        filters: `${D.P[p].long} · ${states.map(sName).join(' vs ')}${band ? ' · ' + band : ''}${lender ? ' · ' + lender : ''} · ${ml(D.MONTHS[0])}–${ml(t)}`,
+        filters: `${pLong(p)} · ${states.map(sName).join(' vs ')}${band ? ' · ' + band : ''}${lender ? ' · ' + lender : ''} · ${ml(D.MONTHS[0])}–${ml(t)}`,
         followups: who === 'industry'
           ? ['Now compare it with my portfolio', 'Which state has the highest ' + (metric === 'bal' ? 'growth' : 'delinquency') + '?', 'Why did my ' + pName(p) + ' delinquency go up?']
           : ['Why did it change?', 'How do I compare with peers?', 'What should I do about it?']
@@ -84,10 +86,10 @@
     };
   });
 
-  def('rank_states', 'Rank the 6 states on a metric (latest month), for the industry or the member, with the change over 12 months.', {
+  def('rank_states', 'Rank all states on a metric (latest month), for the industry or the member, with the change over 12 months.', {
     metric: P_METRIC, product: P_PRODUCT, who: { type: 'string', enum: ['industry', 'member'] }, growth: { type: 'boolean', description: 'rank by YoY growth instead of level' }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] }
   }, ['metric', 'product'], (a) => {
-    const metric = a.metric || 'dpd30', p = a.product || 'PL', who = a.who || 'industry';
+    const metric = a.metric || 'dpd30', p = a.product || 'ALL', who = a.who || 'industry';
     const t = S.latest(), t12 = S.monthsAgo(12);
     const rows = D.STATES.map((x) => {
       const now = S.value(who, metric, { p, s: x.id, b: a.band || null, m: t }), was = S.value(who, metric, { p, s: x.id, b: a.band || null, m: t12 });
@@ -104,7 +106,7 @@
           S.METRICS[metric].unit === 'pct' && metric !== 'cure' ? `The biggest 12-month move was in **${rows.slice().sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0].s.name}** (${F().bps(rows.slice().sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0].d)}).` : ''].filter(Boolean),
         chart: (el) => PIQ.charts.bars(el, { items: rows.map((r) => ({ label: r.s.name, value: a.growth ? r.g : r.now })), fmt: a.growth ? (v) => F().chg(v) : (v) => fmtM(metric, v), color: 'var(--s1)' }),
         sources: src(who),
-        filters: `${D.P[p].long} · ${who === 'member' ? C.member.name : 'industry'} · ${ml(t)}`,
+        filters: `${pLong(p)} · ${who === 'member' ? C.member.name : 'industry'} · ${ml(t)}`,
         followups: [`What is driving the change in ${top.s.name}?`, `What is happening in ${top.s.name}?`, 'How do I compare with peers?']
       },
       facts: { ranking: rows.map((r) => ({ state: r.s.name, value: f(r) })) }
@@ -112,7 +114,7 @@
   });
 
   def('lender_types', 'Compare the 8 lender categories (' + D.LENDERS.map((l) => l.name).join(', ') + ') on a metric in the industry.', { metric: P_METRIC, product: P_PRODUCT, state: P_STATE }, ['metric', 'product'], (a) => {
-    const metric = a.metric || 'dpd30', p = a.product || 'PL', s = a.state || 'ALL';
+    const metric = a.metric || 'dpd30', p = a.product || 'ALL', s = a.state || 'ALL';
     const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
     const series = D.LENDERS.map((l, i) => ({ name: l.name, color: colors[i], points: S.series('industry', metric, { p, s, l: l.id }) }));
     const now = series.map((x) => ({ n: x.name, v: x.points[x.points.length - 1].y, v12: x.points[x.points.length - 13].y }));
@@ -122,7 +124,7 @@
         paras: [now.map((x) => `**${x.n}** ${fmtM(metric, x.v)} (${dfmt(metric, x.v, x.v12)} YoY)`).join(' · '),
           (() => { const by = now.slice().sort((x, y) => y.v - x.v); const hi = S.METRICS[metric].bad ? by[0] : by[by.length - 1], lo = S.METRICS[metric].bad ? by[by.length - 1] : by[0]; return metric.startsWith('dpd') || metric === 'cure' ? `Weakest: **${hi.n}**. Strongest: **${lo.n}**.` : ''; })()].filter(Boolean),
         chart: (el) => PIQ.charts.line(el, { series, xLabel: ml, yFmt: (v) => fmtM(metric, v), yTickFmt: F().metricTick(metric), height: 220 }),
-        sources: src('industry'), filters: `${D.P[p].long} · ${sName(s)} · by lender type`,
+        sources: src('industry'), filters: `${pLong(p)} · ${sName(s)} · by lender type`,
         followups: ['How do I compare with PVT mid-size peers?', 'Is the industry taking more risk in personal loans?']
       },
       facts: { byLender: now.map((x) => ({ lender: x.n, value: fmtM(metric, x.v) })) }
@@ -130,7 +132,7 @@
   });
 
   def('band_mix', 'Balance mix by risk band over time for the industry or the member.', { product: P_PRODUCT, state: P_STATE, who: { type: 'string', enum: ['industry', 'member'] } }, ['product'], (a) => {
-    const p = a.product || 'PL', s = a.state || 'ALL', who = a.who || 'industry';
+    const p = a.product || 'ALL', s = a.state || 'ALL', who = a.who || 'industry';
     const months = D.MONTHS.filter((_, i) => i % 3 === 2);
     const cols = ['var(--r1)', 'var(--r2)', 'var(--r3)', 'var(--r4)', 'var(--r5)'];
     const stacks = D.BANDS.map((b, i) => ({ name: b.name, color: cols[i], values: months.map((m) => S.value(who, 'bal', { p, s, b: b.id, m })) }));
@@ -141,7 +143,7 @@
         paras: [`Near-prime + subprime make up **${F().pct(now, 1)}** of ${who === 'member' ? 'your' : 'industry'} ${pName(p)} balance in ${sName(s)}, versus ${F().pct(was, 1)} a year ago (${F().pp(now - was, 1)}).`,
           now - was > 0.01 ? 'Risk appetite has increased: the mix is tilting towards weaker bands.' : 'The risk mix is broadly stable.'],
         chart: (el) => PIQ.charts.stacked(el, { x: months, xLabel: ml, stacks, height: 200 }),
-        sources: src(who), filters: `${D.P[p].long} · ${sName(s)}`,
+        sources: src(who), filters: `${pLong(p)} · ${sName(s)}`,
         followups: ['How is subprime performing in personal loans?', 'Is the rise in my delinquency me or the market?']
       },
       facts: { nearPrimeSubprimeShareNow: F().pct(now, 1), yearAgo: F().pct(was, 1) }
@@ -152,7 +154,7 @@
   def('benchmark', 'Compare the member with a peer group and the industry on a metric. Peer groups are privacy-checked (min 5 institutions, no institution above 25%).', {
     metric: P_METRIC, product: P_PRODUCT, state: P_STATE, peer_group: { type: 'string', enum: S.PEER_GROUPS.map((g) => g.id) }
   }, ['product'], (a) => {
-    const metric = a.metric || 'dpd30', p = a.product || 'PL', s = a.state || 'ALL';
+    const metric = a.metric || 'dpd30', p = a.product || 'ALL', s = a.state || 'ALL';
     const g = peerFromText(a.peer_group || PIQ.ui.state.peer);
     const f = { p, s };
     const mS = S.series('member', metric, f), iS = S.series('industry', metric, f), pS = S.peerSeries(g.id, metric, f);
@@ -170,7 +172,7 @@
       answer: {
         paras,
         chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: 'Peers', color: 'var(--s2)', points: pS.points }, { name: 'Industry', color: 'var(--s3)', points: iS }], xLabel: ml, yFmt: (v) => fmtM(metric, v), yTickFmt: F().metricTick(metric), height: 220, endLabels: true }),
-        sources: src('member', 'peers', 'industry'), filters: `${D.P[p].long} · ${sName(s)} · peer group: ${g.name}`,
+        sources: src('member', 'peers', 'industry'), filters: `${pLong(p)} · ${sName(s)} · peer group: ${g.name}`,
         followups: ['Why did it change?', 'Where am I worse than the market?', 'What should I do about it?'],
         refusal: false
       },
@@ -181,7 +183,7 @@
   def('where_differ', 'Find the state × risk band cells where the member performs better or worse than the industry, like for like.', {
     product: P_PRODUCT, metric: P_METRIC, direction: { type: 'string', enum: ['better', 'worse'] }
   }, ['product'], (a) => {
-    const p = a.product || 'PL', metric = a.metric || 'dpd30', dir = a.direction || 'worse';
+    const p = a.product || 'ALL', metric = a.metric || 'dpd30', dir = a.direction || 'worse';
     const t = S.latest();
     const cells = [];
     D.STATES.forEach((x) => D.BANDS.forEach((b) => {
@@ -196,7 +198,7 @@
         paras: [`Where you are **${dir}** than the market (${mLow(metric)}, same state and risk band, ${ml(t)}):`],
         bullets: top.map((c) => `**${c.label}**: ${fmtM(metric, c.m)} vs industry ${fmtM(metric, c.i)} (${c.r.toFixed(2)}×) on ${F().cr(c.bal)}`),
         chart: (el) => PIQ.charts.bars(el, { items: top.map((c) => ({ label: c.label, value: c.m, ref: c.i })), fmt: (v) => fmtM(metric, v), color: 'var(--s1)', valueName: 'You', refName: 'Industry' }),
-        sources: src('member', 'industry'), filters: `${D.P[p].long} · like-for-like cells`,
+        sources: src('member', 'industry'), filters: `${pLong(p)} · like-for-like cells`,
         followups: ['Why did it change?', 'What should I do about it?']
       },
       facts: { cells: top.map((c) => ({ cell: c.label, member: fmtM(metric, c.m), industry: fmtM(metric, c.i) })) }
@@ -204,17 +206,17 @@
   });
 
   def('explain_change', 'Decompose the change in the member\'s delinquency into mix shift, market-wide change and member-specific performance, with top contributing segments.', {
-    product: P_PRODUCT, state: P_STATE, metric: { type: 'string', enum: ['dpd30', 'dpd90'] }, from_month: { type: 'string', description: 'YYYY-MM, default 2026-02 (policy change)' }
+    product: P_PRODUCT, state: P_STATE, metric: { type: 'string', enum: S.DPD_METRICS }, from_month: { type: 'string', description: 'YYYY-MM, default 2026-02 (policy change)' }
   }, ['product'], (a) => {
-    const p = a.product || 'PL', s = a.state || 'ALL', metric = a.metric || 'dpd30';
+    const p = a.product || 'ALL', s = a.state || 'ALL', metric = a.metric || 'dpd30';
     const t0 = D.MONTHS.includes(a.from_month) ? a.from_month : C.policyChangeMonth;
-    const d = S.decompose({ p, s, t0, t1: S.latest(), dim: s === 'ALL' ? 'sb' : 'b', metric });
+    const d = S.decompose({ p, s, t0, t1: S.latest(), dim: (p === 'ALL' ? 'p' : '') + (s === 'ALL' ? 'sb' : 'b'), metric });
     const n = PIQ.insights.narrateDecomposition(d);
     return {
       answer: {
         paras: [n.headline, `**${n.verdict}** ${n.drivers}`, n.segments],
         chart: (el) => PIQ.charts.waterfall(el, { start: { label: ml(t0), value: d.R0 }, steps: [{ label: 'Mix shift', value: d.mix }, { label: 'Market', value: d.market }, { label: 'Member-specific', value: d.own }], end: { label: ml(S.latest()), value: d.R1 }, fmt: (v) => F().pct(v), deltaFmt: (v) => Math.round(v * 10000) + ' bps', upIsBad: true, height: 230 }),
-        sources: src('member', 'industry'), filters: `${D.P[p].long} · ${sName(s)} · ${ml(t0)} → ${ml(S.latest())}`,
+        sources: src('member', 'industry'), filters: `${pLong(p)} · ${sName(s)} · ${ml(t0)} → ${ml(S.latest())}`,
         followups: ['What should I do about it?', s === 'ALL' ? 'What is driving the change in Gujarat?' : 'What if I raise my cut-off to 700 in ' + D.S[s].name + '?', ],
         link: { view: 'why', params: { p, s } }
       },
@@ -225,7 +227,7 @@
   def('recommend', 'Ranked, quantified recommended actions (cut-off changes, sourcing audits, early-warning checks, collections, growth).', {
     product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'collections', 'growth', 'policy'] }
   }, [], (a) => {
-    const p = a.product || 'PL', s = a.state || 'ALL', focus = a.focus || 'all';
+    const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
     let recs = PIQ.insights.recommendations(p);
     if (s !== 'ALL') recs = recs.filter((r) => !r.states.length || r.states.includes(s));
     if (focus === 'collections') recs = recs.filter((r) => r.kind === 'collections').concat(recs.filter((r) => r.kind !== 'collections')).slice(0, 2);
@@ -234,7 +236,7 @@
       answer: {
         paras: [recs.length ? `Here's what I'd do, ranked by impact:` : 'No action needed: performance is in line with the market.'],
         bullets: recs.map((r, i) => `**${i + 1}. ${r.title}.** ${r.impact.map(([k, v]) => k + ': ' + v).join(' · ')}`),
-        sources: src('member', 'industry', 'scores', 'logins'), filters: `${D.P[p].long} · ${sName(s)}`,
+        sources: src('member', 'industry', 'scores', 'logins'), filters: `${pLong(p)} · ${sName(s)}`,
         followups: ['What if I raise my cut-off to 700 in Uttar Pradesh?', 'What is happening with my applications this week?', 'Give me a summary for my board'],
         actions: recs.slice(0, 3).map((r) => ({ label: r.title.split(':')[0].slice(0, 48) + (r.title.length > 48 ? '…' : ''), view: r.action.view, params: r.action.params }))
       },
@@ -245,7 +247,7 @@
   def('simulate_cutoff', 'Simulate a score cut-off: approval rate, approvals, expected bad rate, expected loss and net contribution vs the current policy. Use cutoff 0 to find the profit-maximising cut-off.', {
     product: P_PRODUCT, state: P_STATE, cutoff: { type: 'integer', description: '600–800; 0 = find best' }
   }, ['product'], (a) => {
-    const p = a.product || 'PL', s = a.state || 'ALL';
+    const p = !a.product || a.product === 'ALL' ? 'PL' : a.product, s = a.state || 'ALL'; // cut-offs are product-specific
     const cur = C.currentCutoff[p];
     let c = a.cutoff || 0;
     if (!c) { const curve = S.simulateCurve(p, s); c = curve.reduce((m, r) => (r.netCr > m.netCr ? r : m), curve[0]).cutoff; }
@@ -264,7 +266,7 @@
           `Net contribution ${F().cr(A.netCr)} → **${F().cr(B.netCr)}** a month (${gain >= 0 ? '+' : '−'}${F().cr(Math.abs(gain))})`
         ],
         chart: (el) => PIQ.charts.line(el, { series: [{ name: 'Net contribution (₹ Cr / month)', color: 'var(--s1)', points: curve.map((r) => ({ x: r.cutoff, y: r.netCr })), marks: [c] }], xNumeric: true, xLabel: (x) => String(x), yFmt: F().cr, yTickFmt: (v) => v.toFixed(0), height: 190, area: true, annotations: [{ x: cur, label: 'Current ' + cur }] }),
-        sources: src('scores'), filters: `${D.P[p].long} · ${sName(s)} · last 90 days of applications`,
+        sources: src('scores'), filters: `${pLong(p)} · ${sName(s)} · last 90 days of applications`,
         followups: s === 'ALL' ? ['What is the best cut-off for Gujarat?', 'What if I raise my cut-off to 700 in Uttar Pradesh?'] : ['What is the best cut-off for Maharashtra?', 'What should I do about it?'],
         link: { view: 'simulator', params: { p, s, cutoff: c } }
       },
@@ -275,7 +277,7 @@
   def('application_pulse', 'Last 5 days vs prior 25 days of the member\'s applications/logins vs the industry: volume change, approval rate, share of applicants with 3+ enquiries, and where any surge comes from.', {
     product: P_PRODUCT, state: P_STATE, bands: { type: 'string', enum: ['all', 'near_prime_subprime'] }
   }, ['product'], (a) => {
-    const p = a.product || 'PL', s = a.state || 'ALL';
+    const p = a.product || 'ALL', s = a.state || 'ALL';
     const b = a.bands === 'near_prime_subprime' ? ['NP', 'SB'] : null;
     const c = S.loginCompare({ p, s, b }, 5);
     const mem = S.loginDaily('mem', { p, s, b }), ind = S.loginDaily('ind', { p, s, b });
@@ -288,7 +290,7 @@
       answer: {
         paras,
         chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: mem.map((x) => ({ x: x.x, y: (x.apps / bm) * 100 })) }, { name: 'Industry', color: 'var(--s3)', points: ind.map((x) => ({ x: x.x, y: (x.apps / bi) * 100 })) }], xLabel: (x) => F().day(x), yFmt: (v) => v.toFixed(0), height: 200, endLabels: true, annotations: [{ x: D.DAYS[D.DAYS.length - 5], label: 'Last 5 days' }] }),
-        sources: src('logins'), filters: `${D.P[p].long} · ${sName(s)} · index, prior 25-day avg = 100 · to ${C.loginsAsOf}`,
+        sources: src('logins'), filters: `${pLong(p)} · ${sName(s)} · index, prior 25-day avg = 100 · to ${C.loginsAsOf}`,
         followups: ['Where is the surge in applications coming from?', 'What should I do about it?', 'Show me the early-warning alerts'],
         link: { view: 'logins', params: { p, s } }
       },
@@ -309,16 +311,18 @@
     };
   });
 
-  def('market_share', 'The member\'s share of the 6-state market and growth vs the industry, by product.', { product: P_PRODUCT, state: P_STATE }, [], (a) => {
+  def('market_share', 'The member\'s market share and growth vs the industry, by product (or for the whole portfolio).', { product: P_PRODUCT, state: P_STATE }, [], (a) => {
     const s = a.state || 'ALL';
-    const prods = a.product ? [a.product] : ['PL', 'CC'];
-    const rows = prods.map((p) => { const x = PIQ.insights.snapshot(p, s); return { p, x }; });
+    const single = a.product && a.product !== 'ALL';
+    const rows = (single ? [a.product] : D.PRODUCTS.map((x) => x.id)).map((p) => { const x = PIQ.insights.snapshot(p, s); return { p, x }; })
+      .sort((u, v) => (v.x.share - v.x.share12) - (u.x.share - u.x.share12));
+    const prods = rows.slice(0, 3).map((r) => r.p);
     const shareSeries = (p) => S.series('member', 'bal', { p, s }).map((pt, i) => ({ x: pt.x, y: pt.y / S.series('industry', 'bal', { p, s })[i].y }));
     return {
       answer: {
         bullets: rows.map(({ p, x }) => `**${D.P[p].name}**: share **${F().pct(x.share, 2)}** (${F().pp(x.share - x.share12, 2)} YoY) · your balance ${F().cr(x.bal)} growing ${F().chg(x.growth)} vs industry ${F().chg(x.indGrowth)}`),
-        paras: [rows.length > 1 ? `${rows.sort((u, v) => (v.x.share - v.x.share12) - (u.x.share - u.x.share12))[0].p === 'PL' ? 'Personal loans' : 'Credit cards'} are gaining share faster.` : `In ${sName(s)}:`],
-        chart: (el) => PIQ.charts.line(el, { series: prods.map((p, i) => ({ name: D.P[p].name, color: i ? 'var(--s2)' : 'var(--s1)', points: shareSeries(p) })), xLabel: ml, yFmt: (v) => F().pct(v, 2), yTickFmt: (v) => (v * 100).toFixed(1) + '%', height: 200, endLabels: true }),
+        paras: [rows.length > 1 ? `**${rows[0].x && D.P[rows[0].p].name}** is gaining share fastest; **${D.P[rows[rows.length - 1].p].name}** is losing the most. Ranked by change in share over 12 months${s === 'ALL' ? '' : ' in ' + sName(s)}:` : `In ${sName(s)}:`],
+        chart: (el) => PIQ.charts.line(el, { series: prods.map((p, i) => ({ name: D.P[p].name, color: ['var(--s1)', 'var(--s2)', 'var(--s3)'][i], points: shareSeries(p) })), xLabel: ml, yFmt: (v) => F().pct(v, 2), yTickFmt: (v) => (v * 100).toFixed(1) + '%', height: 200, endLabels: true }),
         sources: src('member', 'industry'), filters: `${sName(s)} · market share of balance`,
         followups: ['Which states are growing fastest in personal loans?', 'Where should I grow my credit card book?']
       },
@@ -368,13 +372,15 @@
   });
 
   def('board_summary', 'A short board-ready summary of the portfolio: headline, drivers, alerts and actions.', {}, [], () => {
-    const pl = PIQ.insights.snapshot('PL', 'ALL'), cc = PIQ.insights.snapshot('CC', 'ALL');
+    const pl = PIQ.insights.snapshot('PL', 'ALL'), cc = PIQ.insights.snapshot('CC', 'ALL'), all = PIQ.insights.snapshot('ALL', 'ALL');
     const d = S.decompose({ p: 'PL', s: 'ALL', t0: C.policyChangeMonth, t1: S.latest(), dim: 'sb' });
-    const recs = PIQ.insights.recommendations('PL');
+    const dAll = S.decompose({ p: 'ALL', s: 'ALL', t0: C.policyChangeMonth, t1: S.latest() });
+    const recs = PIQ.insights.recommendations('ALL');
     return {
       answer: {
         paras: [`**Board summary, ${ml(S.latest())}**`],
         bullets: [
+          `Whole book ${F().cr(all.bal)}: 30+ DPD ${F().pct(all.dpd30)} (${F().bps(dAll.delta)} since ${ml(C.policyChangeMonth)} vs industry ${F().bps(dAll.indDelta)}), 90+ ${F().pct(all.dpd90)}, 180+ ${F().pct(all.dpd180)}.`,
           `Personal loan 30+ DPD ${F().pct(pl.dpd30)}, ${F().bps(d.delta)} since ${ml(C.policyChangeMonth)} (industry ${F().bps(d.indDelta)}). ${PIQ.insights.narrateDecomposition(d).verdict}`,
           `Drivers: mix ${F().bps(d.mix)}, market ${F().bps(d.market)}, member-specific ${F().bps(d.own)}; concentrated in Uttar Pradesh and Gujarat.`,
           `Credit cards: 30+ DPD ${F().pct(cc.dpd30)} vs peers ${F().pct(cc.peer30)}, a strength to build on.`,
@@ -413,14 +419,21 @@
   function extract(q) {
     const t = q.toLowerCase();
     const e = {};
-    const pl = /personal loan|\bpl\b|personal/.test(t), cc = /credit card|\bcards?\b|\bcc\b/.test(t);
-    if (/products\b/.test(t) && !pl && !cc) e.products = ['PL', 'CC'];
-    else if (pl && cc) e.products = ['PL', 'CC'];
-    else if (pl) e.product = 'PL';
-    else if (cc) e.product = 'CC';
+    const PRODS = [['PL', /personal loan|\bpl\b|personal/], ['CC', /credit card|\bcards?\b|\bcc\b/],
+      ['HL', /home loan|housing loan|\bhl\b|mortgage/], ['LAP', /\blap\b|loan against property|property loan/],
+      ['AL', /auto loan|car loan|vehicle loan|\bauto\b/], ['TW', /two.?wheeler|\btw\b|bike loan/], ['GL', /gold/],
+      ['MSME', /\bmsmes?\b|\bsmes?\b|small business|business loan/], ['AGRI', /\bagri|farm|kisan|\bkcc\b|crop|tractor/],
+      ['MFL', /micro.?finance(?! institution)|micro.?loan|\bjlg\b/]];
+    const found = PRODS.filter(([, re]) => re.test(t)).map(([id]) => id);
+    if (/\b(products|portfolio|book|overall|whole)\b/.test(t) && !found.length) e.product = 'ALL';
+    if (found.length > 1) e.products = found;
+    if (found.length) e.product = found[0];
     const states = [];
-    D.STATES.forEach((s) => { if (t.includes(s.name.toLowerCase())) states.push({ s: s.id, i: t.indexOf(s.name.toLowerCase()) }); });
-    [['MH', /\bMH\b/], ['TN', /\bTN\b/], ['KA', /\bKA\b/], ['UP', /\bUP\b/], ['GJ', /\bGJ\b/], ['TG', /\bTG\b|\btelengana\b/i]].forEach(([id, re]) => { const m = q.match(re); if (m && !states.find((x) => x.s === id)) states.push({ s: id, i: m.index }); });
+    D.STATES.forEach((s) => { const n = s.name.toLowerCase().replace(/ \(nct\)| states/g, ''); if (t.includes(n)) states.push({ s: s.id, i: t.indexOf(n) }); });
+    [['NE', /north.?east|assam|meghalaya|manipur|mizoram|nagaland|tripura|sikkim|arunachal/], ['DL', /\bdelhi\b|\bncr\b|gurgaon|gurugram/], ['JK', /kashmir|\bj&k\b/],
+      ['OD', /orissa/], ['UT', /\buts?\b|union territor|ladakh|andaman|lakshadweep|puducherry|pondicherry|chandigarh/]]
+      .forEach(([id, re]) => { const m = t.match(re); if (m && !states.find((x) => x.s === id)) states.push({ s: id, i: m.index }); });
+    ['MH', 'TN', 'KA', 'UP', 'GJ', 'TG', 'AP', 'MP', 'WB', 'RJ', 'KL', 'PB', 'DL', 'BR'].map((id) => [id, new RegExp('\\b' + id + '\\b')]).concat([['TG', /\btelengana\b/i]]).forEach(([id, re]) => { const m = q.match(re); if (m && !states.find((x) => x.s === id)) states.push({ s: id, i: m.index }); });
     if (/\bmumbai\b|\bpune\b/.test(t)) states.push({ s: 'MH', i: 0 });
     if (/\bchennai\b/.test(t)) states.push({ s: 'TN', i: 0 });
     if (/\bbengaluru\b|\bbangalore\b/.test(t)) states.push({ s: 'KA', i: 0 });
@@ -435,9 +448,10 @@
     else if (/near.?prime/.test(t)) e.band = 'NP';
     else if (/sub.?prime/.test(t)) e.band = 'SB';
     const LT = [['PSU', /\bpsus?\b|public sector/], ['PVT', /\bpvts?\b|private (sector )?banks?/], ['NBFC', /\bnbfcs?\b/], ['FIN', /fintech/],
-      ['SFB', /\bsfbs?\b|small finance/], ['MFI', /\bmfis?\b|micro.?finance/], ['RRB', /\brrbs?\b|\bdccbs?\b|regional rural|co-?operative bank/], ['HFC', /\bhfcs?\b|housing finance/]];
+      ['SFB', /\bsfbs?\b|small finance/], ['MFI', /\bmfis?\b|micro.?finance institution/], ['RRB', /\brrbs?\b|\bdccbs?\b|regional rural|co-?operative bank/], ['HFC', /\bhfcs?\b|housing finance/]];
     e.lenders = LT.filter(([, re]) => re.test(t)).map(([id]) => id);
-    if (/90\+|90 plus|90 dpd|\bnpa\b/.test(t)) e.metric = 'dpd90';
+    if (/180\+|180 plus|180 dpd|180 days/.test(t)) e.metric = 'dpd180';
+    else if (/90\+|90 plus|90 dpd|\bnpa\b/.test(t)) e.metric = 'dpd90';
     else if (/cure|collection/.test(t)) e.metric = 'cure';
     else if (/30\+|delinquen|\bdpd\b|risk|deteriorat|bad rate|stress/.test(t)) e.metric = 'dpd30';
     else if (/originat|disburs/.test(t)) e.metric = 'orig';
@@ -458,12 +472,12 @@
   }
 
   // ---------------- intent routing ----------------
-  const ctx = { product: 'PL', state: 'ALL', metric: 'dpd30', intent: null, who: 'industry' };
+  const ctx = { product: 'ALL', state: 'ALL', metric: 'dpd30', intent: null, who: 'industry' };
   function route(q) {
     const t = q.toLowerCase().trim();
     const e = extract(q);
     const followUp = /^(and|now|what about|how about|same|compare (that|it|this)|and for|then)\b/.test(t) || /\b(that|it)\b/.test(t) && t.split(' ').length < 9;
-    const p = e.product || (followUp ? ctx.product : 'PL');
+    const p = e.product || (followUp ? ctx.product : 'ALL');
     const st = e.states.length ? e.states[0] : followUp ? ctx.state : 'ALL';
     const metric = e.metric || (followUp ? ctx.metric : null);
 
@@ -485,7 +499,7 @@
     if (/(growth|growing).*(versus|vs|against|compared|than)/.test(t)) return call('market_share', { product: e.product, state: st });
     if (/why|driv|reason|cause|contribut|which segments|me or the market|explain|how much of the change|what changed|open the full analysis/.test(t)) {
       if (/open the full/.test(t)) return { name: 'nav', args: { view: 'why' } };
-      return call('explain_change', { product: p, state: st, metric: metric === 'dpd90' ? 'dpd90' : 'dpd30', from_month: e.from });
+      return call('explain_change', { product: p, state: st, metric: S.DPD_METRICS.includes(metric) ? metric : 'dpd30', from_month: e.from });
     }
     if (/better than the market|worse than the market|where am i (better|worse)|outperform|underperform/.test(t)) return call('where_differ', { product: p, metric: metric || 'dpd30', direction: /better|outperform/.test(t) ? 'better' : 'worse' });
     if (/market share|gaining share|\bshare\b/.test(t)) return call('market_share', { product: e.products ? undefined : e.product, state: st });

@@ -1,17 +1,18 @@
 /* Peer Benchmarking — member vs peer group vs industry, with privacy guardrails enforced live. */
 (function () {
   const PIQ = window.PIQ;
-  const { h, fmt, ml, state, setState, card, stat, sourceText, pageHead, productStateFilters, select, stateName } = PIQ.ui;
+  const { h, fmt, ml, state, setState, card, stat, sourceText, pageHead, productStateFilters, select, stateName, prodLong } = PIQ.ui;
   const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
-  let metric = 'dpd30';
+  let metric = null; // null = follow the global delinquency bucket
   let custom = { types: ['PVT'], sizes: ['Mid'] };
 
   function render(root, params) {
     if (params && params.metric) metric = params.metric;
+    if (!metric || S.DPD_METRICS.includes(metric)) metric = state.dpd;
     const p = state.p, s = state.s;
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
     const bar = productStateFilters(root);
-    select(bar, 'Metric', ['dpd30', 'dpd90', 'cure'].map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; PIQ.go('benchmark'); });
+    select(bar, 'Metric', S.DPD_METRICS.concat(['cure']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (S.DPD_METRICS.includes(v)) setState({ dpd: v }); else PIQ.go('benchmark'); });
     select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
     const group = state.peer === 'custom' ? Object.assign({ id: 'custom', name: 'Custom group' }, custom) : S.PEER_GROUPS.find((g) => g.id === state.peer);
@@ -72,7 +73,7 @@
     g.style.marginTop = '16px';
     const mS = S.series('member', metric, f), iS = S.series('industry', metric, f);
     const c1 = card(g, {
-      title: `${M.name}: trend`, sub: `${D.P[p].long} · ${stateName(s)}`,
+      title: `${M.name}: trend`, sub: `${prodLong(p)} · ${stateName(s)}`,
       source: sourceText(['member', 'peers', 'industry']),
       table: () => ({ cols: [{ name: 'Month' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: mS.map((x, i) => [ml(x.x), fmt.pct(x.y), ps.suppressed ? 'Suppressed' : fmt.pct(ps.points[i].y), fmt.pct(iS[i].y)]) })
     });
@@ -81,29 +82,33 @@
       xLabel: ml, yFmt: (v) => fmt.pct(v), yTickFmt: fmt.metricTick(metric), endLabels: true, height: 270
     });
 
-    const rows = D.STATES.map((x) => ({
+    const topStates = D.STATES.slice().sort((a, b) => S.value('member', 'bal', { p, s: b.id, m: t }) - S.value('member', 'bal', { p, s: a.id, m: t })).slice(0, 12);
+    const rows = topStates.map((x) => ({
       label: x.name,
       values: { mem: S.value('member', metric, { p, s: x.id, m: t }), peer: S.peerValue(group.id === 'custom' ? group : group.id, metric, { p, s: x.id, m: t }), ind: S.value('industry', metric, { p, s: x.id, m: t }) }
     }));
     const c2 = card(g, {
-      title: `${M.short} by state`, sub: ml(t) + ' · the gap between dots is your story',
+      title: `${M.short} by state`, sub: ml(t) + ' · your 12 largest states · the gap between dots is your story',
       source: sourceText(['member', 'peers', 'industry']),
       table: () => ({ cols: [{ name: 'State' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: rows.map((r) => [r.label, fmt.pct(r.values.mem), fmt.pct(r.values.peer), fmt.pct(r.values.ind)]) })
     });
     PIQ.charts.dots(c2.viz, { rows, series: [{ key: 'mem', name: C.member.name, color: 'var(--s1)' }, { key: 'peer', name: 'Peers', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v) });
 
     // Diverging heatmap: member vs industry ratio
-    const c3 = card(g, { cls: 'span2', title: 'Where you differ from the market: state × risk band', sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
+    // Rows are products for the whole book (like-for-like needs the same product), states otherwise
+    const byProd = p === 'ALL';
+    const rowList = byProd ? D.PRODUCTS.map((x) => ({ id: x.id, name: x.name, f: { p: x.id, s } })) : topStates.map((x) => ({ id: x.id, name: x.name, f: { p, s: x.id } }));
+    const c3 = card(g, { cls: 'span2', title: `Where you differ from the market: ${byProd ? 'product' : 'state'} × risk band`, sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
     const tb = h('table', 'tbl heat', h('div', 'table-wrap', c3.viz));
     const hr = h('tr', null, h('thead', null, tb));
-    h('th', null, hr, 'State');
+    h('th', null, hr, byProd ? 'Product' : 'State');
     D.BANDS.forEach((b) => { const th = h('th', null, hr, b.name + ' (' + b.range + ')'); th.style.textAlign = 'center'; });
     const body = h('tbody', null, tb);
-    D.STATES.forEach((x) => {
+    rowList.forEach((x) => {
       const r = h('tr', null, body);
       h('td', null, r, x.name);
       D.BANDS.forEach((b) => {
-        const a = S.value('member', metric, { p, s: x.id, b: b.id, m: t }), ii = S.value('industry', metric, { p, s: x.id, b: b.id, m: t });
+        const a = S.value('member', metric, Object.assign({ b: b.id, m: t }, x.f)), ii = S.value('industry', metric, Object.assign({ b: b.id, m: t }, x.f));
         const ratio = a / ii;
         const worse = M.bad ? ratio > 1 : ratio < 1;
         const k = Math.min(1, Math.abs(Math.log(ratio)) / Math.log(1.8));

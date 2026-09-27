@@ -57,14 +57,17 @@
     PIQ.charts.dots(c2.viz, { rows: mixRows, series: [{ key: 'memR', name: 'You · last 5 days', color: 'var(--s1)' }, { key: 'memP', name: 'You · prior 25 days', color: 'var(--s2)' }, { key: 'indR', name: 'Industry · last 5 days', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v, 0) });
 
     // State table
-    const sc = card(root, { title: 'By state: where is the surge?', sub: 'Last 5 days vs prior 25 days', source: sourceText(['logins']) });
+    const sc = card(root, { title: 'By state: where is the surge?', sub: 'Last 5 days vs weekday-matched baseline · states where you have volume, biggest gap to market first', source: sourceText(['logins']) });
     sc.el.style.marginTop = '16px';
     const t = h('table', 'tbl', h('div', 'table-wrap', sc.viz));
     const hr = h('tr', null, h('thead', null, t));
     ['State', 'Your apps / day', 'Your change', 'Industry change', 'Your approval rate', 'Industry approval rate', '3+ enquiries (you)', '3+ enquiries (industry)', 'Signal'].forEach((x, i) => h('th', i ? 'r' : '', hr, x));
     const tb = h('tbody', null, t);
-    D.STATES.forEach((st) => {
-      const x = S.loginCompare({ p, s: st.id, b }, 5);
+    const memDaily = S.loginCompare({ p, b }, 5).mem.recent.perDay;
+    D.STATES.map((st) => ({ st, x: S.loginCompare({ p, s: st.id, b }, 5) }))
+      .filter((o) => o.x.mem.recent.perDay >= memDaily * 0.01)
+      .sort((a, c) => (c.x.mem.change - c.x.ind.change) - (a.x.mem.change - a.x.ind.change))
+      .forEach(({ st, x }) => {
       const r = h('tr', null, tb);
       h('td', null, r, st.name);
       h('td', 'r', r, fmt.int(x.mem.recent.perDay));

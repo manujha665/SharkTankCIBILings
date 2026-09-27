@@ -170,18 +170,20 @@
     });
     PIQ.charts.bars(c1.viz, { items: dims.map((d) => ({ label: d, value: ins.byDim[d].d30 / ins.byDim[d].bal, ref: ins.byDim[d].exp / ins.byDim[d].bal })), fmt: (v) => fmt.pct(v), color: 'var(--s1)', valueName: 'Your 30+ DPD', refName: 'Market-expected' });
 
-    const c2 = card(g, { title: `Performance index by ${dimName} × state`, sub: 'Actual ÷ market-expected 30+ DPD, near-prime & subprime only. Above 1.0 = worse than market', source: 'Source: uploaded file joined to industry · like-for-like' });
+    const c2 = card(g, { title: `Performance index by ${dimName} × state`, sub: 'Actual ÷ market-expected 30+ DPD, near-prime & subprime, your 8 largest states. Above 1.0 = worse than market', source: 'Source: uploaded file joined to industry · like-for-like' });
     const L = PIQ.uploaded.recs.filter((r) => r.m === ins.last && (r.b === 'NP' || r.b === 'SB'));
     const cells = groupBy(L, (r) => r.dim + '|' + r.s);
     const tb = h('table', 'tbl heat', h('div', 'table-wrap', c2.viz));
     const hr = h('tr', null, h('thead', null, tb));
     h('th', null, hr, dimName);
-    D.STATES.forEach((s) => { const th = h('th', null, hr, s.id); th.style.textAlign = 'center'; th.title = s.name; });
+    const balBy = groupBy(L, (r) => r.s);
+    const topS = D.STATES.filter((s) => balBy[s.id]).sort((a, b) => balBy[b.id].bal - balBy[a.id].bal).slice(0, 8);
+    topS.forEach((s) => { const th = h('th', null, hr, s.id); th.style.textAlign = 'center'; th.title = s.name; });
     const body = h('tbody', null, tb);
     dims.forEach((d) => {
       const r = h('tr', null, body);
       h('td', null, r, d);
-      D.STATES.forEach((s) => {
+      topS.forEach((s) => {
         const a = cells[d + '|' + s.id];
         const idx = a ? a.d30 / a.exp : null;
         const td = h('td', 'cell', r, idx ? idx.toFixed(2) + '×' : '—');

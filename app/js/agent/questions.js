@@ -32,9 +32,9 @@
       'How are fintechs and MFIs performing on personal loans?',
       'Compare PSU, PVT and SFB on delinquency',
       'Is the industry taking more risk in personal loans?',
-      'What is the risk band mix of the credit card market?',
+      'What is the risk band mix of the LAP market?',
       'How have industry originations changed this year?',
-      'What is the 90+ DPD trend for credit cards?'
+      'What is the 180+ DPD trend in MSME loans?'
     ] },
     { cat: 'Risk trends', qs: [
       'How is portfolio risk changing?',
@@ -43,13 +43,13 @@
       'How is subprime performing in personal loans?',
       'How does near-prime delinquency compare across states?',
       'Show me the early-warning alerts',
-      'Is credit card risk rising?'
+      'Is agri loan risk rising?'
     ] },
     { cat: 'Collection trends', qs: [
       'How are collection trends changing?',
       'Which state has the weakest cure rate?',
       'How does my collection performance compare with peers?',
-      'What is the cure rate trend for credit cards?',
+      'Which states show microfinance stress?',
       'Is my cure rate falling in Uttar Pradesh?'
     ] },
     { cat: 'Benchmarking', qs: [
@@ -57,7 +57,7 @@
       'Compare my personal loan delinquency with the industry in Gujarat',
       'Where am I better than the market?',
       'Where am I worse than the market?',
-      'How is my credit card book doing versus peers?',
+      'How is my housing loan book doing versus peers?',
       'Benchmark me against SFB peers',
       'Benchmark me against HFC peers'
     ] },
@@ -66,7 +66,7 @@
       'Which products are gaining share?',
       'How fast is my book growing versus the market?',
       'Which states are growing fastest in personal loans?',
-      'How is my credit card growth versus the industry?',
+      'How fast are gold loans growing?',
       'What is my balance in Maharashtra?'
     ] },
     { cat: 'Applications & logins', qs: [
@@ -75,13 +75,13 @@
       'Where is the surge in applications coming from?',
       'How many of my applicants have multiple enquiries?',
       'How does my approval rate compare with the industry?',
-      'Show me credit card application trends'
+      'Show me housing loan application trends'
     ] },
     { cat: 'Geographic intelligence', qs: [
       'What is happening in Tamil Nadu?',
       'How does Gujarat compare with the national market?',
       'Which regions are showing significant changes?',
-      'Compare Karnataka and Telangana on delinquency',
+      'Compare Bihar and Odisha on microfinance delinquency',
       'What is the trend in personal loans in Maharashtra?'
     ] },
     { cat: 'Your data & definitions', qs: [

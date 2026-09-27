@@ -12,7 +12,7 @@
     months.forEach((m) => {
       D.STATES.forEach((st) => {
         D.BANDS.forEach((b) => {
-          const r = D.member.find((x) => x.m === m && x.p === 'PL' && x.s === st.id && x.b === b.id);
+          const r = D.cube.member.sum({ m, p: 'PL', s: st.id, b: b.id });
           const hot = (st.id === 'GJ' || st.id === 'UP') && (b.id === 'NP' || b.id === 'SB');
           const share = hot ? { Branch: 0.25, DSA: 0.55, Digital: 0.2 } : { Branch: 0.45, DSA: 0.3, Digital: 0.25 };
           const mult = hot

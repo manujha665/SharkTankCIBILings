@@ -10,15 +10,17 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 
 ## 0:30 — Command Centre (60 sec)
 
-- Point at the hero: **2.90%, up 80 bps since February; industry up only 30.**
-- Read the verdict: **"Mostly you — this is within your control."** Point at the split bar: 49% mix, 24% market, 27% member-specific.
+- The page opens on the **whole portfolio** (all 10 products, all states). Point at the hero: **2.10%, up 15 bps since February, while the industry was flat (+2 bps).**
+- Read the verdict: **"Mostly you — this is within your control."** Point at the "30+ DPD by product" card: personal loans stand out.
+- Flip the **30+ / 90+ / 180+** switch once to show the deeper buckets tell the same story.
+- Switch **Product** to **Personal Loan**: **3.21%, up 78 bps; industry up 31.** Split bar: 44% mix, 29% market, 27% member-specific.
 - Point at the alerts: *"Nobody asked for these. The platform found them."* Call out the application surge in UP and Gujarat.
 
 ## 1:30 — Why did it change? The hero feature (75 sec)
 
 - Click **Why did it change? →**
-- Walk the waterfall: *"Start at 2.11%. The mix shift added 39 bps. The market added 19. Your own segments added 22. That's where you ended up."*
-- Switch **State** to **Gujarat**: *"Here the market barely moved, only 15 bps. This one is entirely yours."* Then switch to **Uttar Pradesh**: *"Here it's both."*
+- Walk the waterfall: *"Start at 2.43%. The mix shift added 34 bps. The market added 23. Your own segments added 21. That's where you ended up."*
+- Switch **State** to **Gujarat**: *"Here the market barely moved, only 14 bps. This one is entirely yours."* Then switch to **Uttar Pradesh**: *"Here it's both."*
 - Line: *"Same symptom, two different diseases, and two different treatments."*
 
 ## 2:45 — What should I do? → Simulator (60 sec)
@@ -30,7 +32,7 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 ## 3:45 — Login & Application Pulse (45 sec)
 
 - *"Delinquency is a lagging indicator. This is the leading one."*
-- Show near-prime and subprime applications up ~95% in 5 days vs ~8–9% for the market, and nearly half of those applicants with 3+ enquiries in 30 days.
+- Show near-prime and subprime applications up ~95% in 5 days vs ~5% for the market, and nearly half of those applicants with 3+ enquiries in 30 days.
 - *"No bureau product shows a lender this today. We already receive the enquiries; we just aren't showing them back."*
 
 ## 4:30 — AI Analyst (75 sec)
@@ -46,7 +48,7 @@ Point at the **Source / Filters / Tools** chips: *"Every number is traceable. Th
 ## 5:45 — Bring Your Data (40 sec)
 
 - **Use the sample file** → **Validate** → **Generate insights**.
-- *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 1.56× the market."*
+- *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 1.49× the market."*
 - Mention: the file never leaves the member's tenant.
 
 ## 6:25 — Board Brief + close (35 sec)
@@ -89,5 +91,5 @@ Keep assumptions conservative. Judges discount aggressive numbers.
 
 ## Data notes
 
-- The six demo states (Maharashtra, Tamil Nadu, Karnataka, Uttar Pradesh, Gujarat, Telangana) are among India's largest retail-credit markets. **Check the ranking and weights against the latest published industry reports before quoting any figure. All numbers in the demo are synthetic.**
+- The demo covers every state (north-eastern states grouped, small UTs grouped) and 10 products. State and product weights are illustrative. **Check them against the latest published industry reports before quoting any figure. All numbers in the demo are synthetic.**
 - Risk bands follow the familiar super-prime → subprime tiers; score ranges are illustrative.

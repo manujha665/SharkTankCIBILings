@@ -25,6 +25,13 @@ node server.js          # Node 18+, no npm install needed
 
 To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_SETUP.md). If no LLM is configured, or the LLM fails mid-demo, the analyst falls back to the governed engine automatically, so the demo can't break.
 
+## Coverage
+
+- **Products (10):** Personal Loan, Credit Card, Housing Loan, Loan Against Property, Auto Loan, Two-Wheeler Loan, Gold Loan, MSME Loan, Agri Loan, Microfinance Loan, plus **All products** (the default).
+- **Geography (24):** every state individually, the 8 north-eastern states grouped as **North-East states**, Delhi (NCT), Jammu & Kashmir, and **Other UTs**, plus **All states** (the default).
+- **Lender categories (8):** PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC.
+- **Delinquency buckets:** a 30+ / 90+ / 180+ switch in the filter bar (default 30+).
+
 ## What's inside (10 modules)
 
 | Module | What it shows | Why it matters in the pitch |
@@ -43,15 +50,16 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 
 ## The demo story (built into the synthetic data)
 
-*Sahyadri Bank* (a fictional mid-size private bank) loosened its personal loan cut-off from 700 to 680 in Feb 2026.
+*Sahyadri Bank* (a fictional mid-size private bank with a ₹93,000 Cr book across 10 products) loosened its personal loan cut-off from 700 to 680 in Feb 2026.
 
-1. PL 30+ DPD rose **+80 bps** (2.11% → 2.90%) while the industry rose +30 bps.
-2. **Why?** 49% mix shift, 24% market, 27% member-specific. It's mostly within the bank's control.
+0. **Whole portfolio** (the default view): 30+ DPD rose **+15 bps** (1.95% → 2.10%) while the industry was flat (+2 bps). The top contributing segments are all personal loans in UP and Gujarat.
+1. **Personal loans**: 30+ DPD rose **+78 bps** (2.43% → 3.21%) while the industry rose +31 bps.
+2. **Why?** 44% mix shift, 29% market, 27% member-specific. It's mostly within the bank's control.
 3. **Uttar Pradesh**: the market is deteriorating *and* the bank added risk. **Gujarat**: the market is flat; the deterioration is the bank's own.
 4. **Logins**: near-prime and subprime applications in UP & Gujarat are up ~95% in 5 days, with high enquiry intensity. That's the next wave, visible now.
 5. **What to do**: restore 700 in UP & Gujarat only (the simulator shows net contribution rises), add checks on the application surge, and audit sourcing in Gujarat.
-6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **1.56×** the market. Root cause found.
-7. **Credit cards** are a strength (108 bps better than PVT · Mid-size peers), so there's room to grow.
+6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **1.49×** the market. Root cause found.
+7. **Credit cards** are a strength (109 bps better than PVT · Mid-size peers), so there's room to grow.
 
 ## Architecture
 

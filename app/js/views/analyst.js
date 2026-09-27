@@ -57,7 +57,7 @@
         const c = PIQ.agent.ctx;
         m.ctx.innerHTML = '';
         h('span', null, m.ctx, 'Context:');
-        [PIQ.data.P[c.product].name, c.state === 'ALL' ? 'All states' : PIQ.data.S[c.state].name, PIQ.sem.METRICS[c.metric].short].forEach((x) => h('span', 'tag', m.ctx, x));
+        [PIQ.ui.prodName(c.product), PIQ.ui.stateName(c.state), PIQ.sem.METRICS[c.metric].short].forEach((x) => h('span', 'tag', m.ctx, x));
         h('span', 'muted', m.ctx, '· follow-ups keep this context');
       }
     });
