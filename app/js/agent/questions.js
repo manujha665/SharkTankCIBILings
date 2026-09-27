@@ -29,8 +29,8 @@
       'What is happening in personal loans?',
       'What has been the industry growth trend for credit cards?',
       'What is the trend in 30+ DPD for personal loans?',
-      'How are fintech lenders performing on personal loans?',
-      'Compare PSU banks and private banks on delinquency',
+      'How are fintechs and MFIs performing on personal loans?',
+      'Compare PSU, PVT and SFB on delinquency',
       'Is the industry taking more risk in personal loans?',
       'What is the risk band mix of the credit card market?',
       'How have industry originations changed this year?',
@@ -53,13 +53,13 @@
       'Is my cure rate falling in Uttar Pradesh?'
     ] },
     { cat: 'Benchmarking', qs: [
-      'How do I compare with mid-size private bank peers?',
+      'How do I compare with PVT mid-size peers?',
       'Compare my personal loan delinquency with the industry in Gujarat',
       'Where am I better than the market?',
       'Where am I worse than the market?',
       'How is my credit card book doing versus peers?',
-      'Benchmark me against NBFCs',
-      'Benchmark me against large private banks'
+      'Benchmark me against SFB peers',
+      'Benchmark me against HFC peers'
     ] },
     { cat: 'Business & growth', qs: [
       'What is my market share in personal loans?',

@@ -10,15 +10,15 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 
 ## 0:30 — Command Centre (60 sec)
 
-- Point at the hero: **2.87%, up 77 bps since February; industry up only 28.**
-- Read the verdict: **"Mostly you — this is within your control."** Point at the split bar: 53% mix, 23% market, 24% member-specific.
+- Point at the hero: **2.90%, up 80 bps since February; industry up only 30.**
+- Read the verdict: **"Mostly you — this is within your control."** Point at the split bar: 49% mix, 24% market, 27% member-specific.
 - Point at the alerts: *"Nobody asked for these. The platform found them."* Call out the application surge in UP and Gujarat.
 
 ## 1:30 — Why did it change? The hero feature (75 sec)
 
 - Click **Why did it change? →**
-- Walk the waterfall: *"Start at 2.10%. The mix shift added 41 bps. The market added 17. Your own segments added 19. That's where you ended up."*
-- Switch **State** to **Gujarat**: *"Here the market barely moved, only 12 bps. This one is entirely yours."* Then switch to **Uttar Pradesh**: *"Here it's both."*
+- Walk the waterfall: *"Start at 2.11%. The mix shift added 39 bps. The market added 19. Your own segments added 22. That's where you ended up."*
+- Switch **State** to **Gujarat**: *"Here the market barely moved, only 15 bps. This one is entirely yours."* Then switch to **Uttar Pradesh**: *"Here it's both."*
 - Line: *"Same symptom, two different diseases, and two different treatments."*
 
 ## 2:45 — What should I do? → Simulator (60 sec)
@@ -30,7 +30,7 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 ## 3:45 — Login & Application Pulse (45 sec)
 
 - *"Delinquency is a lagging indicator. This is the leading one."*
-- Show near-prime and subprime applications up ~95% in 5 days vs ~5–9% for the market, and nearly half of those applicants with 3+ enquiries in 30 days.
+- Show near-prime and subprime applications up ~95% in 5 days vs ~8–9% for the market, and nearly half of those applicants with 3+ enquiries in 30 days.
 - *"No bureau product shows a lender this today. We already receive the enquiries; we just aren't showing them back."*
 
 ## 4:30 — AI Analyst (75 sec)
@@ -65,7 +65,7 @@ No. Three things are new: (1) the decomposition that separates *your* problem fr
 The LLM never calculates. It picks from 16 governed tools, and the tools return the numbers. Every answer shows its source, filters and tool. If no tool fits, it says "not in the approved datasets." Guardrails run before the LLM is called.
 
 **"How do you protect member confidentiality?"**
-There are four layers: tenant isolation in the data layer; peer groups need at least 5 institutions with no single institution above 25% of balance (both demonstrated live: try "Large private banks" or "NBFCs"); no borrower-level data; and a full audit trail.
+There are four layers: tenant isolation in the data layer; peer groups need at least 5 institutions with no single institution above 25% of balance (both demonstrated live: pick "PVT · Large" or "NBFC" in the peer group list); no borrower-level data; and a full audit trail.
 
 **"Is it feasible?"**
 The data already exists. The prototype is dependency-free and runs anywhere. The LLM layer is provider-agnostic: Claude or any OpenAI-compatible approved gateway, swapped with one setting. In production the semantic layer sits on the existing platform (OneTru / the modelling platform) and the dashboards reuse existing batch outputs.

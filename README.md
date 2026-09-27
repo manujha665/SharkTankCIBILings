@@ -31,7 +31,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 |---|---|---|
 | **Command Centre** | Monday-morning view: the headline number, "is it me or the market", auto alerts, top 3 actions | Opens the story in 30 seconds |
 | **Industry Intelligence** | Market trends by product, state, lender type and risk band; standard vs self-service modes with saved views | Replaces static industry reports |
-| **Peer Benchmarking** | You vs a peer group vs industry; custom peer builder; state × band heatmap | Privacy guardrails enforced live |
+| **Peer Benchmarking** | You vs a peer group vs industry across 8 lender categories (PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC); custom peer builder; state × band heatmap | Privacy guardrails enforced live |
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
 | **What should I do?** ⭐ | Ranked, quantified recommendations, each linked to a simulation | Turns insight into decisions |
 | **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state | "Surgical, not blanket" policy |
@@ -45,13 +45,13 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 
 *Sahyadri Bank* (a fictional mid-size private bank) loosened its personal loan cut-off from 700 to 680 in Feb 2026.
 
-1. PL 30+ DPD rose **+77 bps** (2.10% → 2.87%) while the industry rose +28 bps.
-2. **Why?** 53% mix shift, 23% market, 24% member-specific. It's mostly within the bank's control.
+1. PL 30+ DPD rose **+80 bps** (2.11% → 2.90%) while the industry rose +30 bps.
+2. **Why?** 49% mix shift, 24% market, 27% member-specific. It's mostly within the bank's control.
 3. **Uttar Pradesh**: the market is deteriorating *and* the bank added risk. **Gujarat**: the market is flat; the deterioration is the bank's own.
 4. **Logins**: near-prime and subprime applications in UP & Gujarat are up ~95% in 5 days, with high enquiry intensity. That's the next wave, visible now.
 5. **What to do**: restore 700 in UP & Gujarat only (the simulator shows net contribution rises), add checks on the application surge, and audit sourcing in Gujarat.
 6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **1.56×** the market. Root cause found.
-7. **Credit cards** are a strength (122 bps better than peers), so there's room to grow.
+7. **Credit cards** are a strength (108 bps better than PVT · Mid-size peers), so there's room to grow.
 
 ## Architecture
 

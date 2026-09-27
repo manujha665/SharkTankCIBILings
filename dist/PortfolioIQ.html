@@ -30,6 +30,8 @@
   --s4: #eda100;
   --s5: #e87ba4;
   --s6: #008300;
+  --s7: #4a3aa7;
+  --s8: #e34948;
   --st-good: #0ca30c;
   --st-warning: #fab219;
   --st-serious: #ec835a;
@@ -52,7 +54,7 @@
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.1);
     --nav: #0a1628; --nav-ink: #b6c3d8; --nav-active: #172c4b;
     --accent: #3987e5; --accent-ink: #86b6ef;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     --good-ink: #0ca30c; --bad-ink: #e66767;
     --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
     --r1: #184f95; --r2: #256abf; --r3: #3987e5; --r4: #6da7ec; --r5: #9ec5f4;
@@ -66,7 +68,7 @@
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.1);
   --nav: #0a1628; --nav-ink: #b6c3d8; --nav-active: #172c4b;
   --accent: #3987e5; --accent-ink: #86b6ef;
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --good-ink: #0ca30c; --bad-ink: #e66767;
   --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
   --r1: #184f95; --r2: #256abf; --r3: #3987e5; --r4: #6da7ec; --r5: #9ec5f4;
@@ -461,18 +463,23 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     { id: 'SB', name: 'Subprime', range: '≤680', lo: 300, sens: 1.35, cure: 0.31 }
   ];
   const LENDERS = [
-    { id: 'PSU', name: 'PSU Banks', risk: 1.05, trend: 0.7 },
-    { id: 'PVT', name: 'Private Banks', risk: 0.86, trend: 0.9 },
-    { id: 'NBFC', name: 'NBFCs', risk: 1.14, trend: 1.1 },
-    { id: 'FIN', name: 'Fintech Lenders', risk: 1.38, trend: 1.6 }
+    // Labels are abbreviations only (UI requirement); long form kept for reference.
+    { id: 'PSU', name: 'PSU', long: 'Public sector banks', risk: 1.05, trend: 0.7 },
+    { id: 'PVT', name: 'PVT', long: 'Private sector banks', risk: 0.86, trend: 0.9 },
+    { id: 'NBFC', name: 'NBFC', long: 'Non-banking financial companies', risk: 1.14, trend: 1.1 },
+    { id: 'FIN', name: 'Fintech', long: 'Fintech lenders', risk: 1.38, trend: 1.6 },
+    { id: 'SFB', name: 'SFB', long: 'Small finance banks', risk: 1.22, trend: 1.2 },
+    { id: 'MFI', name: 'MFI', long: 'Microfinance institutions', risk: 1.5, trend: 1.4 },
+    { id: 'RRB', name: 'RRB/DCCB', long: 'Regional rural & district co-operative banks', risk: 1.3, trend: 0.9 },
+    { id: 'HFC', name: 'HFC', long: 'Housing finance companies', risk: 0.95, trend: 0.8 }
   ];
   const bandShare = {
     PL: { SP: 0.3, PP: 0.22, PR: 0.22, NP: 0.15, SB: 0.11 },
     CC: { SP: 0.34, PP: 0.22, PR: 0.2, NP: 0.14, SB: 0.1 }
   };
   const lenderShare = {
-    PL: { PSU: 0.22, PVT: 0.4, NBFC: 0.26, FIN: 0.12 },
-    CC: { PSU: 0.12, PVT: 0.72, NBFC: 0.08, FIN: 0.08 }
+    PL: { PSU: 0.2, PVT: 0.36, NBFC: 0.22, FIN: 0.1, SFB: 0.05, MFI: 0.02, RRB: 0.03, HFC: 0.02 },
+    CC: { PSU: 0.12, PVT: 0.69, NBFC: 0.07, FIN: 0.06, SFB: 0.03, MFI: 0.01, RRB: 0.01, HFC: 0.01 }
   };
   const baseDpd = {
     PL: { SP: 0.006, PP: 0.013, PR: 0.026, NP: 0.052, SB: 0.095 },
@@ -578,13 +585,14 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
   const PEER_DEFS = [];
   const types = [
     ['PVT', 'Mid', 7], ['PVT', 'Large', 4], ['NBFC', 'Mid', 6], ['NBFC', 'Large', 3],
-    ['FIN', 'Mid', 5], ['PSU', 'Large', 5], ['PSU', 'Mid', 3]
+    ['FIN', 'Mid', 5], ['PSU', 'Large', 5], ['PSU', 'Mid', 3], ['SFB', 'Mid', 6], ['MFI', 'Mid', 5],
+    ['RRB', 'Mid', 8], ['HFC', 'Mid', 6]
   ];
   let pc = 0;
   types.forEach(([lt, size, n]) => {
     for (let i = 0; i < n; i++) {
       pc++;
-      const scale = size === 'Large' ? 3 + rng() * 5 : 0.6 + rng() * 1.1;
+      const scale = size === 'Large' ? 3 + rng() * 2 : 0.9 + rng() * 0.25;
       PEER_DEFS.push({
         id: 'P' + String(pc).padStart(2, '0'), type: lt, size,
         scale, mult: 0.85 + rng() * 0.35,
@@ -775,11 +783,16 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 
   // ---------------- peer groups with privacy guardrails ----------------
   const PEER_GROUPS = [
-    { id: 'mid-pvt', name: 'Mid-size private banks', types: ['PVT'], sizes: ['Mid'] },
-    { id: 'all-pvt', name: 'All private banks', types: ['PVT'], sizes: ['Mid', 'Large'] },
-    { id: 'large-pvt', name: 'Large private banks', types: ['PVT'], sizes: ['Large'] },
-    { id: 'nbfc', name: 'NBFCs (all)', types: ['NBFC'], sizes: ['Mid', 'Large'] },
-    { id: 'fin', name: 'Fintech lenders', types: ['FIN'], sizes: ['Mid'] }
+    { id: 'mid-pvt', name: 'PVT · Mid-size', types: ['PVT'], sizes: ['Mid'] },
+    { id: 'all-pvt', name: 'PVT · All', types: ['PVT'], sizes: ['Mid', 'Large'] },
+    { id: 'large-pvt', name: 'PVT · Large', types: ['PVT'], sizes: ['Large'] },
+    { id: 'psu', name: 'PSU', types: ['PSU'], sizes: ['Large'] },
+    { id: 'nbfc', name: 'NBFC', types: ['NBFC'], sizes: ['Mid', 'Large'] },
+    { id: 'fin', name: 'Fintech', types: ['FIN'], sizes: ['Mid', 'Large'] },
+    { id: 'sfb', name: 'SFB', types: ['SFB'], sizes: ['Mid', 'Large'] },
+    { id: 'mfi', name: 'MFI', types: ['MFI'], sizes: ['Mid', 'Large'] },
+    { id: 'rrb', name: 'RRB/DCCB', types: ['RRB'], sizes: ['Mid', 'Large'] },
+    { id: 'hfc', name: 'HFC', types: ['HFC'], sizes: ['Mid', 'Large'] }
   ];
   function peerMembers(types, sizes) {
     return D.PEER_DEFS.filter((d) => types.includes(d.type) && sizes.includes(d.size));
@@ -971,7 +984,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       }
     });
     const ccM = value('member', 'dpd30', { p: 'CC', m: t }), ccP = peerValue('mid-pvt', 'dpd30', { p: 'CC', m: t });
-    if (ccP && ccM < ccP) out.push({ sev: 'good', kind: 'positive', p: 'CC', s: null, title: 'Credit card 30+ DPD is better than mid-size private bank peers', detail: `${(ccM * 100).toFixed(2)}% vs peer ${(ccP * 100).toFixed(2)}% — room to grow share selectively.`, score: 0 });
+    if (ccP && ccM < ccP) out.push({ sev: 'good', kind: 'positive', p: 'CC', s: null, title: 'Credit card 30+ DPD is better than PVT · Mid-size peers', detail: `${(ccM * 100).toFixed(2)}% vs peer ${(ccP * 100).toFixed(2)}% — room to grow share selectively.`, score: 0 });
     const rank = { critical: 0, serious: 1, warning: 2, good: 3 };
     return out.sort((a, b) => rank[a.sev] - rank[b.sev] || b.score - a.score);
   }
@@ -1690,7 +1703,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       recs.push({
         id: 'cc-growth', priority: 4, kind: 'growth',
         title: 'Grow credit cards in prime segments — you are outperforming peers on risk',
-        why: `Card 30+ DPD is ${PIQ.ui.fmt.pct(ccM)} vs ${PIQ.ui.fmt.pct(ccP)} for mid-size private bank peers, yet your share of the 6-state card market is only ${PIQ.ui.fmt.pct(sh, 2)}. Risk headroom can fund growth.`,
+        why: `Card 30+ DPD is ${PIQ.ui.fmt.pct(ccM)} vs ${PIQ.ui.fmt.pct(ccP)} for PVT · Mid-size peers, yet your share of the 6-state card market is only ${PIQ.ui.fmt.pct(sh, 2)}. Risk headroom can fund growth.`,
         impact: [['Risk headroom vs peers', PIQ.ui.fmt.bps(ccP - ccM).replace('+', ''), 'good']],
         action: { view: 'benchmark', params: { p: 'CC' } },
         states: []
@@ -1809,7 +1822,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     const tv = h('div', 'viz', hc);
     tv.style.marginTop = '18px';
     PIQ.charts.line(tv, {
-      series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: 'Peers (' + (S.PEER_GROUPS.find((g) => g.id === state.peer) || S.PEER_GROUPS[0]).name.toLowerCase() + ')', color: 'var(--s2)', points: pS.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
+      series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: 'Peers (' + (S.PEER_GROUPS.find((g) => g.id === state.peer) || S.PEER_GROUPS[0]).name + ')', color: 'var(--s2)', points: pS.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
       xLabel: ml, yFmt: (v) => fmt.pct(v), yTickFmt: fmt.metricTick('dpd30'), endLabels: true, height: 230,
       annotations: p === 'PL' ? [{ x: C.policyChangeMonth, label: `Cut-off ${C.previousCutoff.PL}→${C.currentCutoff.PL}` }] : []
     });
@@ -1879,7 +1892,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     const bar = productStateFilters(root);
     if (mode === 'custom') {
       select(bar, 'Metric', Object.values(S.METRICS).map((m) => ({ id: m.id, name: m.name })), metric, (v) => { metric = v; PIQ.go('industry'); });
-      select(bar, 'Lender type', [{ id: 'ALL', name: 'All lenders' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
+      select(bar, 'Lender category', [{ id: 'ALL', name: 'All' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
       const save = h('button', 'btn sm', bar, '☆ Save this view');
       save.style.alignSelf = 'flex-end';
       save.addEventListener('click', () => {
@@ -1905,11 +1918,11 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     const g = h('div', 'grid g2', root);
     g.style.marginTop = '16px';
     // Trend by lender type
-    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
     const lenders = lender === 'ALL' ? D.LENDERS : D.LENDERS.filter((l) => l.id === lender);
     const ser = lenders.map((l) => ({ name: l.name, color: colors[D.LENDERS.indexOf(l)], points: S.series('industry', metric, { p, s, l: l.id }) }));
     const c1 = card(g, {
-      title: `${M.name} by lender type`, sub: `${D.P[p].long} · ${stateName(s)} · 24 months`,
+      title: `${M.name} by lender category`, sub: `${D.P[p].long} · ${stateName(s)} · 24 months`,
       source: sourceText(['industry']),
       table: () => ({ cols: [{ name: 'Month' }].concat(ser.map((x) => ({ name: x.name, r: 1 }))), rows: D.MONTHS.map((m, i) => [ml(m)].concat(ser.map((x) => fmt.metric(metric, x.points[i].y)))) })
     });
@@ -1976,7 +1989,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
     const bar = productStateFilters(root);
     select(bar, 'Metric', ['dpd30', 'dpd90', 'cure'].map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; PIQ.go('benchmark'); });
-    select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom group…' }]), state.peer, (v) => setState({ peer: v }));
+    select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
     const group = state.peer === 'custom' ? Object.assign({ id: 'custom', name: 'Custom group' }, custom) : S.PEER_GROUPS.find((g) => g.id === state.peer);
     if (state.peer === 'custom') {
@@ -1999,7 +2012,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
           });
         });
       };
-      mk('Lender type', [['PVT', 'Private banks'], ['PSU', 'PSU banks'], ['NBFC', 'NBFCs'], ['FIN', 'Fintech lenders']], 'types');
+      mk('Category', D.LENDERS.map((l) => [l.id, l.name]), 'types');
       mk('Size', [['Mid', 'Mid-size'], ['Large', 'Large']], 'sizes');
     }
     const chk = S.peerCheck(group.types, group.sizes, { p, s });
@@ -2648,7 +2661,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     [
       `Personal loan 30+ DPD is ${fmt.pct(pl.dpd30)}, ${fmt.bps(dPL.delta)} since the ${ml(C.policyChangeMonth)} cut-off change, against ${fmt.bps(dPL.indDelta)} for the industry. ${nar.verdict}`,
       `Mix shift explains ${fmt.bps(dPL.mix)}, market-wide deterioration ${fmt.bps(dPL.market)}, member-specific performance ${fmt.bps(dPL.own)}. The pressure is concentrated in Uttar Pradesh and Gujarat near-prime / subprime.`,
-      `Credit cards remain a strength: 30+ DPD ${fmt.pct(cc.dpd30)} vs ${fmt.pct(cc.peer30)} for mid-size private bank peers.`,
+      `Credit cards remain a strength: 30+ DPD ${fmt.pct(cc.dpd30)} vs ${fmt.pct(cc.peer30)} for PVT · Mid-size peers.`,
       `Balances grew ${fmt.chg(pl.growth)} (PL) and ${fmt.chg(cc.growth)} (CC) year on year vs industry ${fmt.chg(pl.indGrowth)} / ${fmt.chg(cc.indGrowth)}; 6-state PL market share ${fmt.pct(pl.share, 2)}.`
     ].forEach((x) => h('li', null, ul, x));
 
@@ -2777,8 +2790,8 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       'What is happening in personal loans?',
       'What has been the industry growth trend for credit cards?',
       'What is the trend in 30+ DPD for personal loans?',
-      'How are fintech lenders performing on personal loans?',
-      'Compare PSU banks and private banks on delinquency',
+      'How are fintechs and MFIs performing on personal loans?',
+      'Compare PSU, PVT and SFB on delinquency',
       'Is the industry taking more risk in personal loans?',
       'What is the risk band mix of the credit card market?',
       'How have industry originations changed this year?',
@@ -2801,13 +2814,13 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
       'Is my cure rate falling in Uttar Pradesh?'
     ] },
     { cat: 'Benchmarking', qs: [
-      'How do I compare with mid-size private bank peers?',
+      'How do I compare with PVT mid-size peers?',
       'Compare my personal loan delinquency with the industry in Gujarat',
       'Where am I better than the market?',
       'Where am I worse than the market?',
       'How is my credit card book doing versus peers?',
-      'Benchmark me against NBFCs',
-      'Benchmark me against large private banks'
+      'Benchmark me against SFB peers',
+      'Benchmark me against HFC peers'
     ] },
     { cat: 'Business & growth', qs: [
       'What is my market share in personal loans?',
@@ -2878,7 +2891,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
 
   def('trend', 'Monthly trend of a metric for the industry and/or the member, optionally for one or more states, a risk band or a lender type.', {
     metric: P_METRIC, product: P_PRODUCT, states: { type: 'array', items: P_STATE }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] },
-    lender: { type: 'string', enum: ['PSU', 'PVT', 'NBFC', 'FIN'] }, who: { type: 'string', enum: ['industry', 'member', 'both'] }
+    lender: { type: 'string', enum: D.LENDERS.map((l) => l.id), description: 'Lender category: ' + D.LENDERS.map((l) => l.id + ' = ' + l.long).join('; ') }, who: { type: 'string', enum: ['industry', 'member', 'both'] }
   }, ['metric', 'product'], (a) => {
     const metric = a.metric || 'dpd30', p = a.product || 'PL';
     const states = a.states && a.states.length ? a.states : ['ALL'];
@@ -2956,19 +2969,19 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     };
   });
 
-  def('lender_types', 'Compare lender types (PSU banks, private banks, NBFCs, fintech lenders) on a metric in the industry.', { metric: P_METRIC, product: P_PRODUCT, state: P_STATE }, ['metric', 'product'], (a) => {
+  def('lender_types', 'Compare the 8 lender categories (' + D.LENDERS.map((l) => l.name).join(', ') + ') on a metric in the industry.', { metric: P_METRIC, product: P_PRODUCT, state: P_STATE }, ['metric', 'product'], (a) => {
     const metric = a.metric || 'dpd30', p = a.product || 'PL', s = a.state || 'ALL';
-    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
     const series = D.LENDERS.map((l, i) => ({ name: l.name, color: colors[i], points: S.series('industry', metric, { p, s, l: l.id }) }));
     const now = series.map((x) => ({ n: x.name, v: x.points[x.points.length - 1].y, v12: x.points[x.points.length - 13].y }));
     const unit = S.METRICS[metric].unit;
     return {
       answer: {
         paras: [now.map((x) => `**${x.n}** ${fmtM(metric, x.v)} (${dfmt(metric, x.v, x.v12)} YoY)`).join(' · '),
-          metric.startsWith('dpd') ? `Fintech lenders carry the highest delinquency and are deteriorating fastest; private banks remain the lowest-risk segment.` : ''].filter(Boolean),
+          (() => { const by = now.slice().sort((x, y) => y.v - x.v); const hi = S.METRICS[metric].bad ? by[0] : by[by.length - 1], lo = S.METRICS[metric].bad ? by[by.length - 1] : by[0]; return metric.startsWith('dpd') || metric === 'cure' ? `Weakest: **${hi.n}**. Strongest: **${lo.n}**.` : ''; })()].filter(Boolean),
         chart: (el) => PIQ.charts.line(el, { series, xLabel: ml, yFmt: (v) => fmtM(metric, v), yTickFmt: F().metricTick(metric), height: 220 }),
         sources: src('industry'), filters: `${D.P[p].long} · ${sName(s)} · by lender type`,
-        followups: ['How do I compare with mid-size private bank peers?', 'Is the industry taking more risk in personal loans?']
+        followups: ['How do I compare with PVT mid-size peers?', 'Is the industry taking more risk in personal loans?']
       },
       facts: { byLender: now.map((x) => ({ lender: x.n, value: fmtM(metric, x.v) })) }
     };
@@ -3241,7 +3254,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
   function guard(q) {
     if (OTHER_LENDERS.test(q)) return {
       refusal: true, paras: ['I can\'t share data about any named or identifiable lender. Tenant isolation means you can only see **your own portfolio**, **anonymised peer aggregates** (at least 5 institutions, none above 25% of the group) and **industry totals**.', 'I can compare you with an anonymised peer group instead.'],
-      sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with mid-size private bank peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
+      sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with PVT mid-size peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
     };
     if (PERSONAL.test(q)) return {
       refusal: true, paras: ['I don\'t have access to borrower-level or personal information. This platform works only with aggregated, non-personal portfolio and industry data, in line with CICRA and DPDP principles.'],
@@ -3279,10 +3292,9 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     else if (/near.?prime/.test(t) && /sub.?prime/.test(t)) e.bandPair = true;
     else if (/near.?prime/.test(t)) e.band = 'NP';
     else if (/sub.?prime/.test(t)) e.band = 'SB';
-    if (/\bpsu\b|public sector/.test(t)) e.lender = 'PSU';
-    if (/private bank/.test(t)) e.lender2 = 'PVT';
-    if (/\bnbfcs?\b/.test(t)) e.lender3 = 'NBFC';
-    if (/fintech/.test(t)) e.lender4 = 'FIN';
+    const LT = [['PSU', /\bpsus?\b|public sector/], ['PVT', /\bpvts?\b|private (sector )?banks?/], ['NBFC', /\bnbfcs?\b/], ['FIN', /fintech/],
+      ['SFB', /\bsfbs?\b|small finance/], ['MFI', /\bmfis?\b|micro.?finance/], ['RRB', /\brrbs?\b|\bdccbs?\b|regional rural|co-?operative bank/], ['HFC', /\bhfcs?\b|housing finance/]];
+    e.lenders = LT.filter(([, re]) => re.test(t)).map(([id]) => id);
     if (/90\+|90 plus|90 dpd|\bnpa\b/.test(t)) e.metric = 'dpd90';
     else if (/cure|collection/.test(t)) e.metric = 'cure';
     else if (/30\+|delinquen|\bdpd\b|risk|deteriorat|bad rate|stress/.test(t)) e.metric = 'dpd30';
@@ -3295,11 +3307,11 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     if (/since feb|february/.test(t)) e.from = '2026-02';
     else if (/last (6|six) months/.test(t)) e.from = S.monthsAgo(6);
     else if (/last year|12 months|yoy|this year/.test(t)) e.from = S.monthsAgo(12);
-    if (/mid.?size private/.test(t)) e.peer = 'mid-pvt';
-    else if (/large private/.test(t)) e.peer = 'large-pvt';
-    else if (/all private/.test(t)) e.peer = 'all-pvt';
-    else if (/\bnbfcs?\b/.test(t) && /benchmark|peer|against|compare/.test(t)) e.peer = 'nbfc';
-    else if (/fintech/.test(t) && /benchmark|peer|against/.test(t)) e.peer = 'fin';
+    const pvt = e.lenders.includes('PVT');
+    if (pvt && /mid/.test(t)) e.peer = 'mid-pvt';
+    else if (pvt && /large/.test(t)) e.peer = 'large-pvt';
+    else if (pvt && /\ball\b/.test(t)) e.peer = 'all-pvt';
+    else if (e.lenders.length === 1 && /benchmark|peer|against|compare/.test(t)) e.peer = { PVT: 'all-pvt', PSU: 'psu', NBFC: 'nbfc', FIN: 'fin', SFB: 'sfb', MFI: 'mfi', RRB: 'rrb', HFC: 'hfc' }[e.lenders[0]];
     return e;
   }
 
@@ -3337,7 +3349,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     if (/market share|gaining share|\bshare\b/.test(t)) return call('market_share', { product: e.products ? undefined : e.product, state: st });
     if (/peer|benchmark|how do i compare|how am i|how is my|performing against|versus the industry|vs (the )?industry|compared? (with|to|it with) my|against the industry|my portfolio|compare my/.test(t) || (followUp && e.self && /compare/.test(t)))
       return call('benchmark', { metric: metric === 'bal' || metric === 'orig' || !metric ? 'dpd30' : metric, product: p, state: st, peer_group: e.peer });
-    const lenders = [e.lender, e.lender2, e.lender3, e.lender4].filter(Boolean);
+    const lenders = e.lenders;
     if (lenders.length >= 2 || (lenders.length === 1 && /perform|compare|lenders|how are/.test(t) && !e.self)) {
       if (lenders.length === 1) return call('trend', { metric: metric || 'dpd30', product: p, states: [st], lender: lenders[0], who: 'industry' });
       return call('lender_types', { metric: metric || 'dpd30', product: p, state: st });
@@ -3352,7 +3364,7 @@ code, .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, mono
     }
     if (e.product || e.products || e.metric || e.states.length || /happening|trend|industry|market|how is|how are/.test(t)) {
       if (e.products && /gaining|share/.test(t)) return call('market_share', { state: st });
-      return call('trend', { metric: metric || (/happening|what is going on/.test(t) ? 'dpd30' : 'dpd30'), product: p, states: [st], band: e.band, lender: e.lender || e.lender2 || e.lender3 || e.lender4, who: e.self ? 'both' : 'industry' });
+      return call('trend', { metric: metric || (/happening|what is going on/.test(t) ? 'dpd30' : 'dpd30'), product: p, states: [st], band: e.band, lender: e.lenders[0], who: e.self ? 'both' : 'industry' });
     }
     if (followUp && ctx.intent) return call(ctx.intent, Object.assign({}, ctx.args || {}));
     return null;

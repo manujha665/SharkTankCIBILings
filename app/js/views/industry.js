@@ -13,7 +13,7 @@
     const bar = productStateFilters(root);
     if (mode === 'custom') {
       select(bar, 'Metric', Object.values(S.METRICS).map((m) => ({ id: m.id, name: m.name })), metric, (v) => { metric = v; PIQ.go('industry'); });
-      select(bar, 'Lender type', [{ id: 'ALL', name: 'All lenders' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
+      select(bar, 'Lender category', [{ id: 'ALL', name: 'All' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
       const save = h('button', 'btn sm', bar, '☆ Save this view');
       save.style.alignSelf = 'flex-end';
       save.addEventListener('click', () => {
@@ -39,11 +39,11 @@
     const g = h('div', 'grid g2', root);
     g.style.marginTop = '16px';
     // Trend by lender type
-    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
     const lenders = lender === 'ALL' ? D.LENDERS : D.LENDERS.filter((l) => l.id === lender);
     const ser = lenders.map((l) => ({ name: l.name, color: colors[D.LENDERS.indexOf(l)], points: S.series('industry', metric, { p, s, l: l.id }) }));
     const c1 = card(g, {
-      title: `${M.name} by lender type`, sub: `${D.P[p].long} · ${stateName(s)} · 24 months`,
+      title: `${M.name} by lender category`, sub: `${D.P[p].long} · ${stateName(s)} · 24 months`,
       source: sourceText(['industry']),
       table: () => ({ cols: [{ name: 'Month' }].concat(ser.map((x) => ({ name: x.name, r: 1 }))), rows: D.MONTHS.map((m, i) => [ml(m)].concat(ser.map((x) => fmt.metric(metric, x.points[i].y)))) })
     });

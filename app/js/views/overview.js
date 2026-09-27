@@ -51,7 +51,7 @@
     const tv = h('div', 'viz', hc);
     tv.style.marginTop = '18px';
     PIQ.charts.line(tv, {
-      series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: 'Peers (' + (S.PEER_GROUPS.find((g) => g.id === state.peer) || S.PEER_GROUPS[0]).name.toLowerCase() + ')', color: 'var(--s2)', points: pS.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
+      series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: 'Peers (' + (S.PEER_GROUPS.find((g) => g.id === state.peer) || S.PEER_GROUPS[0]).name + ')', color: 'var(--s2)', points: pS.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
       xLabel: ml, yFmt: (v) => fmt.pct(v), yTickFmt: fmt.metricTick('dpd30'), endLabels: true, height: 230,
       annotations: p === 'PL' ? [{ x: C.policyChangeMonth, label: `Cut-off ${C.previousCutoff.PL}→${C.currentCutoff.PL}` }] : []
     });

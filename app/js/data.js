@@ -66,18 +66,23 @@
     { id: 'SB', name: 'Subprime', range: '≤680', lo: 300, sens: 1.35, cure: 0.31 }
   ];
   const LENDERS = [
-    { id: 'PSU', name: 'PSU Banks', risk: 1.05, trend: 0.7 },
-    { id: 'PVT', name: 'Private Banks', risk: 0.86, trend: 0.9 },
-    { id: 'NBFC', name: 'NBFCs', risk: 1.14, trend: 1.1 },
-    { id: 'FIN', name: 'Fintech Lenders', risk: 1.38, trend: 1.6 }
+    // Labels are abbreviations only (UI requirement); long form kept for reference.
+    { id: 'PSU', name: 'PSU', long: 'Public sector banks', risk: 1.05, trend: 0.7 },
+    { id: 'PVT', name: 'PVT', long: 'Private sector banks', risk: 0.86, trend: 0.9 },
+    { id: 'NBFC', name: 'NBFC', long: 'Non-banking financial companies', risk: 1.14, trend: 1.1 },
+    { id: 'FIN', name: 'Fintech', long: 'Fintech lenders', risk: 1.38, trend: 1.6 },
+    { id: 'SFB', name: 'SFB', long: 'Small finance banks', risk: 1.22, trend: 1.2 },
+    { id: 'MFI', name: 'MFI', long: 'Microfinance institutions', risk: 1.5, trend: 1.4 },
+    { id: 'RRB', name: 'RRB/DCCB', long: 'Regional rural & district co-operative banks', risk: 1.3, trend: 0.9 },
+    { id: 'HFC', name: 'HFC', long: 'Housing finance companies', risk: 0.95, trend: 0.8 }
   ];
   const bandShare = {
     PL: { SP: 0.3, PP: 0.22, PR: 0.22, NP: 0.15, SB: 0.11 },
     CC: { SP: 0.34, PP: 0.22, PR: 0.2, NP: 0.14, SB: 0.1 }
   };
   const lenderShare = {
-    PL: { PSU: 0.22, PVT: 0.4, NBFC: 0.26, FIN: 0.12 },
-    CC: { PSU: 0.12, PVT: 0.72, NBFC: 0.08, FIN: 0.08 }
+    PL: { PSU: 0.2, PVT: 0.36, NBFC: 0.22, FIN: 0.1, SFB: 0.05, MFI: 0.02, RRB: 0.03, HFC: 0.02 },
+    CC: { PSU: 0.12, PVT: 0.69, NBFC: 0.07, FIN: 0.06, SFB: 0.03, MFI: 0.01, RRB: 0.01, HFC: 0.01 }
   };
   const baseDpd = {
     PL: { SP: 0.006, PP: 0.013, PR: 0.026, NP: 0.052, SB: 0.095 },
@@ -183,13 +188,14 @@
   const PEER_DEFS = [];
   const types = [
     ['PVT', 'Mid', 7], ['PVT', 'Large', 4], ['NBFC', 'Mid', 6], ['NBFC', 'Large', 3],
-    ['FIN', 'Mid', 5], ['PSU', 'Large', 5], ['PSU', 'Mid', 3]
+    ['FIN', 'Mid', 5], ['PSU', 'Large', 5], ['PSU', 'Mid', 3], ['SFB', 'Mid', 6], ['MFI', 'Mid', 5],
+    ['RRB', 'Mid', 8], ['HFC', 'Mid', 6]
   ];
   let pc = 0;
   types.forEach(([lt, size, n]) => {
     for (let i = 0; i < n; i++) {
       pc++;
-      const scale = size === 'Large' ? 3 + rng() * 5 : 0.6 + rng() * 1.1;
+      const scale = size === 'Large' ? 3 + rng() * 2 : 0.9 + rng() * 0.25;
       PEER_DEFS.push({
         id: 'P' + String(pc).padStart(2, '0'), type: lt, size,
         scale, mult: 0.85 + rng() * 0.35,

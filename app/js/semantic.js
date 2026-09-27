@@ -79,11 +79,16 @@
 
   // ---------------- peer groups with privacy guardrails ----------------
   const PEER_GROUPS = [
-    { id: 'mid-pvt', name: 'Mid-size private banks', types: ['PVT'], sizes: ['Mid'] },
-    { id: 'all-pvt', name: 'All private banks', types: ['PVT'], sizes: ['Mid', 'Large'] },
-    { id: 'large-pvt', name: 'Large private banks', types: ['PVT'], sizes: ['Large'] },
-    { id: 'nbfc', name: 'NBFCs (all)', types: ['NBFC'], sizes: ['Mid', 'Large'] },
-    { id: 'fin', name: 'Fintech lenders', types: ['FIN'], sizes: ['Mid'] }
+    { id: 'mid-pvt', name: 'PVT · Mid-size', types: ['PVT'], sizes: ['Mid'] },
+    { id: 'all-pvt', name: 'PVT · All', types: ['PVT'], sizes: ['Mid', 'Large'] },
+    { id: 'large-pvt', name: 'PVT · Large', types: ['PVT'], sizes: ['Large'] },
+    { id: 'psu', name: 'PSU', types: ['PSU'], sizes: ['Large'] },
+    { id: 'nbfc', name: 'NBFC', types: ['NBFC'], sizes: ['Mid', 'Large'] },
+    { id: 'fin', name: 'Fintech', types: ['FIN'], sizes: ['Mid', 'Large'] },
+    { id: 'sfb', name: 'SFB', types: ['SFB'], sizes: ['Mid', 'Large'] },
+    { id: 'mfi', name: 'MFI', types: ['MFI'], sizes: ['Mid', 'Large'] },
+    { id: 'rrb', name: 'RRB/DCCB', types: ['RRB'], sizes: ['Mid', 'Large'] },
+    { id: 'hfc', name: 'HFC', types: ['HFC'], sizes: ['Mid', 'Large'] }
   ];
   function peerMembers(types, sizes) {
     return D.PEER_DEFS.filter((d) => types.includes(d.type) && sizes.includes(d.size));
@@ -275,7 +280,7 @@
       }
     });
     const ccM = value('member', 'dpd30', { p: 'CC', m: t }), ccP = peerValue('mid-pvt', 'dpd30', { p: 'CC', m: t });
-    if (ccP && ccM < ccP) out.push({ sev: 'good', kind: 'positive', p: 'CC', s: null, title: 'Credit card 30+ DPD is better than mid-size private bank peers', detail: `${(ccM * 100).toFixed(2)}% vs peer ${(ccP * 100).toFixed(2)}% — room to grow share selectively.`, score: 0 });
+    if (ccP && ccM < ccP) out.push({ sev: 'good', kind: 'positive', p: 'CC', s: null, title: 'Credit card 30+ DPD is better than PVT · Mid-size peers', detail: `${(ccM * 100).toFixed(2)}% vs peer ${(ccP * 100).toFixed(2)}% — room to grow share selectively.`, score: 0 });
     const rank = { critical: 0, serious: 1, warning: 2, good: 3 };
     return out.sort((a, b) => rank[a.sev] - rank[b.sev] || b.score - a.score);
   }

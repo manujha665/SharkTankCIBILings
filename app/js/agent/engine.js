@@ -33,7 +33,7 @@
 
   def('trend', 'Monthly trend of a metric for the industry and/or the member, optionally for one or more states, a risk band or a lender type.', {
     metric: P_METRIC, product: P_PRODUCT, states: { type: 'array', items: P_STATE }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] },
-    lender: { type: 'string', enum: ['PSU', 'PVT', 'NBFC', 'FIN'] }, who: { type: 'string', enum: ['industry', 'member', 'both'] }
+    lender: { type: 'string', enum: D.LENDERS.map((l) => l.id), description: 'Lender category: ' + D.LENDERS.map((l) => l.id + ' = ' + l.long).join('; ') }, who: { type: 'string', enum: ['industry', 'member', 'both'] }
   }, ['metric', 'product'], (a) => {
     const metric = a.metric || 'dpd30', p = a.product || 'PL';
     const states = a.states && a.states.length ? a.states : ['ALL'];
@@ -111,19 +111,19 @@
     };
   });
 
-  def('lender_types', 'Compare lender types (PSU banks, private banks, NBFCs, fintech lenders) on a metric in the industry.', { metric: P_METRIC, product: P_PRODUCT, state: P_STATE }, ['metric', 'product'], (a) => {
+  def('lender_types', 'Compare the 8 lender categories (' + D.LENDERS.map((l) => l.name).join(', ') + ') on a metric in the industry.', { metric: P_METRIC, product: P_PRODUCT, state: P_STATE }, ['metric', 'product'], (a) => {
     const metric = a.metric || 'dpd30', p = a.product || 'PL', s = a.state || 'ALL';
-    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+    const colors = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)', 'var(--s5)', 'var(--s6)', 'var(--s7)', 'var(--s8)'];
     const series = D.LENDERS.map((l, i) => ({ name: l.name, color: colors[i], points: S.series('industry', metric, { p, s, l: l.id }) }));
     const now = series.map((x) => ({ n: x.name, v: x.points[x.points.length - 1].y, v12: x.points[x.points.length - 13].y }));
     const unit = S.METRICS[metric].unit;
     return {
       answer: {
         paras: [now.map((x) => `**${x.n}** ${fmtM(metric, x.v)} (${dfmt(metric, x.v, x.v12)} YoY)`).join(' · '),
-          metric.startsWith('dpd') ? `Fintech lenders carry the highest delinquency and are deteriorating fastest; private banks remain the lowest-risk segment.` : ''].filter(Boolean),
+          (() => { const by = now.slice().sort((x, y) => y.v - x.v); const hi = S.METRICS[metric].bad ? by[0] : by[by.length - 1], lo = S.METRICS[metric].bad ? by[by.length - 1] : by[0]; return metric.startsWith('dpd') || metric === 'cure' ? `Weakest: **${hi.n}**. Strongest: **${lo.n}**.` : ''; })()].filter(Boolean),
         chart: (el) => PIQ.charts.line(el, { series, xLabel: ml, yFmt: (v) => fmtM(metric, v), yTickFmt: F().metricTick(metric), height: 220 }),
         sources: src('industry'), filters: `${D.P[p].long} · ${sName(s)} · by lender type`,
-        followups: ['How do I compare with mid-size private bank peers?', 'Is the industry taking more risk in personal loans?']
+        followups: ['How do I compare with PVT mid-size peers?', 'Is the industry taking more risk in personal loans?']
       },
       facts: { byLender: now.map((x) => ({ lender: x.n, value: fmtM(metric, x.v) })) }
     };
@@ -396,7 +396,7 @@
   function guard(q) {
     if (OTHER_LENDERS.test(q)) return {
       refusal: true, paras: ['I can\'t share data about any named or identifiable lender. Tenant isolation means you can only see **your own portfolio**, **anonymised peer aggregates** (at least 5 institutions, none above 25% of the group) and **industry totals**.', 'I can compare you with an anonymised peer group instead.'],
-      sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with mid-size private bank peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
+      sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with PVT mid-size peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
     };
     if (PERSONAL.test(q)) return {
       refusal: true, paras: ['I don\'t have access to borrower-level or personal information. This platform works only with aggregated, non-personal portfolio and industry data, in line with CICRA and DPDP principles.'],
@@ -434,10 +434,9 @@
     else if (/near.?prime/.test(t) && /sub.?prime/.test(t)) e.bandPair = true;
     else if (/near.?prime/.test(t)) e.band = 'NP';
     else if (/sub.?prime/.test(t)) e.band = 'SB';
-    if (/\bpsu\b|public sector/.test(t)) e.lender = 'PSU';
-    if (/private bank/.test(t)) e.lender2 = 'PVT';
-    if (/\bnbfcs?\b/.test(t)) e.lender3 = 'NBFC';
-    if (/fintech/.test(t)) e.lender4 = 'FIN';
+    const LT = [['PSU', /\bpsus?\b|public sector/], ['PVT', /\bpvts?\b|private (sector )?banks?/], ['NBFC', /\bnbfcs?\b/], ['FIN', /fintech/],
+      ['SFB', /\bsfbs?\b|small finance/], ['MFI', /\bmfis?\b|micro.?finance/], ['RRB', /\brrbs?\b|\bdccbs?\b|regional rural|co-?operative bank/], ['HFC', /\bhfcs?\b|housing finance/]];
+    e.lenders = LT.filter(([, re]) => re.test(t)).map(([id]) => id);
     if (/90\+|90 plus|90 dpd|\bnpa\b/.test(t)) e.metric = 'dpd90';
     else if (/cure|collection/.test(t)) e.metric = 'cure';
     else if (/30\+|delinquen|\bdpd\b|risk|deteriorat|bad rate|stress/.test(t)) e.metric = 'dpd30';
@@ -450,11 +449,11 @@
     if (/since feb|february/.test(t)) e.from = '2026-02';
     else if (/last (6|six) months/.test(t)) e.from = S.monthsAgo(6);
     else if (/last year|12 months|yoy|this year/.test(t)) e.from = S.monthsAgo(12);
-    if (/mid.?size private/.test(t)) e.peer = 'mid-pvt';
-    else if (/large private/.test(t)) e.peer = 'large-pvt';
-    else if (/all private/.test(t)) e.peer = 'all-pvt';
-    else if (/\bnbfcs?\b/.test(t) && /benchmark|peer|against|compare/.test(t)) e.peer = 'nbfc';
-    else if (/fintech/.test(t) && /benchmark|peer|against/.test(t)) e.peer = 'fin';
+    const pvt = e.lenders.includes('PVT');
+    if (pvt && /mid/.test(t)) e.peer = 'mid-pvt';
+    else if (pvt && /large/.test(t)) e.peer = 'large-pvt';
+    else if (pvt && /\ball\b/.test(t)) e.peer = 'all-pvt';
+    else if (e.lenders.length === 1 && /benchmark|peer|against|compare/.test(t)) e.peer = { PVT: 'all-pvt', PSU: 'psu', NBFC: 'nbfc', FIN: 'fin', SFB: 'sfb', MFI: 'mfi', RRB: 'rrb', HFC: 'hfc' }[e.lenders[0]];
     return e;
   }
 
@@ -492,7 +491,7 @@
     if (/market share|gaining share|\bshare\b/.test(t)) return call('market_share', { product: e.products ? undefined : e.product, state: st });
     if (/peer|benchmark|how do i compare|how am i|how is my|performing against|versus the industry|vs (the )?industry|compared? (with|to|it with) my|against the industry|my portfolio|compare my/.test(t) || (followUp && e.self && /compare/.test(t)))
       return call('benchmark', { metric: metric === 'bal' || metric === 'orig' || !metric ? 'dpd30' : metric, product: p, state: st, peer_group: e.peer });
-    const lenders = [e.lender, e.lender2, e.lender3, e.lender4].filter(Boolean);
+    const lenders = e.lenders;
     if (lenders.length >= 2 || (lenders.length === 1 && /perform|compare|lenders|how are/.test(t) && !e.self)) {
       if (lenders.length === 1) return call('trend', { metric: metric || 'dpd30', product: p, states: [st], lender: lenders[0], who: 'industry' });
       return call('lender_types', { metric: metric || 'dpd30', product: p, state: st });
@@ -507,7 +506,7 @@
     }
     if (e.product || e.products || e.metric || e.states.length || /happening|trend|industry|market|how is|how are/.test(t)) {
       if (e.products && /gaining|share/.test(t)) return call('market_share', { state: st });
-      return call('trend', { metric: metric || (/happening|what is going on/.test(t) ? 'dpd30' : 'dpd30'), product: p, states: [st], band: e.band, lender: e.lender || e.lender2 || e.lender3 || e.lender4, who: e.self ? 'both' : 'industry' });
+      return call('trend', { metric: metric || (/happening|what is going on/.test(t) ? 'dpd30' : 'dpd30'), product: p, states: [st], band: e.band, lender: e.lenders[0], who: e.self ? 'both' : 'industry' });
     }
     if (followUp && ctx.intent) return call(ctx.intent, Object.assign({}, ctx.args || {}));
     return null;

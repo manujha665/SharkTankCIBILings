@@ -123,7 +123,7 @@
       recs.push({
         id: 'cc-growth', priority: 4, kind: 'growth',
         title: 'Grow credit cards in prime segments — you are outperforming peers on risk',
-        why: `Card 30+ DPD is ${PIQ.ui.fmt.pct(ccM)} vs ${PIQ.ui.fmt.pct(ccP)} for mid-size private bank peers, yet your share of the 6-state card market is only ${PIQ.ui.fmt.pct(sh, 2)}. Risk headroom can fund growth.`,
+        why: `Card 30+ DPD is ${PIQ.ui.fmt.pct(ccM)} vs ${PIQ.ui.fmt.pct(ccP)} for PVT · Mid-size peers, yet your share of the 6-state card market is only ${PIQ.ui.fmt.pct(sh, 2)}. Risk headroom can fund growth.`,
         impact: [['Risk headroom vs peers', PIQ.ui.fmt.bps(ccP - ccM).replace('+', ''), 'good']],
         action: { view: 'benchmark', params: { p: 'CC' } },
         states: []

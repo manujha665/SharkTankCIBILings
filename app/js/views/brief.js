@@ -25,7 +25,7 @@
     [
       `Personal loan 30+ DPD is ${fmt.pct(pl.dpd30)}, ${fmt.bps(dPL.delta)} since the ${ml(C.policyChangeMonth)} cut-off change, against ${fmt.bps(dPL.indDelta)} for the industry. ${nar.verdict}`,
       `Mix shift explains ${fmt.bps(dPL.mix)}, market-wide deterioration ${fmt.bps(dPL.market)}, member-specific performance ${fmt.bps(dPL.own)}. The pressure is concentrated in Uttar Pradesh and Gujarat near-prime / subprime.`,
-      `Credit cards remain a strength: 30+ DPD ${fmt.pct(cc.dpd30)} vs ${fmt.pct(cc.peer30)} for mid-size private bank peers.`,
+      `Credit cards remain a strength: 30+ DPD ${fmt.pct(cc.dpd30)} vs ${fmt.pct(cc.peer30)} for PVT · Mid-size peers.`,
       `Balances grew ${fmt.chg(pl.growth)} (PL) and ${fmt.chg(cc.growth)} (CC) year on year vs industry ${fmt.chg(pl.indGrowth)} / ${fmt.chg(cc.indGrowth)}; 6-state PL market share ${fmt.pct(pl.share, 2)}.`
     ].forEach((x) => h('li', null, ul, x));
 

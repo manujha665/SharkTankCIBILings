@@ -12,7 +12,7 @@
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
     const bar = productStateFilters(root);
     select(bar, 'Metric', ['dpd30', 'dpd90', 'cure'].map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; PIQ.go('benchmark'); });
-    select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom group…' }]), state.peer, (v) => setState({ peer: v }));
+    select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
     const group = state.peer === 'custom' ? Object.assign({ id: 'custom', name: 'Custom group' }, custom) : S.PEER_GROUPS.find((g) => g.id === state.peer);
     if (state.peer === 'custom') {
@@ -35,7 +35,7 @@
           });
         });
       };
-      mk('Lender type', [['PVT', 'Private banks'], ['PSU', 'PSU banks'], ['NBFC', 'NBFCs'], ['FIN', 'Fintech lenders']], 'types');
+      mk('Category', D.LENDERS.map((l) => [l.id, l.name]), 'types');
       mk('Size', [['Mid', 'Mid-size'], ['Large', 'Large']], 'sizes');
     }
     const chk = S.peerCheck(group.types, group.sizes, { p, s });
