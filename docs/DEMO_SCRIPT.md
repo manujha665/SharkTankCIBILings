@@ -96,7 +96,7 @@ Tiered subscription: *Standard* (industry intelligence + benchmarks), *Pro* (dec
 | Faster decisions | days saved per analysis × number of analyses | "7–10 days → minutes" |
 | Subscription revenue | members × adoption % × annual price per tier | __ × __% × ₹__ |
 | Retention | churn avoided × average member revenue | |
-| Member-side value | the simulator's "net contribution" delta, e.g. +₹0.3 Cr/month for one bank in one decision | shows value to the *customer* |
+| Member-side value | the simulator's "net contribution" delta, e.g. +₹0.45 Cr/month for one bank in one decision | shows value to the *customer* |
 
 Keep assumptions conservative. Judges discount aggressive numbers.
 

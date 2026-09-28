@@ -60,6 +60,10 @@
     const llm = h('span', 'pill', r, 'AI: governed engine');
     llm.id = 'llm-pill';
     PIQ.llm.status().then((s) => { if (s.ok) { llm.textContent = 'AI: ' + s.label; llm.className = 'pill ok'; } });
+    const tourBtn = h('button', 'btn sm primary', r, '▶ Demo tour');
+    tourBtn.type = 'button';
+    tourBtn.title = 'Guided walkthrough of the pitch story (→ next, ← back, Esc exit)';
+    tourBtn.addEventListener('click', () => PIQ.tour.start());
     const theme = h('button', 'icon-btn', r, '◐');
     theme.type = 'button';
     theme.title = 'Toggle light / dark';
@@ -124,4 +128,6 @@
   const start = (location.hash || '').slice(1);
   setupDrawer();
   go(PIQ.views[start] ? start : 'overview');
+  // index.html#tour opens the guided tour; #tour-play auto-plays it (handy for kiosks / recordings)
+  if (start === 'tour' || start === 'tour-play') setTimeout(() => PIQ.tour.start({ autoplay: start === 'tour-play' }), 300);
 })();
