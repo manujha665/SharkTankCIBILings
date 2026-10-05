@@ -44,7 +44,7 @@
   function productRecs(p) {
     const recs = [];
     const P = D.P[p];
-    const cur = C.currentCutoff[p];
+    const CO = PIQ.cutoffs, cur = CO.def(p); // product default; states may differ (policy grid)
     const t = S.latest();
     const prodBal = S.value('member', 'bal', { p, m: t });
     const material = (s) => S.value('member', 'bal', { p, s, m: t }) >= prodBal * 0.03;
@@ -52,18 +52,19 @@
     // 1) state-level cut-off optimisation where the book has deteriorated
     const perState = states.map((st) => {
       const dec = S.decompose({ p, s: st.id, t0: C.policyChangeMonth, t1: t, dim: 'b' });
-      const a = S.simulate(p, st.id, cur);
+      const c0 = CO.get(p, st.id);
+      const a = S.simulate(p, st.id, c0);
       let best = a;
       if (dec.mix + dec.own > 0.002)
-        for (let c = cur - 20; c <= cur + 40; c += 10) { const r = S.simulate(p, st.id, c); if (r.netCr > best.netCr + Math.max(0.05, Math.abs(a.netCr) * 0.02)) best = r; }
-      return { st, cur: a, best, dec };
+        for (let c = c0 - 20; c <= c0 + 40; c += 10) { const r = S.simulate(p, st.id, c); if (r.netCr > best.netCr + Math.max(0.05, Math.abs(a.netCr) * 0.02)) best = r; }
+      return { st, cur: a, best, dec, c0 };
     });
-    const tighten = perState.filter((x) => x.best.cutoff > cur);
+    const tighten = perState.filter((x) => x.best.cutoff > x.c0);
     if (tighten.length) {
       const gain = tighten.reduce((acc, x) => acc + (x.best.netCr - x.cur.netCr), 0);
       const lossCut = tighten.reduce((acc, x) => acc + (x.cur.expLossCr - x.best.expLossCr), 0);
       const volCut = tighten.reduce((acc, x) => acc + (x.cur.approvedPerMonth - x.best.approvedPerMonth), 0);
-      const totalAppr = S.simulate(p, 'ALL', cur).approvedPerMonth;
+      const totalAppr = S.simulate(p, 'ALL', CO.fn(p)).approvedPerMonth;
       const loosened = C.previousCutoff[p] !== cur;
       recs.push({
         id: 'cutoff-' + p, priority: 1, kind: 'policy', p,
@@ -141,6 +142,7 @@
 
   // Ranked recommendations for a product, or across the whole portfolio (p = 'ALL')
   const recCache = new Map();
+  if (PIQ.cutoffs) PIQ.cutoffs.onChange(() => recCache.clear()); // a new policy grid changes the advice
   function recommendations(p) {
     p = p || 'ALL';
     if (recCache.has(p)) return recCache.get(p);

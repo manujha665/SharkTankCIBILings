@@ -12,7 +12,7 @@ The concept note is in [`portfolio_intelligence_ai_platform.md`](portfolio_intel
 
 ## Run the prototype
 
-**Option 0: one file.** [`dist/PortfolioIQ.html`](dist/PortfolioIQ.html) is the whole prototype in a single self-contained HTML file (≈350 KB, no internet needed). Email it, put it on a USB stick, double-click to open. Rebuild it after changes with `node scripts/build-single-html.js`.
+**Option 0: one file.** [`dist/PortfolioIQ.html`](dist/PortfolioIQ.html) is the whole prototype in a single self-contained HTML file (≈420 KB, no internet needed). Email it, put it on a USB stick, double-click to open. Rebuild it after changes with `node scripts/build-single-html.js`.
 
 **Option 1: no installation (works on locked-down laptops).** Double-click `app/index.html`. Everything works, including the AI Analyst, which runs on the built-in governed engine.
 
@@ -43,10 +43,10 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | **Overlap Intelligence** ⭐ | Retail × Microfinance (8 Cr MFI base → 50% retail footprint → 25% live-to-live; products, states, MFI lender count, stress spill-over, member exposure) and Commercial × Retail (MSME promoters' retail loans as early warning) | Only a bureau can see these |
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
 | **What should I do?** ⭐ | Ranked, quantified recommendations, each linked to a simulation | Turns insight into decisions |
-| **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state | "Surgical, not blanket" policy |
-| **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a last-7-days quality check: score banding, expected probability of default, PIN-code risk tier (high / medium / low) and sourcing pool | Earliest warning signal; no competitor shows it |
-| **AI Analyst** | Chat with 67-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
-| **Bring Your Data** | Upload a CSV (e.g. sourcing channel), map fields, join to industry, get like-for-like insights | Extends the platform beyond bureau fields |
+| **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state. The member's **current cut-offs by product × state** can be typed into a grid or imported as CSV (long or wide layout), with a feasibility assessment on the page | "Surgical, not blanket" policy |
+| **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a **last 7 / 15 / 30 days** quality check (dropdown): applicants with more than one enquiry on the same day, score banding, expected probability of default, PIN-code risk tier (high / medium / low) and sourcing pool | Earliest warning signal; no competitor shows it |
+| **AI Analyst** | Chat or **speak** (🎤 voice input), 70-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
+| **Bring Your Data** | Four upload buttons for bureau Portfolio Review outputs (**Consumer PR, Commercial PR, Microfinance PR, MFI + Consumer PR**), each with its own layout, sample file and analysis computed from that file alone; plus custom files (e.g. sourcing channel) joined to industry | Extends the platform beyond bureau fields |
 | **Action Board** ⭐ | Pin anything from any module (📌 buttons or right-click → "Send to Action Board"; highlight text to send just that). Each action keeps its source module and filters, gets priority, owner, due date, status and notes; export to CSV, print, feeds the Board Brief | Insight → action in one click |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
 | **Governance & Trust** | Tenant isolation, peer privacy rules, metric catalogue, live audit trail | Answers the "can we trust AI?" question |

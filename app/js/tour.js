@@ -86,7 +86,7 @@
         title: 'MSME promoters slip first',
         say: `"Directors and partners borrow personally. In ${pct(N.ms.stats.precededPct, 0)} of MSME defaults, a promoter slipped on a personal loan or card first, about ${N.ms.stats.medianLeadMonths} months earlier. Tamil Nadu tops Sahyadri's watchlist, which is exactly where its MSME book broke."`,
         tip: 'Connects back to the Tamil Nadu alert on the Command Centre.' },
-      { view: 'upload', setup: async () => { clickText('Use the sample file'); await wait(200); clickText('Validate'); await wait(200); clickText('Generate insights'); await wait(300); }, target: () => q('.callout.danger'),
+      { view: 'upload', setup: async () => { PIQ.views.upload.demo('custom'); await wait(300); }, target: () => q('.callout.danger'),
         title: 'Bring your own data',
         say: '"Sourcing channel isn\'t bureau data. The bank uploads it, the platform joins it to the market like-for-like, and there\'s the root cause for Gujarat: the DSA channel. The file never leaves the bank\'s tenant."',
         tip: 'The sample file is built in, so there is no need to carry a CSV.' },

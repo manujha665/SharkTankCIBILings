@@ -6,7 +6,8 @@
  *  industry : month x product x state x riskBand x lenderCategory
  *  member   : month x product x state x riskBand
  *  peers    : peer x month x product x state            (never shown individually)
- *  logins   : who x day x product x state x riskBand   (industry + member)
+ *  logins   : who x day x product x state x riskBand x PIN tier x pool (industry + member);
+ *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day
  *  scores   : product x state x 20-pt score bin (member applications, last 90 days)
  *
  * Amounts are stored as sums (balance, DPD balances, ...) so any slice aggregates
@@ -339,16 +340,19 @@
   const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
   const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
   const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN']);
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay']);
   const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
   const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
     const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
     for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
       const apps = tot * pinW[a] * poolW[c];
       const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
-      const o = (base + a * LS[5] + c * LS[6]) * 4;
+      const o = (base + a * LS[5] + c * LS[6]) * 5;
       LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
       LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+      // applicants who made more than one enquiry on the same day (rate-shopping or loan stacking);
+      // deterministic share of the high-enquiry rate, higher in surges and DSA / fintech-partner pools
+      LD[o + 4] += apps * Math.min(0.5, enqRate * risky * (surge ? 0.62 : 0.4) + 0.012);
     }
   };
   DAYS.forEach((d, i) => {

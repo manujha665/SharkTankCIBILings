@@ -269,6 +269,10 @@ input[type='range'] { width: 100%; accent-color: var(--accent); }
 .chip:hover { border-color: var(--accent); color: var(--accent-ink); }
 .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); }
 .chat-input input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.chat-input .mic { min-width: 44px; font-size: 16px; }
+.chat-input .mic.on { background: var(--st-critical); border-color: var(--st-critical); color: #fff; animation: micPulse 1.2s ease-in-out infinite; }
+@keyframes micPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(209, 59, 59, 0.45); } 50% { box-shadow: 0 0 0 7px rgba(209, 59, 59, 0); } }
+@media (prefers-reduced-motion: reduce) { .chat-input .mic.on { animation: none; } }
 .chat-side { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; overflow-y: auto; min-height: 0; }
 .qcat { margin-bottom: 12px; }
 .qcat h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); margin: 8px 0 6px; display: flex; justify-content: space-between; }
@@ -391,6 +395,29 @@ body.touring .fab { display: none; }
   .card { box-shadow: none; break-inside: avoid; }
 }
 
+/* Policy Simulator: product × state cut-off grid */
+.policy-grid summary { cursor: pointer; padding: 2px 0; }
+.policy-grid > p { margin: 10px 0; }
+.cut-grid th.sel, .cut-grid tr.sel td { background: color-mix(in oklab, var(--accent) 8%, transparent); }
+.cut-grid td, .cut-grid th { padding: 4px 6px; }
+.cut-grid tr.all-row td { border-bottom: 2px solid var(--axis); font-weight: 600; }
+.cut-in { width: 64px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--ink); text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
+.cut-in.custom { background: color-mix(in oklab, var(--st-warning) 22%, var(--surface)); border-color: var(--st-warning); font-weight: 600; }
+.cut-in.err { border-color: var(--st-critical); }
+.cut-import { margin-top: 14px; border-top: 1px solid var(--grid); padding-top: 12px; }
+.cut-import textarea { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* Bring Your Data: Portfolio Review type picker */
+.pr-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; box-shadow: var(--shadow); transition: border-color .15s, transform .15s; }
+.pr-btn:hover, .pr-btn:focus-visible { border-color: var(--accent); transform: translateY(-1px); }
+.pr-btn strong { font-size: 16px; }
+.pr-btn .pr-go { margin-top: auto; padding-top: 6px; color: var(--accent-ink); font-weight: 600; font-size: 13px; }
+.pr-ico { font-size: 24px; line-height: 1; }
+.pr-head { display: flex; gap: 12px; align-items: center; margin-bottom: 12px; }
+.pr-head > div { flex: 1; }
+.pr-head h3 { margin: 0 0 2px; }
+
 </style>
 </head>
 <body>
@@ -452,7 +479,8 @@ body.touring .fab { display: none; }
  *  industry : month x product x state x riskBand x lenderCategory
  *  member   : month x product x state x riskBand
  *  peers    : peer x month x product x state            (never shown individually)
- *  logins   : who x day x product x state x riskBand   (industry + member)
+ *  logins   : who x day x product x state x riskBand x PIN tier x pool (industry + member);
+ *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day
  *  scores   : product x state x 20-pt score bin (member applications, last 90 days)
  *
  * Amounts are stored as sums (balance, DPD balances, ...) so any slice aggregates
@@ -785,16 +813,19 @@ body.touring .fab { display: none; }
   const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
   const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
   const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN']);
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay']);
   const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
   const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
     const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
     for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
       const apps = tot * pinW[a] * poolW[c];
       const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
-      const o = (base + a * LS[5] + c * LS[6]) * 4;
+      const o = (base + a * LS[5] + c * LS[6]) * 5;
       LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
       LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+      // applicants who made more than one enquiry on the same day (rate-shopping or loan stacking);
+      // deterministic share of the high-enquiry rate, higher in surges and DSA / fintech-partner pools
+      LD[o + 4] += apps * Math.min(0.5, enqRate * risky * (surge ? 0.62 : 0.4) + 0.012);
     }
   };
   DAYS.forEach((d, i) => {
@@ -1055,20 +1086,22 @@ body.touring .fab { display: none; }
   function simulate(p, s, cutoff, assumptions) {
     const A = Object.assign({}, DEFAULT_ASSUMPTIONS[p], assumptions || {});
     const states = !s || s === 'ALL' ? D.STATES.map((x) => x.id) : [s];
+    // cutoff: one score for every state, or a function state -> score (the member's product × state policy grid)
+    const cutOf = typeof cutoff === 'function' ? cutoff : () => cutoff;
     let apps = 0, approved = 0, bad = 0, badInd = 0;
-    states.forEach((st) => (scoreIdx[p + '|' + st] || []).forEach((r) => {
+    states.forEach((st) => { const cut = cutOf(st); (scoreIdx[p + '|' + st] || []).forEach((r) => {
       apps += r.apps;
-      const pass = r.lo >= cutoff ? 1 : r.hi > cutoff ? (r.hi - cutoff) / (r.hi - r.lo) : 0;
+      const pass = r.lo >= cut ? 1 : r.hi > cut ? (r.hi - cut) / (r.hi - r.lo) : 0;
       const a = r.apps * pass * A.otherPass;
       approved += a; bad += a * r.badMem; badInd += a * r.badInd;
-    }));
+    }); });
     const perMonth = approved / 3;
     const disb = (perMonth * A.ticket) / 100; // ₹ crore (ticket in lakh)
     const badRate = approved ? bad / approved : 0;
     const loss = disb * badRate * A.lgd;
     const margin = disb * (A.yield - A.cof - A.opex);
     return {
-      p, s, cutoff, apps: apps / 3, approvalRate: apps ? approved / apps : 0,
+      p, s, cutoff: typeof cutoff === 'function' ? null : cutoff, apps: apps / 3, approvalRate: apps ? approved / apps : 0,
       approvedPerMonth: perMonth, disbursalCr: disb, badRate, badRateInd: approved ? badInd / approved : 0,
       expLossCr: loss, netCr: margin - loss, assumptions: A
     };
@@ -1122,7 +1155,7 @@ body.touring .fab { display: none; }
   function loginQuality(who, f, days) {
     const base = Object.assign({}, f, { who, d: days });
     const tot = agg('logins', base);
-    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0 }; };
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0 }; };
     const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
     D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
       const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
@@ -1134,6 +1167,7 @@ body.touring .fab { display: none; }
     return {
       who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
       pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
+      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0,
       bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
       pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
       pools: D.POOLS.map((x) => {
@@ -1145,11 +1179,18 @@ body.touring .fab { display: none; }
       pdBuckets: buckets
     };
   }
-  // Convenience: last 7 days vs the prior 23 days for the member, and the industry's last 7 days
-  function loginQuality7(f) {
-    const last = D.DAYS.slice(-7), prior = D.DAYS.slice(0, -7);
-    return { mem: loginQuality('mem', f, last), memPrior: loginQuality('mem', f, prior), ind: loginQuality('ind', f, last) };
+  // Login window: last N days (7, 15 or 30) vs the rest of the 30-day feed for the member, and the
+  // industry over the same N days. With N = 30 there is no prior window, so memPrior is null.
+  const LOGIN_WINDOWS = [7, 15, 30];
+  function loginQualityWin(f, n) {
+    n = Math.min(D.DAYS.length, n || 7);
+    const last = D.DAYS.slice(-n), prior = D.DAYS.slice(0, -n);
+    return {
+      n, days: last, priorDays: prior.length,
+      mem: loginQuality('mem', f, last), memPrior: prior.length ? loginQuality('mem', f, prior) : null, ind: loginQuality('ind', f, last)
+    };
   }
+  const loginQuality7 = (f) => loginQualityWin(f, 7);
 
   // ---------------- Alerts (early warning runs on 30+ DPD, the earliest bucket) ----------------
   let alertCache = null;
@@ -1215,9 +1256,112 @@ body.touring .fab { display: none; }
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,
-    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, PD_BUCKETS, alerts
+    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, loginQualityWin, LOGIN_WINDOWS, PD_BUCKETS, alerts
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>/* js/cutoffs.js */
+/*
+ * Current score cut-offs by product × state (the member's credit policy grid).
+ * Defaults come from config (one cut-off per product); the member can override any product/state
+ * cell by typing in the grid or by importing a CSV. Overrides are kept in this browser
+ * (localStorage) in the prototype; in production they live in the member's private tenant.
+ */
+(function () {
+  const PIQ = window.PIQ;
+  const D = PIQ.data, C = PIQ.config;
+  const KEY = 'piq-cutoffs-v1';
+  const MIN = 300, MAX = 900;
+  let over = {}; // { 'PL|UP': 700 }
+  try { over = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { over = {}; }
+  const listeners = [];
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(over)); } catch (e) { /* private mode: keep in memory */ }
+    listeners.forEach((f) => f());
+  };
+
+  const def = (p) => C.currentCutoff[p];
+  const get = (p, s) => (s && s !== 'ALL' && over[p + '|' + s] != null ? over[p + '|' + s] : def(p));
+  const isCustom = (p, s) => over[p + '|' + s] != null && over[p + '|' + s] !== def(p);
+  const varies = (p) => D.STATES.some((st) => get(p, st.id) !== def(p));
+  const fn = (p) => (st) => get(p, st); // per-state cut-off function for the simulator
+  const valid = (v) => Number.isFinite(v) && v >= MIN && v <= MAX;
+
+  function set(p, s, v, quiet) {
+    v = Math.round(+v);
+    if (!valid(v)) return false;
+    if (v === def(p)) delete over[p + '|' + s]; else over[p + '|' + s] = v;
+    if (!quiet) { save(); log(p, s, v); }
+    return true;
+  }
+  function setProduct(p, v) {
+    v = Math.round(+v);
+    if (!valid(v)) return false;
+    D.STATES.forEach((st) => set(p, st.id, v, true));
+    save(); log(p, 'ALL', v);
+    return true;
+  }
+  function reset() { over = {}; save(); log('ALL', 'ALL', 'defaults'); }
+  const log = (p, s, v) => { if (PIQ.sem) PIQ.sem.log('cutoffs.update', { p, s, cutoff: v }); };
+  const count = () => Object.keys(over).length;
+
+  // ---- CSV in / out ----
+  const norm = (x) => String(x == null ? '' : x).trim().toLowerCase().replace(/\s+/g, ' ');
+  const findProd = (v) => D.PRODUCTS.find((p) => [p.id, p.name, p.long].some((x) => norm(x) === norm(v)));
+  const isAll = (v) => /^(all|all states|\*|india|national)$/.test(norm(v));
+  const findState = (v) => D.STATES.find((s) => norm(s.id) === norm(v) || norm(s.name) === norm(v) || norm(s.name).replace(/ states$/, '') === norm(v));
+  function rows(text) {
+    return String(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => l.split(/[,;\t]/).map((x) => x.trim().replace(/^"|"$/g, '')));
+  }
+  // Accepts two layouts:
+  //  long: product,state,cutoff   (one row per cell; state "All" sets every state for that product)
+  //  wide: state,PL,CC,HL,...     (one row per state, one column per product; a row "All" sets the product default for all states)
+  function importCSV(text) {
+    const r = rows(text);
+    if (!r.length) return { ok: 0, errors: ['The file is empty.'] };
+    const head = r[0].map(norm);
+    const errors = [];
+    let ok = 0;
+    const apply = (p, sv, v, line) => {
+      const n = Math.round(+v);
+      if (!valid(n)) { errors.push(`Line ${line}: cut-off "${v}" must be a number between ${MIN} and ${MAX}`); return; }
+      if (isAll(sv)) { D.STATES.forEach((st) => set(p.id, st.id, n, true)); ok += D.STATES.length; return; }
+      const st = findState(sv);
+      if (!st) { errors.push(`Line ${line}: unknown state "${sv}"`); return; }
+      set(p.id, st.id, n, true); ok++;
+    };
+    const prodCols = head.map((x) => findProd(x));
+    if (head[0] === 'state' || head[0] === 'region' || prodCols.filter(Boolean).length >= 2) {
+      r.slice(1).forEach((row, i) => {
+        row.slice(1).forEach((v, j) => {
+          const p = prodCols[j + 1];
+          if (!p || v === '') return;
+          apply(p, row[0], v, i + 2);
+        });
+      });
+    } else {
+      const hasHead = !findProd(r[0][0]);
+      const ci = hasHead ? { p: head.findIndex((x) => /product/.test(x)), s: head.findIndex((x) => /state|region/.test(x)), c: head.findIndex((x) => /cut|score|min/.test(x)) } : { p: 0, s: 1, c: 2 };
+      if (ci.p < 0 || ci.s < 0 || ci.c < 0) return { ok: 0, errors: ['Columns not recognised. Use "product,state,cutoff" or "state,PL,CC,…" (see the template).'] };
+      r.slice(hasHead ? 1 : 0).forEach((row, i) => {
+        const line = i + (hasHead ? 2 : 1);
+        const p = findProd(row[ci.p]);
+        if (!p) { errors.push(`Line ${line}: unknown product "${row[ci.p]}"`); return; }
+        apply(p, row[ci.s], row[ci.c], line);
+      });
+    }
+    if (ok) { save(); log('import', 'ALL', ok + ' cells'); }
+    return { ok, errors };
+  }
+  function templateCSV() {
+    const lines = [['state'].concat(D.PRODUCTS.map((p) => p.id)).join(',')];
+    D.STATES.forEach((st) => lines.push(['"' + st.name + '"'].concat(D.PRODUCTS.map((p) => get(p.id, st.id))).join(',')));
+    return lines.join('\n');
+  }
+
+  PIQ.cutoffs = { MIN, MAX, def, get, set, setProduct, reset, isCustom, varies, fn, count, importCSV, templateCSV, onChange: (f) => listeners.push(f) };
+})();
 
 </script>
   <script>/* js/ui.js */
@@ -1857,7 +2001,7 @@ body.touring .fab { display: none; }
   function productRecs(p) {
     const recs = [];
     const P = D.P[p];
-    const cur = C.currentCutoff[p];
+    const CO = PIQ.cutoffs, cur = CO.def(p); // product default; states may differ (policy grid)
     const t = S.latest();
     const prodBal = S.value('member', 'bal', { p, m: t });
     const material = (s) => S.value('member', 'bal', { p, s, m: t }) >= prodBal * 0.03;
@@ -1865,18 +2009,19 @@ body.touring .fab { display: none; }
     // 1) state-level cut-off optimisation where the book has deteriorated
     const perState = states.map((st) => {
       const dec = S.decompose({ p, s: st.id, t0: C.policyChangeMonth, t1: t, dim: 'b' });
-      const a = S.simulate(p, st.id, cur);
+      const c0 = CO.get(p, st.id);
+      const a = S.simulate(p, st.id, c0);
       let best = a;
       if (dec.mix + dec.own > 0.002)
-        for (let c = cur - 20; c <= cur + 40; c += 10) { const r = S.simulate(p, st.id, c); if (r.netCr > best.netCr + Math.max(0.05, Math.abs(a.netCr) * 0.02)) best = r; }
-      return { st, cur: a, best, dec };
+        for (let c = c0 - 20; c <= c0 + 40; c += 10) { const r = S.simulate(p, st.id, c); if (r.netCr > best.netCr + Math.max(0.05, Math.abs(a.netCr) * 0.02)) best = r; }
+      return { st, cur: a, best, dec, c0 };
     });
-    const tighten = perState.filter((x) => x.best.cutoff > cur);
+    const tighten = perState.filter((x) => x.best.cutoff > x.c0);
     if (tighten.length) {
       const gain = tighten.reduce((acc, x) => acc + (x.best.netCr - x.cur.netCr), 0);
       const lossCut = tighten.reduce((acc, x) => acc + (x.cur.expLossCr - x.best.expLossCr), 0);
       const volCut = tighten.reduce((acc, x) => acc + (x.cur.approvedPerMonth - x.best.approvedPerMonth), 0);
-      const totalAppr = S.simulate(p, 'ALL', cur).approvedPerMonth;
+      const totalAppr = S.simulate(p, 'ALL', CO.fn(p)).approvedPerMonth;
       const loosened = C.previousCutoff[p] !== cur;
       recs.push({
         id: 'cutoff-' + p, priority: 1, kind: 'policy', p,
@@ -1954,6 +2099,7 @@ body.touring .fab { display: none; }
 
   // Ranked recommendations for a product, or across the whole portfolio (p = 'ALL')
   const recCache = new Map();
+  if (PIQ.cutoffs) PIQ.cutoffs.onChange(() => recCache.clear()); // a new policy grid changes the advice
   function recommendations(p) {
     p = p || 'ALL';
     if (recCache.has(p)) return recCache.get(p);
@@ -2243,6 +2389,429 @@ body.touring .fab { display: none; }
   }
   PIQ.sampleUploadCSV = sampleUploadCSV;
 })(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>/* js/pr.js */
+/*
+ * Portfolio Review (PR) uploads: the member uploads a bureau Portfolio Review output and gets
+ * insights computed from that file alone. Four PR types, each with its own layout, sample file
+ * and analysis:
+ *   consumer     Consumer PR        retail loans & cards by product, state, score band
+ *   commercial   Commercial PR      MSME / commercial exposure by segment, sector, state, CMR rank
+ *   mfi          Microfinance PR    MFI book by state, number of MFI lenders, ticket size
+ *   mfiConsumer  MFI + Consumer PR  the MFI book split by its consumer-credit footprint
+ * Sample files are synthetic and deterministic (seeded), with a story built in.
+ */
+(function () {
+  const PIQ = window.PIQ;
+  const D = PIQ.data;
+
+  // ---------- shared helpers ----------
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const MONTHS = () => D.MONTHS.slice(-12);
+  const nm = (id) => D.S[id].name;
+  const csvCell = (v) => (/[",]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v));
+  const csv = (head, rows) => [head.join(',')].concat(rows.map((r) => r.map(csvCell).join(','))).join('\n');
+  const f2 = (x) => Math.max(0, x).toFixed(2), f3 = (x) => Math.max(0, x).toFixed(3);
+  const ml = (m) => D.monthLabel(m);
+  const pct = (v, d) => (v == null || !isFinite(v) ? '—' : (v * 100).toFixed(d == null ? 2 : d) + '%');
+  const bps = (v) => (v >= 0 ? '+' : '−') + Math.abs(Math.round(v * 10000)) + ' bps';
+  const ppt = (v) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1) + ' pp';
+  const chg = (v) => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1) + '%';
+  const cr = (v) => PIQ.ui.fmt.cr(v);
+  const cnt = (v) => PIQ.ui.fmt.count(v);
+  const sum = (recs, keyFn, fields) => {
+    const g = new Map();
+    recs.forEach((r) => {
+      const k = keyFn(r);
+      let a = g.get(k);
+      if (!a) { a = { n: 0 }; fields.forEach((f) => (a[f] = 0)); g.set(k, a); }
+      a.n++;
+      fields.forEach((f) => (a[f] += r[f] || 0));
+    });
+    return g;
+  };
+  const one = (recs, fields) => sum(recs, () => 'x', fields).get('x') || Object.fromEntries(fields.map((f) => [f, 0]));
+  const div = (a, b) => (b ? a / b : 0);
+  const num = (label) => { const m = String(label).match(/\d+/); return m ? +m[0] : 0; };
+  // months in the file, plus the first, latest and "3 months ago" reference points
+  const timeline = (recs) => {
+    const ms = [...new Set(recs.map((r) => r.m))].sort();
+    return { ms, F: ms[0], L: ms[ms.length - 1], L3: ms[Math.max(0, ms.length - 4)], first3: ms.slice(0, 3), last3: ms.slice(-3) };
+  };
+
+  // ---------- 1. Consumer PR ----------
+  const CONSUMER = {
+    id: 'consumer', label: 'Consumer PR', icon: '👤', file: 'consumer_pr_output.csv',
+    blurb: 'Retail loans and cards: balances, disbursals and 30+ / 90+ delinquency by product, state and score band.',
+    fields: [
+      { id: 'm', name: 'Month (YYYY-MM)', kind: 'month', req: true, guess: /month|period|date/i },
+      { id: 'product', name: 'Product', kind: 'cat', req: true, guess: /product/i },
+      { id: 'state', name: 'State', kind: 'state', req: true, guess: /state|region/i },
+      { id: 'band', name: 'Score band', kind: 'cat', req: true, guess: /band|score|tier/i },
+      { id: 'acc', name: 'Live accounts', kind: 'num', req: true, guess: /account|live/i },
+      { id: 'bal', name: 'Balance outstanding (₹ Cr)', kind: 'num', req: true, guess: /^bal|balance|outstanding|pos/i },
+      { id: 'disb', name: 'Disbursed in month (₹ Cr)', kind: 'num', req: false, guess: /disb|sanction/i },
+      { id: 'd30', name: '30+ DPD balance (₹ Cr)', kind: 'num', req: true, guess: /30/i },
+      { id: 'd90', name: '90+ DPD balance (₹ Cr)', kind: 'num', req: true, guess: /90/i }
+    ],
+    sample() {
+      const r = rng(1101);
+      const prods = { PL: [16000, 0.025, 3, 0.06], CC: [6000, 0.045, 0.6, 0.1], HL: [30000, 0.008, 30, 0.015], AL: [7000, 0.02, 6, 0.04], TW: [2500, 0.05, 0.8, 0.06], GL: [5000, 0.015, 1, 0.15] };
+      const st = { MH: [0.2, 1], UP: [0.15, 1.25], TN: [0.13, 1], KA: [0.12, 0.95], GJ: [0.1, 0.95], BR: [0.1, 1.3], WB: [0.1, 1.05], RJ: [0.1, 1.1] };
+      const bandShare = [0.2, 0.22, 0.28, 0.18, 0.12], bandMult = [0.35, 0.6, 1, 1.9, 3.2];
+      const rows = [];
+      MONTHS().forEach((m, t) => Object.entries(prods).forEach(([p, [base, rate, ticket, disbRate]]) => Object.entries(st).forEach(([s, [w, sm]]) => {
+        const hot = p === 'PL' && (s === 'UP' || s === 'BR');
+        const sh = bandShare.map((x, i) => x * (hot && i >= 3 ? 1 + 0.06 * t : 1));
+        const tot = sh.reduce((a, b) => a + b, 0);
+        D.BANDS.forEach((b, i) => {
+          const bal = base * w * (sh[i] / tot) * Math.pow(1.012, t) * (0.95 + 0.1 * r());
+          const trend = hot ? 1 + 0.045 * t : p === 'CC' ? 1 - 0.015 * t : 1 + 0.005 * t;
+          const d30r = Math.min(0.5, rate * bandMult[i] * sm * trend * (0.94 + 0.12 * r()));
+          const roll = (hot ? 0.5 + 0.012 * t : p === 'CC' ? 0.38 : 0.44) * (0.95 + 0.1 * r());
+          const disb = bal * disbRate * (hot && i >= 3 ? 1 + 0.05 * t : 1) * (0.9 + 0.2 * r());
+          rows.push([m, D.P[p].name, nm(s), `${b.name} (${b.range})`, Math.round((bal * 100) / ticket), f2(bal), f2(disb), f3(bal * d30r), f3(bal * d30r * roll)]);
+        });
+      })));
+      return csv(['month', 'product', 'state', 'score_band', 'live_accounts', 'balance_cr', 'disbursed_cr', 'dpd30_balance_cr', 'dpd90_balance_cr'], rows);
+    },
+    analyse(recs) {
+      const T = timeline(recs), F = ['acc', 'bal', 'disb', 'd30', 'd90'];
+      const byM = sum(recs, (r) => r.m, F);
+      const LT = byM.get(T.L), FT = byM.get(T.F);
+      const r30 = (a) => div(a.d30, a.bal), r90 = (a) => div(a.d90, a.bal);
+      const prods = [...new Set(recs.map((r) => r.product))];
+      const pL = sum(recs.filter((r) => r.m === T.L), (r) => r.product, F), pF = sum(recs.filter((r) => r.m === T.F), (r) => r.product, F);
+      const cL = sum(recs.filter((r) => r.m === T.L), (r) => r.product + '|' + r.state, F), cF = sum(recs.filter((r) => r.m === T.F), (r) => r.product + '|' + r.state, F);
+      const hot = [...cL.entries()].filter(([k, a]) => a.bal >= LT.bal * 0.01 && cF.get(k)).map(([k, a]) => ({ k, a, was: r30(cF.get(k)), now: r30(a) })).map((x) => Object.assign(x, { d: x.now - x.was })).sort((x, y) => y.d - x.d);
+      const bands = [...new Set(recs.map((r) => r.band))];
+      const weakRe = /near|sub|<|≤|low|ntc|thin/i;
+      const weak = bands.filter((b) => weakRe.test(b));
+      const shareOf = (rs, key) => { const tot = one(rs, [key])[key]; return div(rs.filter((r) => weak.includes(r.band)).reduce((a, r) => a + (r[key] || 0), 0), tot); };
+      const wF = shareOf(recs.filter((r) => r.m === T.F), 'bal'), wL = shareOf(recs.filter((r) => r.m === T.L), 'bal');
+      const dF = shareOf(recs.filter((r) => T.first3.includes(r.m)), 'disb'), dL = shareOf(recs.filter((r) => T.last3.includes(r.m)), 'disb');
+      const bL = sum(recs.filter((r) => r.m === T.L), (r) => r.band, F), bF = sum(recs.filter((r) => r.m === T.F), (r) => r.band, F);
+      const prodRows = prods.map((p) => ({ p, L: pL.get(p), F: pF.get(p) })).filter((x) => x.L && x.F).sort((a, b) => b.L.bal - a.L.bal);
+      const rollTop = prodRows.slice().sort((a, b) => div(b.L.d90, b.L.d30) - div(a.L.d90, a.L.d30))[0];
+      const best = prodRows.slice().sort((a, b) => (r30(a.L) - r30(a.F)) - (r30(b.L) - r30(b.F)))[0];
+      const w = hot[0];
+      const [wp, ws] = w ? w.k.split('|') : ['', ''];
+      const findings = [];
+      if (weak.length) findings.push({ tone: wL > wF + 0.01 ? 'danger' : 'insight', title: `Weaker score bands are ${wL > wF + 0.005 ? 'growing' : 'stable'}: ${pct(wF, 1)} → ${pct(wL, 1)} of balance`, text: `${weak.join(' and ')} took ${pct(dL, 0)} of disbursals in the last 3 months, against ${pct(dF, 0)} in the first 3 months of the file. New lending is ${dL > dF + 0.01 ? 'drifting down the score curve' : 'holding its risk mix'}.` });
+      if (rollTop) findings.push({ tone: div(rollTop.L.d90, rollTop.L.d30) > 0.5 ? 'danger' : 'insight', title: `${rollTop.p}: ${pct(div(rollTop.L.d90, rollTop.L.d30), 0)} of the 30+ book is already 90+`, text: `The highest roll-forward in the file (was ${pct(div(rollTop.F.d90, rollTop.F.d30), 0)} in ${ml(T.F)}). Early-bucket collections on this product are not curing accounts before they reach 90+.` });
+      if (best && r30(best.L) < r30(best.F)) findings.push({ tone: 'okay', title: `${best.p} is improving: 30+ DPD ${pct(r30(best.F))} → ${pct(r30(best.L))}`, text: `${bps(r30(best.L) - r30(best.F))} since ${ml(T.F)} on ${cr(best.L.bal)} of balance. A candidate for selective growth.` });
+      return {
+        headline: w ? { tone: w.d > 0.005 ? 'danger' : 'insight', title: `${wp} in ${ws}: 30+ DPD up ${bps(w.d).replace('+', '')} to ${pct(w.now)} since ${ml(T.F)}`, text: `The fastest-deteriorating product × state in your Consumer PR, ${(w.now / r30(LT)).toFixed(1)}× your book average of ${pct(r30(LT))}, on ${cr(w.a.bal)} of balance (${pct(w.a.bal / LT.bal, 1)} of the book).` } : null,
+        stats: [
+          { label: `Balance · ${ml(T.L)}`, value: cr(LT.bal), note: `${chg(LT.bal / FT.bal - 1)} since ${ml(T.F)}` },
+          { label: '30+ DPD', value: pct(r30(LT)), note: `${bps(r30(LT) - r30(FT))} since ${ml(T.F)}`, bad: r30(LT) - r30(FT) > 0.002 },
+          { label: '90+ DPD', value: pct(r90(LT)), note: `${bps(r90(LT) - r90(FT))} since ${ml(T.F)}`, bad: r90(LT) - r90(FT) > 0.001 },
+          { label: 'Live accounts', value: cnt(LT.acc), note: `${cr(LT.disb)} disbursed in ${ml(T.L)}` }
+        ],
+        charts: [
+          { type: 'line', title: 'Delinquency trend', sub: '30+ and 90+ DPD as % of balance, whole file', yPct: true, series: [{ name: '30+ DPD', points: T.ms.map((m) => ({ x: m, y: r30(byM.get(m)) })) }, { name: '90+ DPD', points: T.ms.map((m) => ({ x: m, y: r90(byM.get(m)) })) }] },
+          { type: 'bars', title: 'Balance mix by score band', sub: `Share of balance · ${ml(T.L)} vs ${ml(T.F)} (tick)`, fmt: 'pct0', valueName: ml(T.L), refName: ml(T.F), items: bands.map((b) => ({ label: b, value: div((bL.get(b) || {}).bal, LT.bal), ref: div((bF.get(b) || {}).bal, FT.bal) })) }
+        ],
+        tables: [
+          { title: 'By product', sub: `${ml(T.L)} · change since ${ml(T.F)}`, cols: ['Product', 'Balance', 'Share', '30+ DPD', 'Change', '90+ DPD', '90+ ÷ 30+'], rows: prodRows.map((x) => [x.p, cr(x.L.bal), pct(x.L.bal / LT.bal, 1), pct(r30(x.L)), { v: bps(r30(x.L) - r30(x.F)), bad: r30(x.L) - r30(x.F) > 0.003, good: r30(x.L) < r30(x.F) }, pct(r90(x.L)), pct(div(x.L.d90, x.L.d30), 0)]) },
+          { title: 'Fastest-deteriorating product × state', sub: `Segments with at least 1% of balance · 30+ DPD ${ml(T.F)} → ${ml(T.L)}`, cols: ['Segment', 'Balance', `30+ ${ml(T.F)}`, `30+ ${ml(T.L)}`, 'Change'], rows: hot.slice(0, 6).map((x) => [x.k.replace('|', ' · '), cr(x.a.bal), pct(x.was), pct(x.now), { v: bps(x.d), bad: x.d > 0.003, good: x.d < 0 }]) }
+        ],
+        findings,
+        ai: [w ? `Fastest-deteriorating segment: ${wp} in ${ws}, 30+ DPD ${pct(w.was)} → ${pct(w.now)}` : '', `Book 30+ DPD ${pct(r30(LT))} (${bps(r30(LT) - r30(FT))} since ${ml(T.F)}); 90+ ${pct(r90(LT))}`].concat(findings.map((f) => f.title)).filter(Boolean)
+      };
+    }
+  };
+
+  // ---------- 2. Commercial PR ----------
+  const COMMERCIAL = {
+    id: 'commercial', label: 'Commercial PR', icon: '🏭', file: 'commercial_pr_output.csv',
+    blurb: 'MSME and commercial exposure by borrower segment, sector, state and CIBIL MSME Rank (CMR), with SMA-0/1/2 and NPA.',
+    fields: [
+      { id: 'm', name: 'Month (YYYY-MM)', kind: 'month', req: true, guess: /month|period|date/i },
+      { id: 'seg', name: 'Borrower segment (Micro / Small / Medium)', kind: 'cat', req: true, guess: /segment|size/i },
+      { id: 'sector', name: 'Sector', kind: 'cat', req: true, guess: /sector|industry/i },
+      { id: 'state', name: 'State', kind: 'state', req: true, guess: /state|region/i },
+      { id: 'cmr', name: 'CMR band', kind: 'cat', req: true, guess: /cmr|rank/i },
+      { id: 'acc', name: 'Live accounts', kind: 'num', req: true, guess: /account|borrower|live/i },
+      { id: 'exp', name: 'Exposure outstanding (₹ Cr)', kind: 'num', req: true, guess: /exposure|balance|outstanding/i },
+      { id: 'sma0', name: 'SMA-0 balance (₹ Cr)', kind: 'num', req: true, guess: /sma.?0/i },
+      { id: 'sma1', name: 'SMA-1 balance (₹ Cr)', kind: 'num', req: true, guess: /sma.?1/i },
+      { id: 'sma2', name: 'SMA-2 balance (₹ Cr)', kind: 'num', req: true, guess: /sma.?2/i },
+      { id: 'npa', name: 'NPA balance (₹ Cr)', kind: 'num', req: true, guess: /npa|90/i }
+    ],
+    sample() {
+      const r = rng(2202);
+      const segs = { Micro: [4000, 1.4, 0.4], Small: [9000, 1, 2], Medium: [12000, 0.7, 9] };
+      const sectors = { Manufacturing: [0.3, 1], Trading: [0.25, 1.2], Services: [0.22, 0.9], Construction: [0.13, 1.3], 'Agri-processing': [0.1, 1.05] };
+      const st = { MH: [0.24, 1], TN: [0.2, 1.05], GJ: [0.18, 0.9], KA: [0.14, 0.95], UP: [0.13, 1.15], WB: [0.11, 1.1] };
+      const cmrs = ['CMR 1-3', 'CMR 4-6', 'CMR 7-8', 'CMR 9-10'], cmrMult = [0.4, 0.8, 1.6, 3];
+      const rows = [];
+      MONTHS().forEach((m, t) => Object.entries(segs).forEach(([sg, [base, sgm, ticket]]) => Object.entries(sectors).forEach(([sec, [sw, secm]]) => Object.entries(st).forEach(([s, [w, sm]]) => {
+        const sh = [0.35 - 0.006 * t, 0.35 - 0.004 * t, 0.2 + 0.006 * t, 0.1 + 0.004 * t];
+        cmrs.forEach((c, i) => {
+          const exp = base * sw * w * sh[i] * Math.pow(1.009, t) * (0.93 + 0.14 * r());
+          const k = cmrMult[i] * sgm * secm * sm;
+          const tradeTN = sec === 'Trading' && s === 'TN' && t >= 7 ? 1 + 0.32 * (t - 6) : 1;
+          const consMH = sec === 'Construction' && s === 'MH' ? 1 + 0.03 * t : 1;
+          const j = () => 0.92 + 0.16 * r();
+          rows.push([m, sg, sec, nm(s), c, Math.round((exp * 100) / ticket), f2(exp), f3(exp * 0.05 * k * j()), f3(exp * 0.025 * k * tradeTN * j()), f3(exp * 0.012 * k * tradeTN * tradeTN * j()), f3(exp * 0.03 * k * consMH * (tradeTN > 1 ? 1 + 0.05 * (t - 6) : 1) * j())]);
+        });
+      }))));
+      return csv(['month', 'borrower_segment', 'sector', 'state', 'cmr_band', 'live_accounts', 'exposure_cr', 'sma0_cr', 'sma1_cr', 'sma2_cr', 'npa_cr'], rows);
+    },
+    analyse(recs) {
+      const T = timeline(recs), F = ['acc', 'exp', 'sma0', 'sma1', 'sma2', 'npa'];
+      const byM = sum(recs, (r) => r.m, F);
+      const LT = byM.get(T.L), FT = byM.get(T.F), L3T = byM.get(T.L3);
+      const rt = (a, k) => div(a[k], a.exp);
+      const risky = (r) => num(r.cmr) >= 7;
+      const highShare = (m) => div(recs.filter((r) => r.m === m && risky(r)).reduce((a, r) => a + r.exp, 0), byM.get(m).exp);
+      const at = (m, key) => sum(recs.filter((r) => r.m === m), key, F);
+      const secL = at(T.L, (r) => r.sector), sec3 = at(T.L3, (r) => r.sector);
+      const segL = at(T.L, (r) => r.seg);
+      const cL = at(T.L, (r) => r.sector + '|' + r.state), c3 = at(T.L3, (r) => r.sector + '|' + r.state);
+      const hot = [...cL.entries()].filter(([k, a]) => a.exp >= LT.exp * 0.01 && c3.get(k)).map(([k, a]) => ({ k, a, was: rt(c3.get(k), 'sma2'), now: rt(a, 'sma2') })).map((x) => Object.assign(x, { d: x.now - x.was })).sort((x, y) => y.d - x.d);
+      const w = hot[0];
+      const [wsec, wst] = w ? w.k.split('|') : ['', ''];
+      const secRows = [...secL.entries()].map(([k, a]) => ({ k, a, b: sec3.get(k) })).filter((x) => x.b).sort((x, y) => y.a.exp - x.a.exp);
+      const segRows = [...segL.entries()].sort((x, y) => rt(y[1], 'npa') - rt(x[1], 'npa'));
+      const hF = highShare(T.F), hL = highShare(T.L);
+      const findings = [];
+      findings.push({ tone: hL > hF + 0.01 ? 'danger' : 'insight', title: `Exposure to CMR 7–10 borrowers: ${pct(hF, 1)} → ${pct(hL, 1)}`, text: `The riskiest CIBIL MSME Ranks now hold ${cr(hL * LT.exp)} of your exposure. ${hL > hF + 0.01 ? 'New and renewed limits are going to weaker-ranked businesses.' : 'The rank mix is broadly stable.'}` });
+      if (segRows.length > 1) { const [hi, lo] = [segRows[0], segRows[segRows.length - 1]]; findings.push({ tone: 'insight', title: `${hi[0]} businesses carry ${(rt(hi[1], 'npa') / Math.max(1e-6, rt(lo[1], 'npa'))).toFixed(1)}× the NPA rate of ${lo[0]}`, text: `NPA ${pct(rt(hi[1], 'npa'))} vs ${pct(rt(lo[1], 'npa'))} in ${ml(T.L)}. Pricing and monitoring intensity should differ by segment.` }); }
+      findings.push({ tone: rt(LT, 'sma2') > rt(L3T, 'sma2') * 1.1 ? 'danger' : 'okay', title: `SMA-2 book ${rt(LT, 'sma2') > rt(L3T, 'sma2') ? 'building' : 'easing'}: ${pct(rt(L3T, 'sma2'))} → ${pct(rt(LT, 'sma2'))} in 3 months`, text: `SMA-2 (61–90 days overdue) is the last stop before NPA. ${cr(LT.sma2)} sits there today.` });
+      return {
+        headline: w ? { tone: w.d > 0.004 ? 'danger' : 'insight', title: `${wsec} in ${wst}: SMA-2 rose from ${pct(w.was)} to ${pct(w.now)} in 3 months`, text: `These are next quarter's NPAs: ${cr(w.a.sma2)} of ${cr(w.a.exp)} exposure is 61–90 days overdue, the fastest build-up of any sector × state in your Commercial PR. Review limits and stock statements now.` } : null,
+        stats: [
+          { label: `Exposure · ${ml(T.L)}`, value: cr(LT.exp), note: `${chg(LT.exp / FT.exp - 1)} since ${ml(T.F)}` },
+          { label: 'SMA-2 (pre-NPA)', value: pct(rt(LT, 'sma2')), note: `${bps(rt(LT, 'sma2') - rt(L3T, 'sma2'))} in 3 months`, bad: rt(LT, 'sma2') > rt(L3T, 'sma2') * 1.1 },
+          { label: 'NPA', value: pct(rt(LT, 'npa')), note: `${bps(rt(LT, 'npa') - rt(FT, 'npa'))} since ${ml(T.F)}`, bad: rt(LT, 'npa') > rt(FT, 'npa') + 0.002 },
+          { label: 'Exposure in CMR 7–10', value: pct(hL, 1), note: `${ppt(hL - hF)} since ${ml(T.F)}`, bad: hL > hF + 0.01 }
+        ],
+        charts: [
+          { type: 'line', title: 'Stress pipeline', sub: 'SMA-0, SMA-1, SMA-2 and NPA as % of exposure', yPct: true, series: ['sma0', 'sma1', 'sma2', 'npa'].map((k) => ({ name: k === 'npa' ? 'NPA' : k.toUpperCase().replace('SMA', 'SMA-'), points: T.ms.map((m) => ({ x: m, y: rt(byM.get(m), k) })) })) },
+          { type: 'bars', title: 'SMA-2 by sector', sub: `${ml(T.L)} vs 3 months earlier (tick)`, fmt: 'pct', valueName: ml(T.L), refName: ml(T.L3), items: secRows.map((x) => ({ label: x.k, value: rt(x.a, 'sma2'), ref: rt(x.b, 'sma2') })) }
+        ],
+        tables: [
+          { title: 'By sector', sub: `${ml(T.L)} · SMA-2 change over 3 months`, cols: ['Sector', 'Exposure', 'Share', 'SMA-2', '3-month change', 'NPA'], rows: secRows.map((x) => [x.k, cr(x.a.exp), pct(x.a.exp / LT.exp, 1), pct(rt(x.a, 'sma2')), { v: bps(rt(x.a, 'sma2') - rt(x.b, 'sma2')), bad: rt(x.a, 'sma2') - rt(x.b, 'sma2') > 0.002 }, pct(rt(x.a, 'npa'))]) },
+          { title: 'Fastest SMA-2 build-up: sector × state', sub: `Cells with at least 1% of exposure · ${ml(T.L3)} → ${ml(T.L)}`, cols: ['Segment', 'Exposure', `SMA-2 ${ml(T.L3)}`, `SMA-2 ${ml(T.L)}`, 'Change'], rows: hot.slice(0, 6).map((x) => [x.k.replace('|', ' · '), cr(x.a.exp), pct(x.was), pct(x.now), { v: bps(x.d), bad: x.d > 0.002 }]) },
+          { title: 'By borrower segment', sub: ml(T.L), cols: ['Segment', 'Exposure', 'Accounts', 'SMA-2', 'NPA'], rows: segRows.map(([k, a]) => [k, cr(a.exp), cnt(a.acc), pct(rt(a, 'sma2')), pct(rt(a, 'npa'))]) }
+        ],
+        findings,
+        ai: [w ? `Fastest SMA-2 build-up: ${wsec} in ${wst}, ${pct(w.was)} → ${pct(w.now)} in 3 months` : '', `SMA-2 ${pct(rt(LT, 'sma2'))}, NPA ${pct(rt(LT, 'npa'))} of ${cr(LT.exp)} exposure`].concat(findings.map((f) => f.title)).filter(Boolean)
+      };
+    }
+  };
+
+  // ---------- 3. Microfinance PR ----------
+  const MFI = {
+    id: 'mfi', label: 'Microfinance PR', icon: '🤝', file: 'microfinance_pr_output.csv',
+    blurb: 'Your microfinance book by state, number of MFI lenders per borrower and ticket size, with PAR 30 / PAR 90.',
+    fields: [
+      { id: 'm', name: 'Month (YYYY-MM)', kind: 'month', req: true, guess: /month|period|date/i },
+      { id: 'state', name: 'State', kind: 'state', req: true, guess: /state|region/i },
+      { id: 'lenders', name: 'MFI lenders per borrower (1, 2, 3, 4+)', kind: 'cat', req: true, guess: /lender/i },
+      { id: 'ticket', name: 'Ticket-size bucket', kind: 'cat', req: true, guess: /ticket/i },
+      { id: 'borrowers', name: 'Live borrowers', kind: 'num', req: true, guess: /borrower|live/i },
+      { id: 'glp', name: 'Gross loan portfolio (₹ Cr)', kind: 'num', req: true, guess: /glp|gross|portfolio|balance/i },
+      { id: 'disb', name: 'Disbursed in month (₹ Cr)', kind: 'num', req: false, guess: /disb/i },
+      { id: 'par30', name: 'PAR 30 balance (₹ Cr)', kind: 'num', req: true, guess: /par.?30|30/i },
+      { id: 'par90', name: 'PAR 90 balance (₹ Cr)', kind: 'num', req: true, guess: /par.?90|90/i }
+    ],
+    sample() {
+      const r = rng(3303);
+      const st = { BR: [0.18, 1.2], UP: [0.16, 1.15], TN: [0.14, 0.9], KA: [0.12, 0.85], WB: [0.12, 1], MH: [0.1, 0.95], OD: [0.1, 1.05], MP: [0.08, 1.1] };
+      const lenders = ['1', '2', '3', '4+'], lMult = [1, 1.4, 2.1, 3.4];
+      const tickets = [['<30K', 25000, 0.9], ['30–50K', 40000, 1], ['50K+', 62000, 1.3]];
+      const rows = [];
+      MONTHS().forEach((m, t) => Object.entries(st).forEach(([s, [w, sm]]) => {
+        const lsh = [0.45 - 0.004 * t, 0.28, 0.15, 0.12 + 0.004 * t];
+        const tsh = [0.4 - 0.006 * t, 0.4, 0.2 + 0.006 * t];
+        lenders.forEach((l, li) => tickets.forEach(([tk, avg, tm], ti) => {
+          const bor = 4000000 * w * lsh[li] * tsh[ti] * Math.pow(1.006, t) * (0.94 + 0.12 * r());
+          const glp = (bor * avg * 0.62) / 1e7;
+          const stress = (s === 'BR' || s === 'UP' ? 1 + 0.06 * t : 1) * (s === 'MP' && t >= 9 ? 1.5 : 1);
+          const par30 = Math.min(0.5, 0.02 * lMult[li] * tm * sm * stress * (0.92 + 0.16 * r()));
+          rows.push([m, nm(s), l, tk, Math.round(bor), f2(glp), f2(glp * 0.09 * (0.9 + 0.2 * r())), f3(glp * par30), f3(glp * par30 * (0.5 + 0.1 * r()))]);
+        }));
+      }));
+      return csv(['month', 'state', 'mfi_lenders', 'ticket_bucket', 'live_borrowers', 'glp_cr', 'disbursed_cr', 'par30_cr', 'par90_cr'], rows);
+    },
+    analyse(recs) {
+      const T = timeline(recs), F = ['borrowers', 'glp', 'disb', 'par30', 'par90'];
+      const byM = sum(recs, (r) => r.m, F);
+      const LT = byM.get(T.L), FT = byM.get(T.F);
+      const p30 = (a) => div(a.par30, a.glp), p90 = (a) => div(a.par90, a.glp);
+      const lBuckets = [...new Set(recs.map((r) => r.lenders))].sort((a, b) => num(a) - num(b));
+      const top = lBuckets[lBuckets.length - 1], low = lBuckets[0];
+      const at = (m, key) => sum(recs.filter((r) => r.m === m), key, F);
+      const lL = at(T.L, (r) => r.lenders), lF = at(T.F, (r) => r.lenders);
+      const topShare = (m) => div((at(m, (r) => r.lenders).get(top) || {}).borrowers, byM.get(m).borrowers);
+      const sL = at(T.L, (r) => r.state), sF = at(T.F, (r) => r.state);
+      const stRows = [...sL.entries()].map(([k, a]) => ({ k, a, b: sF.get(k), top4: div(recs.filter((r) => r.m === T.L && r.state === k && r.lenders === top).reduce((x, r) => x + r.borrowers, 0), a.borrowers) })).filter((x) => x.b).sort((x, y) => (p30(y.a) - p30(y.b)) - (p30(x.a) - p30(x.b)));
+      const w = stRows[0];
+      const tks = [...new Set(recs.map((r) => r.ticket))];
+      const bigT = tks.slice().sort((a, b) => num(b.replace(/[<]/, '')) - num(a.replace(/[<]/, '')))[0];
+      const tShare = (ms) => { const rs = recs.filter((r) => ms.includes(r.m)); return div(rs.filter((r) => r.ticket === bigT).reduce((a, r) => a + (r.disb || 0), 0), rs.reduce((a, r) => a + (r.disb || 0), 0)); };
+      const tF = tShare(T.first3), tL = tShare(T.last3);
+      const multi = div(p30(lL.get(top)), p30(lL.get(low)));
+      const findings = [
+        { tone: multi > 2 ? 'danger' : 'insight', title: `Borrowers with ${top} MFI lenders: PAR 30 ${pct(p30(lL.get(top)))}, ${multi.toFixed(1)}× single-lender borrowers`, text: `They are ${pct(topShare(T.L), 1)} of your live borrowers (${ppt(topShare(T.L) - topShare(T.F))} since ${ml(T.F)}) and hold ${cr(lL.get(top).glp)}. Over-indebtedness is where the stress sits: cap exposure where a borrower already has ${top} lenders.` },
+        { tone: tL > tF + 0.02 ? 'danger' : 'insight', title: `Bigger tickets: ${bigT} loans are ${pct(tL, 0)} of recent disbursals (was ${pct(tF, 0)})`, text: `Ticket sizes are ${tL > tF + 0.02 ? 'creeping up while repayment capacity stays the same, a classic precursor of MFI stress' : 'stable'}. Their PAR 30 is ${pct(p30(at(T.L, (r) => r.ticket).get(bigT)))}.` }
+      ];
+      return {
+        headline: w ? { tone: p30(w.a) - p30(w.b) > 0.01 ? 'danger' : 'insight', title: `${w.k}: PAR 30 up from ${pct(w.b ? p30(w.b) : 0)} to ${pct(p30(w.a))} since ${ml(T.F)}`, text: `The sharpest deterioration of any state in your Microfinance PR, on ${cr(w.a.glp)} of portfolio. ${pct(w.top4, 0)} of borrowers there have ${top} MFI lenders.` } : null,
+        stats: [
+          { label: `Gross loan portfolio · ${ml(T.L)}`, value: cr(LT.glp), note: `${chg(LT.glp / FT.glp - 1)} since ${ml(T.F)}` },
+          { label: 'PAR 30', value: pct(p30(LT)), note: `${bps(p30(LT) - p30(FT))} since ${ml(T.F)}`, bad: p30(LT) > p30(FT) + 0.003 },
+          { label: 'PAR 90', value: pct(p90(LT)), note: `${bps(p90(LT) - p90(FT))} since ${ml(T.F)}`, bad: p90(LT) > p90(FT) + 0.002 },
+          { label: `Borrowers with ${top} MFI lenders`, value: pct(topShare(T.L), 1), note: `${ppt(topShare(T.L) - topShare(T.F))} since ${ml(T.F)} · ${cnt(LT.borrowers)} live borrowers`, bad: topShare(T.L) > topShare(T.F) + 0.01 }
+        ],
+        charts: [
+          { type: 'line', title: 'Portfolio at risk', sub: 'PAR 30 and PAR 90 as % of gross loan portfolio', yPct: true, series: [{ name: 'PAR 30', points: T.ms.map((m) => ({ x: m, y: p30(byM.get(m)) })) }, { name: 'PAR 90', points: T.ms.map((m) => ({ x: m, y: p90(byM.get(m)) })) }] },
+          { type: 'bars', title: 'PAR 30 by number of MFI lenders', sub: `${ml(T.L)} vs ${ml(T.F)} (tick) · more lenders, more stress`, fmt: 'pct', valueName: ml(T.L), refName: ml(T.F), items: lBuckets.map((l) => ({ label: l + (l === '1' ? ' lender' : ' lenders'), value: p30(lL.get(l)), ref: lF.get(l) ? p30(lF.get(l)) : null })) }
+        ],
+        tables: [
+          { title: 'By state', sub: `${ml(T.L)} · worst change first`, cols: ['State', 'Portfolio', 'Borrowers', 'PAR 30', 'Change', `${top} lenders`], rows: stRows.map((x) => [x.k, cr(x.a.glp), cnt(x.a.borrowers), pct(p30(x.a)), { v: bps(p30(x.a) - p30(x.b)), bad: p30(x.a) - p30(x.b) > 0.005, good: p30(x.a) < p30(x.b) }, pct(x.top4, 0)]) }
+        ],
+        findings,
+        ai: [w ? `Sharpest PAR 30 rise: ${w.k}, ${pct(p30(w.b))} → ${pct(p30(w.a))}` : '', `PAR 30 ${pct(p30(LT))}, PAR 90 ${pct(p90(LT))} on ${cr(LT.glp)}`].concat(findings.map((f) => f.title)).filter(Boolean)
+      };
+    }
+  };
+
+  // ---------- 4. MFI + Consumer PR ----------
+  const MFI_CONSUMER = {
+    id: 'mfiConsumer', label: 'MFI + Consumer PR', icon: '🔗', file: 'mfi_consumer_pr_output.csv',
+    blurb: 'Your microfinance borrowers split by their consumer-credit footprint (live, closed, enquiry only), with stress on both sides.',
+    fields: [
+      { id: 'm', name: 'Month (YYYY-MM)', kind: 'month', req: true, guess: /month|period|date/i },
+      { id: 'state', name: 'State', kind: 'state', req: true, guess: /state|region/i },
+      { id: 'overlap', name: 'Overlap type', kind: 'cat', req: true, guess: /overlap|footprint|type/i },
+      { id: 'cprod', name: 'Consumer product held', kind: 'cat', req: true, guess: /product/i },
+      { id: 'borrowers', name: 'Borrowers', kind: 'num', req: true, guess: /borrower/i },
+      { id: 'mglp', name: 'MFI portfolio (₹ Cr)', kind: 'num', req: true, guess: /mfi.*(glp|bal|portfolio)/i },
+      { id: 'cbal', name: 'Consumer balance (₹ Cr)', kind: 'num', req: false, guess: /consumer.*bal|cons.*bal/i },
+      { id: 'mpar', name: 'MFI PAR 30 balance (₹ Cr)', kind: 'num', req: true, guess: /mfi.*(par|30)/i },
+      { id: 'cd30', name: 'Consumer 30+ DPD balance (₹ Cr)', kind: 'num', req: false, guess: /consumer.*(dpd|30)|cons.*dpd/i }
+    ],
+    sample() {
+      const r = rng(4404);
+      const st = { BR: [0.17, 1.15, 0.9], UP: [0.15, 1.1, 1], TN: [0.15, 0.9, 1.35], KA: [0.13, 0.85, 1.3], WB: [0.12, 1, 0.85], MH: [0.1, 0.95, 1.1], OD: [0.1, 1.05, 0.8], MP: [0.08, 1.1, 0.9] };
+      const types = [['MFI only', 0.5, 1], ['MFI + live consumer loan', 0.25, 1.7], ['MFI + closed consumer loan', 0.13, 1.1], ['MFI + consumer enquiry only', 0.12, 1.35]];
+      const prods = [['Gold Loan', 0.42, 60000, 0.02], ['Personal Loan', 0.24, 120000, 0.06], ['Consumer Durable', 0.2, 25000, 0.05], ['Two-Wheeler Loan', 0.1, 70000, 0.07], ['Credit Card', 0.04, 40000, 0.09]];
+      const rows = [];
+      MONTHS().forEach((m, t) => Object.entries(st).forEach(([s, [w, sm, ov]]) => {
+        const tot = 4000000 * w * Math.pow(1.006, t);
+        const live = 0.25 * ov * (1 + 0.006 * t);
+        const shares = [1 - live - 0.13 - 0.12, live, 0.13, 0.12];
+        types.forEach(([tp, , mult], ti) => {
+          const spread = ti === 1 ? 1 + 0.03 * t : 1;
+          if (ti === 0) {
+            const b = tot * shares[0] * (0.95 + 0.1 * r());
+            const g = (b * 26000) / 1e7;
+            rows.push([m, nm(s), tp, 'None', Math.round(b), f2(g), '0.00', f3(g * 0.022 * sm * (0.92 + 0.16 * r())), '0.000']);
+            return;
+          }
+          prods.forEach(([pn, psh, ticket, d30]) => {
+            const b = tot * shares[ti] * psh * (0.93 + 0.14 * r());
+            const g = (b * 30000) / 1e7;
+            const cb = ti === 1 ? (b * ticket * 0.6) / 1e7 : 0;
+            rows.push([m, nm(s), tp, pn, Math.round(b), f2(g), f2(cb), f3(g * 0.022 * sm * mult * spread * (0.92 + 0.16 * r())), f3(cb * d30 * sm * 1.6 * spread * (0.9 + 0.2 * r()))]);
+          });
+        });
+      }));
+      return csv(['month', 'state', 'overlap_type', 'consumer_product', 'borrowers', 'mfi_glp_cr', 'consumer_bal_cr', 'mfi_par30_cr', 'consumer_dpd30_cr'], rows);
+    },
+    analyse(recs) {
+      const T = timeline(recs), F = ['borrowers', 'mglp', 'cbal', 'mpar', 'cd30'];
+      const byM = sum(recs, (r) => r.m, F);
+      const LT = byM.get(T.L);
+      const isOnly = (o) => !/consumer|retail|cc|loan/i.test(o.replace(/^mfi/i, '')) || /^mfi only$/i.test(o.trim());
+      const isLive = (o) => /live/i.test(o);
+      const par = (a) => div(a.mpar, a.mglp), cd = (a) => div(a.cd30, a.cbal);
+      const L = recs.filter((r) => r.m === T.L);
+      const only = one(L.filter((r) => isOnly(r.overlap)), F), live = one(L.filter((r) => isLive(r.overlap)), F), any = one(L.filter((r) => !isOnly(r.overlap)), F);
+      const series = (pred) => T.ms.map((m) => ({ x: m, y: par(one(recs.filter((r) => r.m === m && pred(r.overlap)), F)) }));
+      const types = sum(L, (r) => r.overlap, F);
+      const prodL = sum(L.filter((r) => isLive(r.overlap) && !/^none$/i.test(r.cprod)), (r) => r.cprod, F);
+      const prodRows = [...prodL.entries()].sort((a, b) => b[1].borrowers - a[1].borrowers);
+      const stL = sum(L, (r) => r.state, F);
+      const stRows = [...stL.keys()].map((k) => {
+        const rs = L.filter((r) => r.state === k);
+        const tot = one(rs, F), lv = one(rs.filter((r) => isLive(r.overlap)), F), on = one(rs.filter((r) => isOnly(r.overlap)), F), an = one(rs.filter((r) => !isOnly(r.overlap)), F);
+        return { k, tot, lv, on, an, liveShare: div(lv.borrowers, tot.borrowers), anyShare: div(an.borrowers, tot.borrowers) };
+      }).sort((a, b) => b.liveShare - a.liveShare);
+      const mult = div(par(live), par(only));
+      const clean = only.borrowers * (1 - par(only));
+      const firstLive = one(recs.filter((r) => r.m === T.F && isLive(r.overlap)), F), firstOnly = one(recs.filter((r) => r.m === T.F && isOnly(r.overlap)), F);
+      const multF = div(par(firstLive), par(firstOnly));
+      const w = stRows[0];
+      const findings = [
+        { tone: 'insight', title: `${pct(div(any.borrowers, LT.borrowers), 0)} of your MFI borrowers have a consumer-credit footprint; ${pct(div(live.borrowers, LT.borrowers), 0)} are servicing both right now`, text: `${cnt(live.borrowers)} borrowers hold a live consumer loan worth ${cr(live.cbal)} alongside ${cr(live.mglp)} of MFI loans. Their consumer 30+ DPD is ${pct(cd(live))}.` },
+        prodRows.length ? { tone: 'insight', title: `Most-held consumer product: ${prodRows[0][0]} (${pct(div(prodRows[0][1].borrowers, live.borrowers), 0)} of live-overlap borrowers)`, text: prodRows.map(([k, a]) => `${k} ${pct(div(a.borrowers, live.borrowers), 0)} (30+ DPD ${pct(cd(a))})`).join(' · ') } : null,
+        w ? { tone: w.liveShare > div(live.borrowers, LT.borrowers) * 1.2 ? 'danger' : 'insight', title: `${w.k} has the deepest overlap: ${pct(w.liveShare, 0)} of MFI borrowers servicing a consumer loan too`, text: `MFI PAR 30 there is ${pct(par(w.lv))} for overlapping borrowers vs ${pct(par(w.on))} for MFI-only. Tighten combined-indebtedness checks in this state first.` } : null,
+        { tone: 'okay', title: `Graduation pool: about ${cnt(clean)} MFI-only borrowers with a clean MFI record`, text: 'No consumer footprint yet and current on their MFI loans: a ready, bureau-verified pipeline for a first gold loan, two-wheeler or small personal loan.' }
+      ].filter(Boolean);
+      return {
+        headline: { tone: mult > 1.4 ? 'danger' : 'insight', title: `Borrowers servicing MFI and consumer loans together: MFI PAR 30 of ${pct(par(live))}, ${mult.toFixed(1)}× MFI-only borrowers`, text: `The gap has ${mult > multF + 0.05 ? 'widened' : 'held'} from ${multF.toFixed(1)}× in ${ml(T.F)}. Stress on one side of the balance sheet is reaching the other: these borrowers are where combined leverage bites first.` },
+        stats: [
+          { label: `MFI borrowers · ${ml(T.L)}`, value: cnt(LT.borrowers), note: `${cr(LT.mglp)} MFI portfolio` },
+          { label: 'Any consumer footprint', value: pct(div(any.borrowers, LT.borrowers), 0), note: 'live, closed or enquiry only' },
+          { label: 'Live-to-live overlap', value: pct(div(live.borrowers, LT.borrowers), 0), note: `${cr(live.cbal)} consumer balance` },
+          { label: 'MFI PAR 30: overlap vs MFI-only', value: mult.toFixed(1) + '×', note: `${pct(par(live))} vs ${pct(par(only))}`, bad: mult > 1.4 }
+        ],
+        charts: [
+          { type: 'line', title: 'MFI PAR 30: overlapping vs MFI-only borrowers', sub: 'Does consumer credit add stress to the MFI book?', yPct: true, series: [{ name: 'MFI + live consumer', points: series(isLive) }, { name: 'MFI only', points: series(isOnly) }] },
+          { type: 'bars', title: 'Borrowers by overlap type', sub: `${ml(T.L)} · share of MFI borrowers`, fmt: 'pct0', valueName: 'Share of borrowers', items: [...types.entries()].map(([k, a]) => ({ label: k, value: div(a.borrowers, LT.borrowers) })) }
+        ],
+        tables: [
+          { title: 'By state', sub: `${ml(T.L)} · deepest live overlap first`, cols: ['State', 'MFI borrowers', 'Any footprint', 'Live-to-live', 'MFI PAR 30 (overlap)', 'MFI PAR 30 (MFI only)', 'Consumer 30+ DPD'], rows: stRows.map((x) => [x.k, cnt(x.tot.borrowers), pct(x.anyShare, 0), pct(x.liveShare, 0), { v: pct(par(x.lv)), bad: par(x.lv) > par(x.on) * 1.5 }, pct(par(x.on)), pct(cd(x.lv))]) },
+          { title: 'Consumer products held by live-overlap borrowers', sub: ml(T.L), cols: ['Product', 'Borrowers', 'Share', 'Consumer balance', 'Consumer 30+ DPD', 'MFI PAR 30'], rows: prodRows.map(([k, a]) => [k, cnt(a.borrowers), pct(div(a.borrowers, live.borrowers), 0), cr(a.cbal), pct(cd(a)), pct(par(a))]) }
+        ],
+        findings,
+        ai: [`MFI PAR 30 overlap ${pct(par(live))} vs MFI-only ${pct(par(only))} (${mult.toFixed(1)}×)`, `Any consumer footprint ${pct(div(any.borrowers, LT.borrowers), 0)}, live-to-live ${pct(div(live.borrowers, LT.borrowers), 0)}`].concat(findings.map((f) => f.title))
+      };
+    }
+  };
+
+  const TYPES = { consumer: CONSUMER, commercial: COMMERCIAL, mfi: MFI, mfiConsumer: MFI_CONSUMER };
+  const ORDER = ['consumer', 'commercial', 'mfi', 'mfiConsumer'];
+
+  // ---------- parse mapped rows into typed records ----------
+  const findState = (v) => { const n = String(v).trim().toLowerCase(); return D.STATES.find((s) => s.name.toLowerCase() === n || s.id.toLowerCase() === n); };
+  function toRecords(type, rows, mapping) {
+    const recs = [], bad = { month: 0, number: 0, blank: 0 };
+    let unknownStates = new Set();
+    rows.forEach((row) => {
+      const r = {};
+      for (const f of type.fields) {
+        const idx = mapping[f.id];
+        if (idx == null) { if (f.req) return; continue; }
+        const raw = String(row[idx] == null ? '' : row[idx]).trim();
+        if (f.kind === 'month') {
+          const m = raw.slice(0, 7);
+          if (!/^\d{4}-\d{2}$/.test(m)) { bad.month++; return; }
+          r[f.id] = m;
+        } else if (f.kind === 'num') {
+          const v = parseFloat(raw.replace(/,/g, ''));
+          if (!isFinite(v) || v < 0) { if (f.req || raw !== '') { bad.number++; return; } r[f.id] = 0; } else r[f.id] = v;
+        } else {
+          if (!raw) { bad.blank++; return; }
+          if (f.kind === 'state') { const st = findState(raw); if (!st) unknownStates.add(raw); r[f.id] = st ? st.name : raw; } else r[f.id] = raw;
+        }
+      }
+      recs.push(r);
+    });
+    return { recs, bad, unknownStates: [...unknownStates] };
+  }
+
+  PIQ.pr = { TYPES, ORDER, toRecords };
+})();
 
 </script>
   <script>/* js/actions.js */
@@ -2896,16 +3465,121 @@ body.touring .fab { display: none; }
   const PIQ = window.PIQ;
   const { h, fmt, state, card, sourceText, pageHead, productStateFilters, stateName } = PIQ.ui;
   const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
-  let cutoff = null, lastKey = '';
+  let cutoff = null, lastKey = '', gridOpen = false, importMsg = null;
   const assume = { PL: {}, CC: {} };
+  const CO = PIQ.cutoffs;
+
+  // ---------- current cut-off policy: product × state grid, editable and importable ----------
+  function policyCard(root, p, s) {
+    const n = CO.count();
+    const box = h('details', 'card policy-grid', root);
+    box.open = gridOpen;
+    box.style.marginTop = '16px';
+    box.addEventListener('toggle', () => { gridOpen = box.open; });
+    const sm = h('summary', null, box);
+    h('strong', null, sm, 'Your current cut-offs by product and state');
+    h('span', 'muted small', sm, n ? `  ·  ${n} state-specific cut-off${n > 1 ? 's' : ''} in use · edit or import` : '  ·  one cut-off per product today · enter state-wise cut-offs or import them');
+    h('p', 'small muted', box, `Type a cut-off in any cell, or set a product for all states in the first row. Cells you changed are highlighted. Every number on this page, the recommendations and the AI analyst use this grid as your current policy. Range ${CO.MIN}–${CO.MAX}.`);
+    const wrap = h('div', 'table-wrap', box);
+    const t = h('table', 'tbl cut-grid', wrap);
+    const hr = h('tr', null, h('thead', null, t));
+    h('th', null, hr, 'State');
+    D.PRODUCTS.forEach((pr) => { const th = h('th', 'r' + (pr.id === p ? ' sel' : ''), hr, pr.id); th.title = pr.long; });
+    const tb = h('tbody', null, t);
+    const input = (td, val, onSet, label, custom) => {
+      const i = h('input', 'cut-in' + (custom ? ' custom' : ''), td);
+      Object.assign(i, { type: 'number', min: CO.MIN, max: CO.MAX, step: 5, value: val });
+      i.setAttribute('aria-label', label);
+      i.addEventListener('change', () => {
+        if (!onSet(+i.value)) { i.classList.add('err'); i.title = `Enter a number between ${CO.MIN} and ${CO.MAX}`; return; }
+        gridOpen = true; PIQ.go('simulator', { p, s });
+      });
+    };
+    const all = h('tr', 'all-row', tb);
+    h('td', null, all, 'All states (sets every state)');
+    D.PRODUCTS.forEach((pr) => input(h('td', 'r', all), CO.def(pr.id), (v) => CO.setProduct(pr.id, v), `${pr.name} cut-off for all states`, false));
+    D.STATES.forEach((st) => {
+      const r = h('tr', st.id === s ? 'sel' : '', tb);
+      h('td', null, r, st.name);
+      D.PRODUCTS.forEach((pr) => input(h('td', 'r', r), CO.get(pr.id, st.id), (v) => CO.set(pr.id, st.id, v), `${pr.name} cut-off in ${st.name}`, CO.isCustom(pr.id, st.id)));
+    });
+
+    // import / export
+    const im = h('div', 'cut-import', box);
+    h('h4', null, im, 'Import cut-offs from your policy file');
+    h('p', 'small muted', im, 'Paste or upload a CSV in either layout. Long: product,state,cutoff (state "All" sets every state). Wide: state,PL,CC,HL,… one row per state (the template). Product codes or names and state names or codes both work.');
+    const ta = h('textarea', null, im);
+    ta.rows = 4;
+    ta.placeholder = 'product,state,cutoff\nPL,Uttar Pradesh,700\nPL,Gujarat,700\nCC,All,730';
+    ta.setAttribute('aria-label', 'Paste cut-offs CSV');
+    const row = h('div', 'btn-row', im);
+    const done = (res) => {
+      importMsg = res;
+      gridOpen = true;
+      PIQ.go('simulator', { p, s });
+    };
+    const bi = h('button', 'btn primary', row, 'Import pasted cut-offs');
+    bi.addEventListener('click', () => { if (ta.value.trim()) done(CO.importCSV(ta.value)); });
+    const fl = h('label', 'btn', row, 'Upload CSV');
+    const fi = h('input', null, fl);
+    Object.assign(fi, { type: 'file', accept: '.csv,.txt,text/csv' });
+    fi.style.display = 'none';
+    fi.addEventListener('change', () => { const f = fi.files[0]; if (f) f.text().then((x) => done(CO.importCSV(x))); });
+    const bt = h('button', 'btn', row, 'Download template');
+    bt.addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([CO.templateCSV()], { type: 'text/csv' }));
+      a.download = 'cutoffs_product_x_state.csv'; a.click();
+    });
+    const br = h('button', 'btn', row, 'Reset to product defaults');
+    br.addEventListener('click', () => { CO.reset(); importMsg = null; gridOpen = true; PIQ.go('simulator', { p, s }); });
+    if (importMsg) {
+      const m = h('div', 'callout ' + (importMsg.errors.length ? (importMsg.ok ? 'insight' : 'danger') : 'okay'), im);
+      m.style.marginTop = '10px';
+      h('h4', null, m, importMsg.ok ? `Imported ${importMsg.ok} cut-off${importMsg.ok > 1 ? 's' : ''}` : 'Nothing imported');
+      if (importMsg.errors.length) h('p', null, m, importMsg.errors.slice(0, 5).join(' · ') + (importMsg.errors.length > 5 ? ` · and ${importMsg.errors.length - 5} more` : ''));
+      importMsg = null;
+    }
+  }
+
+  function feasibility(parent) {
+    const c = card(parent, {
+      title: 'Feasibility: taking in the member\'s real cut-offs',
+      sub: 'Can every product and state carry its own current cut-off? Yes. Here is how it gets in, and what it takes.',
+      source: 'Assessment by the PortfolioIQ team · prototype implements routes 1 and 2'
+    });
+    c.el.style.marginTop = '16px';
+    const t = h('table', 'tbl', h('div', 'table-wrap', c.viz));
+    const hr = h('tr', null, h('thead', null, t));
+    ['Route', 'How it works', 'Effort', 'When'].forEach((x) => h('th', null, hr, x));
+    const tb = h('tbody', null, t);
+    [
+      ['1. Enter on screen', 'Credit policy team types cut-offs into the product × state grid above. Validated (300–900), changes logged in the audit trail.', 'Low', 'MVP · live in prototype'],
+      ['2. Upload the policy matrix', 'CSV / Excel export of the credit policy note, long or wide layout. Unknown products or states are flagged line by line, nothing is guessed.', 'Low', 'MVP · live in prototype'],
+      ['3. Pull from LOS / rule engine', 'Nightly API or SFTP feed from the lender\'s loan origination system or business-rules engine, so the grid always matches live policy.', 'Medium · per-lender integration', 'Phase 2'],
+      ['4. Infer from bureau data', 'Estimate the effective cut-off from the member\'s own enquiries vs new accounts (the score where approvals drop). Flags gaps between stated and actual policy.', 'Medium · uses data we already hold', 'Phase 2']
+    ].forEach((r) => { const tr = h('tr', null, tb); r.forEach((x, i) => { const td = h('td', null, tr, x); if (i === 0) td.style.fontWeight = '600'; if (i > 1) td.style.whiteSpace = 'nowrap'; }); });
+    const g = h('div', 'grid g3', c.body);
+    g.style.marginTop = '12px';
+    [
+      ['Data needed', `Cut-off per product × state (${D.PRODUCTS.length} × ${D.STATES.length} = ${D.PRODUCTS.length * D.STATES.length} values), plus an effective date. Optional: by channel or customer segment later.`],
+      ['Governance', 'A member\'s policy is confidential: stored in its own tenant, versioned, audit-logged and never used in peer benchmarks.'],
+      ['Limits to state openly', 'Real policies also use income, FOIR and bureau vintage rules. The simulator models the score cut-off; other rules enter through the "other pass rate" assumption.']
+    ].forEach(([k, v]) => { const d = h('div', 'callout insight', g); h('h4', null, d, k); h('p', null, d, v); });
+  }
 
   function render(root, params) {
     if (params && params.cutoff) cutoff = params.cutoff;
     const p = state.p === 'ALL' ? 'PL' : state.p, s = state.s;
     const key = p + s;
-    if (cutoff == null || (lastKey && lastKey !== key && !(params && params.cutoff))) cutoff = p === 'PL' ? C.previousCutoff.PL : C.currentCutoff[p] + 20;
+    // current policy: the member's product × state grid. For "All states" with state-wise cut-offs,
+    // the current case simulates each state at its own cut-off.
+    const gridMode = s === 'ALL' && CO.varies(p);
+    const cur = s === 'ALL' ? CO.def(p) : CO.get(p, s);
+    const curSim = gridMode ? CO.fn(p) : cur;
+    const curName = gridMode ? 'state-wise cut-offs' : String(cur);
+    if (cutoff == null || (lastKey && lastKey !== key && !(params && params.cutoff))) cutoff = p === 'PL' && cur === C.currentCutoff.PL ? C.previousCutoff.PL : cur + 20;
     lastKey = key;
-    const cur = C.currentCutoff[p];
     pageHead(root, 'Policy Simulator', 'Move the score cut-off and see the trade-off between growth and risk before you change policy. Uses your last 90 days of applications and the bad rates observed at each score.');
     const bar = productStateFilters(root, { allProducts: false });
     const sw = h('div', 'slider-wrap', bar);
@@ -2919,15 +3593,16 @@ body.touring .fab { display: none; }
     const out = h('strong', null, row, String(cutoff));
     out.style.cssText = 'font-size:20px;min-width:44px';
 
+    policyCard(root, p, s);
     const body = h('div', null, root);
     const draw = () => {
       body.innerHTML = '';
       const A = Object.assign({}, S.DEFAULT_ASSUMPTIONS[p], assume[p]);
-      const a = S.simulate(p, s, cur, A), b = S.simulate(p, s, cutoff, A), prev = S.simulate(p, s, C.previousCutoff[p], A);
+      const a = S.simulate(p, s, curSim, A), b = S.simulate(p, s, cutoff, A), prev = S.simulate(p, s, C.previousCutoff[p], A);
       S.log('simulate', { p, s, cutoff });
       const g = h('div', 'grid g-1-2', body);
       const kc = h('div', 'card', g);
-      h('h3', null, kc, `Current ${cur} vs proposed ${cutoff}`);
+      h('h3', null, kc, `Current ${curName} vs proposed ${cutoff}`);
       h('div', 'sub muted small', kc, `${D.P[p].long} · ${stateName(s)} · per month`);
       const k = h('div', 'kpi-compare', kc);
       k.style.marginTop = '14px';
@@ -2963,7 +3638,7 @@ body.touring .fab { display: none; }
       PIQ.charts.line(c1.viz, {
         series: [{ name: 'Net contribution', color: 'var(--s1)', points: curve.map((r) => ({ x: r.cutoff, y: r.netCr })), marks: [best.cutoff] }],
         xNumeric: true, xLabel: (x) => String(x), yFmt: fmt.cr, yTickFmt: (v) => v.toFixed(0), height: 200, area: true,
-        annotations: [{ x: cur, label: 'Current ' + cur }].concat(cutoff !== cur ? [{ x: cutoff, label: 'Proposed ' + cutoff }] : [])
+        annotations: (gridMode ? [] : [{ x: cur, label: 'Current ' + cur }]).concat(cutoff !== cur || gridMode ? [{ x: cutoff, label: 'Proposed ' + cutoff }] : [])
       });
       const note = h('div', 'small muted', c1.body, `Profit-maximising cut-off for this slice: ${best.cutoff} (marked).`);
       note.style.marginTop = '4px';
@@ -2977,29 +3652,35 @@ body.touring .fab { display: none; }
       // State-level optimum
       const st = card(body, { title: 'Surgical, not blanket: the best cut-off per state', sub: 'A single national cut-off leaves money on the table · states with at least 2% of your applications', source: sourceText(['scores']) });
       st.el.style.marginTop = '16px';
-      const prodApps = S.simulate(p, 'ALL', cur, A).apps;
-      const rows = D.STATES.filter((x) => S.simulate(p, x.id, cur, A).apps >= prodApps * 0.02).map((x) => {
-        const c0 = S.simulate(p, x.id, cur, A);
+      const prodApps = S.simulate(p, 'ALL', curSim, A).apps;
+      const rows = D.STATES.filter((x) => S.simulate(p, x.id, CO.get(p, x.id), A).apps >= prodApps * 0.02).map((x) => {
+        const cs = CO.get(p, x.id);
+        const c0 = S.simulate(p, x.id, cs, A);
         let bb = c0;
         for (let c = 640; c <= 780; c += 10) { const r = S.simulate(p, x.id, c, A); if (r.netCr > bb.netCr + 0.02) bb = r; }
-        return { x, c0, bb };
+        return { x, cs, c0, bb };
       });
       const t = h('table', 'tbl', h('div', 'table-wrap', st.viz));
       const hr = h('tr', null, h('thead', null, t));
       ['State', 'Current cut-off', 'Best cut-off', 'Approvals change', 'Exp. loss change', 'Net change / month', ''].forEach((c, i) => h('th', i && i < 6 ? 'r' : '', hr, c));
       const tb = h('tbody', null, t);
-      rows.forEach(({ x, c0, bb }) => {
+      rows.forEach(({ x, cs, c0, bb }) => {
         const r = h('tr', null, tb);
         h('td', null, r, x.name);
-        h('td', 'r', r, String(cur));
-        h('td', 'r', r, String(bb.cutoff)).style.fontWeight = bb.cutoff !== cur ? '700' : '400';
+        h('td', 'r', r, String(cs) + (CO.isCustom(p, x.id) ? ' ✎' : '')).title = CO.isCustom(p, x.id) ? 'From your cut-off grid' : 'Product default';
+        h('td', 'r', r, String(bb.cutoff)).style.fontWeight = bb.cutoff !== cs ? '700' : '400';
         h('td', 'r', r, fmt.chg(bb.approvedPerMonth / c0.approvedPerMonth - 1));
-        h('td', 'r ' + (bb.expLossCr < c0.expLossCr ? 'good' : ''), r, bb.cutoff === cur ? '—' : '−' + fmt.cr(c0.expLossCr - bb.expLossCr));
-        h('td', 'r ' + (bb.netCr > c0.netCr + 0.01 ? 'good' : ''), r, bb.cutoff === cur ? '—' : '+' + fmt.cr(bb.netCr - c0.netCr));
+        h('td', 'r ' + (bb.expLossCr < c0.expLossCr ? 'good' : ''), r, bb.cutoff === cs ? '—' : (bb.expLossCr <= c0.expLossCr ? '−' : '+') + fmt.cr(Math.abs(c0.expLossCr - bb.expLossCr)));
+        h('td', 'r ' + (bb.netCr > c0.netCr + 0.01 ? 'good' : ''), r, bb.cutoff === cs ? '—' : '+' + fmt.cr(bb.netCr - c0.netCr));
         const td = h('td', null, r);
-        if (bb.cutoff !== cur) {
-          const bt = h('button', 'btn sm', td, 'Apply');
+        td.style.whiteSpace = 'nowrap';
+        if (bb.cutoff !== cs) {
+          const bt = h('button', 'btn sm', td, 'Simulate');
           bt.addEventListener('click', () => PIQ.go('simulator', { p, s: x.id, cutoff: bb.cutoff }));
+          const ad = h('button', 'btn sm', td, 'Adopt');
+          ad.title = `Set ${bb.cutoff} as your current ${D.P[p].name} cut-off in ${x.name}`;
+          ad.style.marginLeft = '6px';
+          ad.addEventListener('click', () => { CO.set(p, x.id, bb.cutoff); PIQ.go('simulator', { p, s }); });
         }
       });
 
@@ -3017,6 +3698,7 @@ body.touring .fab { display: none; }
         i.addEventListener('change', () => { assume[p][k2] = +i.value / mult; draw(); });
       });
       h('p', 'small muted', as, 'Simplified 12-month view for decision support: margin = disbursal × (yield − cost of funds − opex); loss = disbursal × bad rate × LGD. Replace with the member\'s own profitability model in production.');
+      feasibility(body);
     };
     rng.addEventListener('input', () => { cutoff = +rng.value; out.textContent = rng.value; draw(); });
     draw();
@@ -3031,13 +3713,15 @@ body.touring .fab { display: none; }
   const PIQ = window.PIQ;
   const { h, fmt, state, card, stat, sourceText, pageHead, productStateFilters, seg, stateName } = PIQ.ui;
   const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
-  let bands = 'NPSB';
+  let bands = 'NPSB', win = 7;
 
-  function render(root) {
+  function render(root, params) {
+    if (params && [7, 15, 30].includes(+params.win)) win = +params.win;
     const p = state.p, s = state.s;
     pageHead(root, 'Login & Application Pulse', `Your last 30 days of applications against the whole market, refreshed daily (T-1, to ${C.loginsAsOf}). This is the earliest signal a lender gets: it shows up months before delinquency does.`);
     const bar = productStateFilters(root);
     seg(bar, 'Risk bands', [{ id: 'ALL', name: 'All bands' }, { id: 'NPSB', name: 'Near-prime + Subprime' }], bands, (v) => { bands = v; PIQ.go('logins'); });
+    PIQ.ui.select(bar, 'Logins', S.LOGIN_WINDOWS.map((n) => ({ id: String(n), name: `Last ${n} days` })), String(win), (v) => { win = +v; PIQ.go('logins'); }).setAttribute('aria-label', 'Login window');
     const b = bands === 'NPSB' ? ['NP', 'SB'] : null;
     const f = { p, s, b };
     const c = S.loginCompare(f, 5);
@@ -3084,70 +3768,101 @@ body.touring .fab { display: none; }
     });
     PIQ.charts.dots(c2.viz, { rows: mixRows, series: [{ key: 'memR', name: 'You · last 5 days', color: 'var(--s1)' }, { key: 'memP', name: 'You · prior 25 days', color: 'var(--s2)' }, { key: 'indR', name: 'Industry · last 5 days', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v, 0) });
 
-    // ---------- Last 7 days' logins: quality check ----------
-    const q = S.loginQuality7({ p, s });
-    S.log('loginQuality7', { p, s });
-    const qs = h('div', 'section-title', root, `Last 7 days' logins · quality check (${fmt.day(D.DAYS[D.DAYS.length - 7])} – ${fmt.day(D.DAYS[D.DAYS.length - 1])}, all risk bands)`);
-    qs.style.marginTop = '26px';
-    const qt = h('div', 'grid g4', root);
+    // ---------- Logins in the selected window: same-day enquiries + quality check ----------
+    const q = S.loginQualityWin({ p, s }, win);
+    S.log('loginQualityWin', { p, s, days: win });
+    const winTxt = `last ${win} days`, winShort = `last ${win}d`;
+    const hasPrior = !!q.memPrior, priorTxt = hasPrior ? `prior ${q.priorDays} days` : '', priorShort = hasPrior ? `prior ${q.priorDays}d` : '';
+    const QP = hasPrior ? q.memPrior : null;
     const pp = (x, d) => fmt.pct(x, d == null ? 1 : d);
-    stat(qt, { label: 'Expected probability of default', value: pp(q.mem.pd), delta: 'Prior 23 days ' + pp(q.memPrior.pd) + ' · industry ' + pp(q.ind.pd), deltaTone: q.mem.pd > q.ind.pd * 1.1 ? 'bad' : '' });
-    stat(qt, { label: 'From high-risk PIN codes', value: pp(q.mem.pins[0].share, 0), delta: 'Prior ' + pp(q.memPrior.pins[0].share, 0) + ' · industry ' + pp(q.ind.pins[0].share, 0), deltaTone: q.mem.pins[0].share > q.ind.pins[0].share * 1.15 ? 'bad' : '' });
+    const vsPrior = (fmtd) => (hasPrior ? 'Prior ' + fmtd + ' · ' : '');
+    const qs = h('div', 'section-title', root, `Logins in the ${winTxt} · quality check (${fmt.day(q.days[0])} – ${fmt.day(q.days[q.days.length - 1])}, all risk bands)`);
+    qs.style.marginTop = '26px';
+
+    // Same-day multiple enquiries: applicants with more than one enquiry on the same day
+    const sd = card(root, {
+      title: `Applicants with more than one enquiry on the same day · ${winTxt}`,
+      sub: `Same applicant, 2+ credit enquiries on one calendar day, at any lender. A rate-shopping and loan-stacking signal · ${stateName(s)} · ${PIQ.ui.prodName(p)}`,
+      source: sourceText(['logins'], 'enquiries matched across all lenders on the same day'),
+      pinDetail: () => `${fmt.int(q.mem.sameDayCount)} applicants (${pp(q.mem.sameDay)}) in the ${winTxt}; industry ${pp(q.ind.sameDay)}`,
+      table: () => ({ cols: [{ name: 'Sourcing pool' }, { name: 'Applicants (you)', r: 1 }, { name: 'Share of pool logins', r: 1 }].concat(hasPrior ? [{ name: 'Share, ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry share', r: 1 }]),
+        rows: q.mem.pools.map((x, i) => [x.name, fmt.int(x.sameDay * x.apps), pp(x.sameDay)].concat(hasPrior ? [pp(QP.pools[i].sameDay)] : []).concat([pp(q.ind.pools[i].sameDay)])) })
+    });
+    const sdg = h('div', 'grid g3', sd.viz);
+    const tile = (label, value, note, bad) => { const t = h('div', 'stat', sdg); h('div', 'stat-label', t, label); h('div', 'stat-value', t, value); const d = h('div', 'stat-delta ' + (bad ? 'bad' : ''), t, note); return d; };
+    tile(`Count · ${winTxt}`, fmt.int(q.mem.sameDayCount), `${fmt.int(q.mem.sameDayCount / win)} a day · of ${fmt.int(q.mem.apps)} applicants`, false);
+    tile('Share of your applicants', pp(q.mem.sameDay), vsPrior(pp(QP ? QP.sameDay : 0)) + 'industry ' + pp(q.ind.sameDay), q.mem.sameDay > q.ind.sameDay * 1.2);
+    const sdTop = q.mem.pools.slice().sort((a, b) => b.sameDay * b.apps - a.sameDay * a.apps)[0];
+    tile('Biggest source', sdTop.name.split(' (')[0], `${fmt.int(sdTop.sameDay * sdTop.apps)} applicants · ${pp(sdTop.sameDay)} of the pool`, sdTop.sameDay > q.ind.sameDay * 1.3);
+    if (q.mem.sameDay > q.ind.sameDay * 1.2) {
+      const cl = h('div', 'callout danger', sd.body);
+      cl.style.marginTop = '12px';
+      h('h4', null, cl, `${pp(q.mem.sameDay)} of your applicants enquired more than once on the same day, vs ${pp(q.ind.sameDay)} for the market`);
+      h('p', null, cl, `Same-day multiple enquiries usually mean an applicant is shopping the same loan through several DSAs or apps, or stacking loans before the bureau reflects them. Hold disbursal on these ${fmt.int(q.mem.sameDayCount)} applicants until a fresh bureau pull confirms no new loans, and review the ${sdTop.name.split(' (')[0]} pool first.`);
+    }
+
+    const qt = h('div', 'grid g4', root);
+    qt.style.marginTop = '16px';
+    stat(qt, { label: 'Expected probability of default', value: pp(q.mem.pd), delta: vsPrior(pp(QP ? QP.pd : 0)) + 'industry ' + pp(q.ind.pd), deltaTone: q.mem.pd > q.ind.pd * 1.1 ? 'bad' : '' });
+    stat(qt, { label: 'From high-risk PIN codes', value: pp(q.mem.pins[0].share, 0), delta: vsPrior(pp(QP ? QP.pins[0].share : 0, 0)) + 'industry ' + pp(q.ind.pins[0].share, 0), deltaTone: q.mem.pins[0].share > q.ind.pins[0].share * 1.15 ? 'bad' : '' });
     const weak = (o) => o.bands[3].share + o.bands[4].share;
-    stat(qt, { label: 'Near-prime + subprime logins', value: pp(weak(q.mem), 0), delta: 'Prior ' + pp(weak(q.memPrior), 0) + ' · industry ' + pp(weak(q.ind), 0), deltaTone: weak(q.mem) > weak(q.ind) * 1.15 ? 'bad' : '' });
+    stat(qt, { label: 'Near-prime + subprime logins', value: pp(weak(q.mem), 0), delta: vsPrior(pp(QP ? weak(QP) : 0, 0)) + 'industry ' + pp(weak(q.ind), 0), deltaTone: weak(q.mem) > weak(q.ind) * 1.15 ? 'bad' : '' });
     const topPool = q.mem.pools.slice().sort((a, b) => b.share - a.share)[0];
     stat(qt, { label: 'Largest sourcing pool', value: topPool.name.split(' (')[0], delta: pp(topPool.share, 0) + ' of logins · PD ' + pp(topPool.pd), deltaTone: topPool.pd > q.ind.pd * 1.2 ? 'bad' : '' });
 
-    const worst = q.mem.pools.map((x, i) => ({ x, prior: q.memPrior.pools[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
-    if (q.mem.pd > q.memPrior.pd * 1.08) {
+    // compare with the member's prior period when there is one, else with the industry
+    const ref = QP || q.ind, refName = hasPrior ? `the ${priorTxt}` : 'the industry';
+    const worst = q.mem.pools.map((x, i) => ({ x, prior: ref.pools[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
+    if (q.mem.pd > ref.pd * 1.08) {
       const cl = h('div', 'callout danger', root);
       cl.style.marginTop = '16px';
-      h('h4', null, cl, `Recent logins are riskier: expected PD ${pp(q.mem.pd)} vs ${pp(q.memPrior.pd)} in the prior 23 days (industry ${pp(q.ind.pd)})`);
-      h('p', null, cl, `The biggest contributor is the ${worst.x.name} pool: ${pp(worst.x.share, 0)} of logins (was ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (was ${pp(worst.prior.pd)}), and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review this pool's approvals before they book.`);
+      h('h4', null, cl, `Recent logins are riskier: expected PD ${pp(q.mem.pd)} vs ${pp(ref.pd)} in ${refName}${hasPrior ? ` (industry ${pp(q.ind.pd)})` : ''}`);
+      h('p', null, cl, `The biggest contributor is the ${worst.x.name} pool: ${pp(worst.x.share, 0)} of logins (${refName}: ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (${refName}: ${pp(worst.prior.pd)}), and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review this pool's approvals before they book.`);
     }
 
     const g2 = h('div', 'grid g2', root);
     g2.style.marginTop = '16px';
-    const bandRows = D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } }));
+    const bandRows = D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: Object.assign({ m: q.mem.bands[i].share, ind: q.ind.bands[i].share }, QP ? { pr: QP.bands[i].share } : {}) }));
     const cb = card(g2, {
       title: 'Score banding of logins', sub: 'Share of applications by bureau score band',
       source: sourceText(['logins']),
-      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }, { name: 'Your expected PD', r: 1 }], rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share), pp(q.memPrior.bands[i].share), pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd)]) })
+      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }]), rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share)].concat(QP ? [pp(QP.bands[i].share)] : []).concat([pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd)])) })
     });
-    PIQ.charts.dots(cb.viz, { rows: bandRows, series: [{ key: 'm', name: 'You · last 7 days', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior 23 days', color: 'var(--s2)' }, { key: 'ind', name: 'Industry · last 7 days', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v, 0) });
+    PIQ.charts.dots(cb.viz, { rows: bandRows, series: [{ key: 'm', name: 'You · ' + winTxt, color: 'var(--s1)' }].concat(QP ? [{ key: 'pr', name: 'You · ' + priorTxt, color: 'var(--s2)' }] : []).concat([{ key: 'ind', name: 'Industry · ' + winTxt, color: 'var(--s3)' }]), fmt: (v) => fmt.pct(v, 0) });
 
     const cp = card(g2, {
-      title: 'Probability of default: distribution of last 7 days\' logins', sub: 'Share of applications by expected 12-month PD (90+) · tick = industry',
+      title: `Probability of default: distribution of the ${winTxt}' logins`, sub: 'Share of applications by expected 12-month PD (90+) · tick = industry',
       source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and sourcing pool'),
-      table: () => ({ cols: [{ name: 'PD bucket' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }], rows: q.mem.pdBuckets.map((k, i) => [k.label, pp(k.share), pp(q.memPrior.pdBuckets[i].share), pp(q.ind.pdBuckets[i].share)]) })
+      table: () => ({ cols: [{ name: 'PD bucket' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }]), rows: q.mem.pdBuckets.map((k, i) => [k.label, pp(k.share)].concat(QP ? [pp(QP.pdBuckets[i].share)] : []).concat([pp(q.ind.pdBuckets[i].share)])) })
     });
-    PIQ.charts.bars(cp.viz, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · last 7 days', refName: 'Industry' });
+    PIQ.charts.bars(cp.viz, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · ' + winTxt, refName: 'Industry' });
 
     const cpin = card(g2, {
       title: 'Where logins come from: PIN-code risk tier', sub: 'PIN codes graded by the locality\'s bureau delinquency history · tick = industry',
       source: sourceText(['logins'], 'PIN-code risk tiers from bureau-wide 90+ rates'),
-      table: () => ({ cols: [{ name: 'PIN tier' }, { name: 'You · last 7d', r: 1 }, { name: 'You · prior 23d', r: 1 }, { name: 'Industry · last 7d', r: 1 }, { name: 'Your expected PD', r: 1 }], rows: D.PINS.map((x, i) => [x.name, pp(q.mem.pins[i].share), pp(q.memPrior.pins[i].share), pp(q.ind.pins[i].share), pp(q.mem.pins[i].pd)]) })
+      table: () => ({ cols: [{ name: 'PIN tier' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }]), rows: D.PINS.map((x, i) => [x.name, pp(q.mem.pins[i].share)].concat(QP ? [pp(QP.pins[i].share)] : []).concat([pp(q.ind.pins[i].share), pp(q.mem.pins[i].pd)])) })
     });
-    PIQ.charts.bars(cpin.viz, { items: D.PINS.map((x, i) => ({ label: x.name, value: q.mem.pins[i].share, ref: q.ind.pins[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · last 7 days', refName: 'Industry' });
-    const pinNote = h('div', 'small muted', cpin.body, `Your prior 23 days: ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.memPrior.pins[i].share, 0)).join(' · ')}. Expected PD by tier (you, last 7 days): ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.mem.pins[i].pd)).join(' · ')}.`);
+    PIQ.charts.bars(cpin.viz, { items: D.PINS.map((x, i) => ({ label: x.name, value: q.mem.pins[i].share, ref: q.ind.pins[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · ' + winTxt, refName: 'Industry' });
+    const pinNote = h('div', 'small muted', cpin.body, (QP ? `Your ${priorTxt}: ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(QP.pins[i].share, 0)).join(' · ')}. ` : '') + `Expected PD by tier (you, ${winTxt}): ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.mem.pins[i].pd)).join(' · ')}.`);
     pinNote.style.marginTop = '8px';
 
-    const cpool = card(g2, { title: 'Which pool are the applications coming from?', sub: 'Last 7 days vs your prior 23 days (in brackets) and the industry · ⚠ = expected PD up 20%+', source: sourceText(['logins']) });
+    const cpool = card(g2, { title: 'Which pool are the applications coming from?', sub: (QP ? `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs your ${priorTxt} (in brackets) and the industry · ⚠ = expected PD up 20%+` : `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs the industry (in brackets) · ⚠ = expected PD 20%+ above the industry`), source: sourceText(['logins']) });
     const pt = h('table', 'tbl', h('div', 'table-wrap', cpool.viz));
     const ph = h('tr', null, h('thead', null, pt));
-    ['Pool', 'Share (prior)', 'Industry', 'Exp. PD (prior)', 'High-risk PIN', '3+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
+    ['Pool', QP ? 'Share (prior)' : 'Share', 'Industry', QP ? 'Exp. PD (prior)' : 'Exp. PD (industry)', 'High-risk PIN', '3+ enq.', 'Same-day 2+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
     const pb = h('tbody', null, pt);
     q.mem.pools.forEach((x, i) => {
-      const pr = q.memPrior.pools[i], ind = q.ind.pools[i];
+      const ind = q.ind.pools[i], pr = QP ? QP.pools[i] : ind;
       const r = h('tr', null, pb);
       const nm = h('td', null, r, (x.pd > pr.pd * 1.2 && x.share > 0.1 ? '⚠ ' : '') + x.name.split(' (')[0].replace('Existing customer', 'Existing cust.'));
       nm.title = x.name;
       if (x.pd > pr.pd * 1.2 && x.share > 0.1) nm.className = 'bad';
-      h('td', 'r', r, pp(x.share, 0) + ' (' + pp(pr.share, 0) + ')');
+      h('td', 'r', r, pp(x.share, 0) + (QP ? ' (' + pp(pr.share, 0) + ')' : ''));
       h('td', 'r', r, pp(ind.share, 0));
       h('td', 'r ' + (x.pd > pr.pd * 1.2 ? 'bad' : ''), r, pp(x.pd) + ' (' + pp(pr.pd) + ')');
       h('td', 'r ' + (x.highPin > ind.highPin * 1.25 ? 'bad' : ''), r, pp(x.highPin, 0));
       h('td', 'r', r, pp(x.hiEnq, 0));
+      h('td', 'r ' + (x.sameDay > ind.sameDay * 1.3 ? 'bad' : ''), r, pp(x.sameDay));
     });
 
     // State table
@@ -3450,9 +4165,9 @@ body.touring .fab { display: none; }
 /* Bring Your Data — upload a member file, map fields, join with industry, get new insights. */
 (function () {
   const PIQ = window.PIQ;
-  const { h, fmt, ml, card, sourceText, pageHead } = PIQ.ui;
+  const { h, fmt, ml, card, stat, sourceText, pageHead } = PIQ.ui;
   const S = PIQ.sem, D = PIQ.data;
-  let parsed = null, mapping = null, step = 1, fileName = '';
+  let parsed = null, mapping = null, step = 0, fileName = '';
 
   const FIELDS = [
     { id: 'month', name: 'Month (YYYY-MM)', req: true, guess: /month|period|date/i },
@@ -3492,15 +4207,6 @@ body.touring .fab { display: none; }
   const findBand = (v) => D.BANDS.find((b) => norm(b.name) === norm(v) || norm(b.id) === norm(v));
   const findProd = (v) => D.PRODUCTS.find((p) => norm(p.id) === norm(v) || norm(p.name) === norm(v) || norm(p.long) === norm(v));
 
-  function autoMap(head) {
-    const used = new Set(), m = {};
-    FIELDS.forEach((f) => {
-      const idx = head.findIndex((c, i) => !used.has(i) && f.guess.test(c));
-      if (idx >= 0) { m[f.id] = idx; used.add(idx); }
-    });
-    return m;
-  }
-
   // Join uploaded rows to industry: expected DPD if each row performed at the industry rate of its segment
   function analyse() {
     const recs = [];
@@ -3534,47 +4240,98 @@ body.touring .fab { display: none; }
     return { last, byDim, worst };
   };
 
+  // ---------- Portfolio Review (PR) uploads + custom files ----------
+  // kind: null (choose) | 'consumer' | 'commercial' | 'mfi' | 'mfiConsumer' | 'custom'
+  let kind = null, prRes = null;
+  const CUSTOM = { id: 'custom', label: 'Custom file', icon: '⇪', file: 'sahyadri_pl_sourcing_channel.csv', fields: FIELDS, blurb: 'Any file with a field the bureau doesn\'t hold (sourcing channel, campaign, branch), joined to industry benchmarks.' };
+  const typeOf = () => (kind === 'custom' ? CUSTOM : PIQ.pr.TYPES[kind]);
+  const sampleOf = () => (kind === 'custom' ? PIQ.sampleUploadCSV() : typeOf().sample());
+  const autoMapFor = (head, fields) => {
+    const used = new Set(), m = {};
+    fields.forEach((f) => { const idx = head.findIndex((c, i) => !used.has(i) && f.guess.test(c)); if (idx >= 0) { m[f.id] = idx; used.add(idx); } });
+    return m;
+  };
+  function load(name, text) {
+    fileName = name;
+    parsed = parseCSV(text);
+    mapping = autoMapFor(parsed.head, typeOf().fields);
+    step = 2;
+    PIQ.go('upload');
+  }
+  function download(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+    a.download = name; a.click();
+  }
+
   function render(root) {
-    pageHead(root, 'Bring Your Data', 'Upload a file with fields the bureau doesn\'t hold, such as sourcing channel, campaign, branch or collection agency. The platform joins it to industry benchmarks so you can see how each slice performs against the market, like for like.');
+    pageHead(root, 'Bring Your Data', 'Upload a bureau Portfolio Review (PR) output and get insights computed from that file alone. Pick the PR type first, so the platform knows the layout and which analysis to run.');
     const steps = h('div', 'steps', root);
-    ['Upload', 'Map fields', 'Validate', 'Insights'].forEach((n, i) => { const s = h('div', 'step' + (step === i + 1 ? ' on' : ''), steps); h('b', null, s, String(i + 1)); h('span', null, s, n); });
+    ['Choose PR type', 'Upload', 'Map fields', 'Validate & submit', 'Insights'].forEach((n, i) => { const st = h('div', 'step' + (step === i ? ' on' : ''), steps); h('b', null, st, String(i + 1)); h('span', null, st, n); });
     const privacy = h('div', 'callout okay', root);
     privacy.style.marginBottom = '16px';
     h('h4', null, privacy, '🔒 Your file never leaves this browser');
-    h('p', null, privacy, 'In this prototype, parsing and joining happen on your device. In production, uploads live in the member\'s private tenant: they are encrypted, never pooled into industry data, and never visible to other members.');
+    h('p', null, privacy, 'In this prototype, parsing and analysis happen on your device. In production, uploads live in the member\'s private tenant: they are encrypted, never pooled into industry data, and never visible to other members.');
+
+    if (step === 0 || !kind) {
+      step = 0;
+      h('div', 'section-title', root, 'What are you uploading?');
+      const g = h('div', 'grid g4 pr-pick', root);
+      PIQ.pr.ORDER.forEach((k) => {
+        const T = PIQ.pr.TYPES[k];
+        const b = h('button', 'pr-btn', g);
+        b.type = 'button';
+        h('span', 'pr-ico', b, T.icon);
+        h('strong', null, b, T.label);
+        h('span', 'small muted', b, T.blurb);
+        h('span', 'pr-go', b, 'Upload ' + T.label + ' →');
+        b.addEventListener('click', () => { kind = k; step = 1; PIQ.go('upload'); });
+      });
+      const other = h('div', 'card', root);
+      other.style.marginTop = '16px';
+      h('h3', null, other, 'Other data: a file with a new field');
+      h('p', 'small muted', other, CUSTOM.blurb + ' Example: your personal-loan sourcing channel, benchmarked against the market like for like.');
+      const ob = h('button', 'btn', other, 'Upload a custom file (e.g. sourcing channel) →');
+      ob.addEventListener('click', () => { kind = 'custom'; step = 1; PIQ.go('upload'); });
+      return;
+    }
+    const T = typeOf();
 
     if (step === 1) {
+      const hd = h('div', 'pr-head', root);
+      h('span', 'pr-ico', hd, T.icon);
+      const tx = h('div', null, hd);
+      h('h3', null, tx, 'Upload: ' + T.label);
+      h('div', 'small muted', tx, T.blurb);
+      const ch = h('button', 'btn sm', hd, '← Choose another type');
+      ch.addEventListener('click', () => { kind = null; step = 0; PIQ.go('upload'); });
       const drop = h('label', 'drop', root);
       h('div', null, drop, '⇪').style.fontSize = '28px';
-      h('div', null, drop, 'Drop a CSV here or click to browse');
-      h('div', 'small muted', drop, 'Needs: month, product, state, risk band, balance, 30+ DPD balance, plus any new field to analyse');
+      h('div', null, drop, `Drop your ${T.label} output (CSV) here or click to browse`);
+      h('div', 'small muted', drop, 'Expected columns: ' + T.fields.map((f) => f.name + (f.req ? '' : ' (optional)')).join(' · '));
       const inp = h('input', null, drop); inp.type = 'file'; inp.accept = '.csv,text/csv'; inp.style.display = 'none';
-      const load = (name, text) => { fileName = name; parsed = parseCSV(text); mapping = autoMap(parsed.head); step = 2; PIQ.go('upload'); };
       inp.addEventListener('change', () => { const f = inp.files[0]; if (f) f.text().then((t) => load(f.name, t)); });
       drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
       drop.addEventListener('dragleave', () => drop.classList.remove('over'));
       drop.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) f.text().then((t) => load(f.name, t)); });
       const row = h('div', null, root); row.style.cssText = 'display:flex;gap:10px;margin-top:14px;flex-wrap:wrap';
-      const b1 = h('button', 'btn primary', row, 'Use the sample file (sourcing channel)');
-      b1.addEventListener('click', () => load('sahyadri_pl_sourcing_channel.csv', PIQ.sampleUploadCSV()));
-      const b2 = h('button', 'btn', row, 'Download sample CSV');
-      b2.addEventListener('click', () => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([PIQ.sampleUploadCSV()], { type: 'text/csv' }));
-        a.download = 'sahyadri_pl_sourcing_channel.csv'; a.click();
-      });
+      const b1 = h('button', 'btn primary', row, kind === 'custom' ? 'Use the sample file (sourcing channel)' : `Use the sample ${T.label}`);
+      b1.addEventListener('click', () => load(T.file, sampleOf()));
+      const b2 = h('button', 'btn', row, kind === 'custom' ? 'Download sample CSV' : `Download sample ${T.label} (CSV)`);
+      b2.addEventListener('click', () => download(T.file, sampleOf()));
       return;
     }
     if (step === 2) {
       const c = h('div', 'card', root);
       h('h3', null, c, `Map fields: ${fileName}`);
-      h('div', 'sub muted small', c, `${parsed.rows.length.toLocaleString('en-IN')} rows · ${parsed.head.length} columns · fields detected automatically, adjust if needed`);
+      h('div', 'sub muted small', c, `${T.label} · ${parsed.rows.length.toLocaleString('en-IN')} rows · ${parsed.head.length} columns · fields detected automatically, adjust if needed`);
       const grid = h('div', null, c); grid.style.marginTop = '12px';
-      FIELDS.forEach((f) => {
+      T.fields.forEach((f) => {
         const r = h('div', 'map-row', grid);
         h('div', null, r, f.name + (f.req ? ' *' : ''));
         const sel = h('select', null, r);
         sel.style.cssText = 'padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--surface)';
+        sel.setAttribute('aria-label', 'Column for ' + f.name);
         const none = h('option', null, sel, '— not mapped —'); none.value = '';
         parsed.head.forEach((col, i) => { const o = h('option', null, sel, col); o.value = i; if (mapping[f.id] === i) o.selected = true; });
         sel.addEventListener('change', () => { if (sel.value === '') delete mapping[f.id]; else mapping[f.id] = +sel.value; });
@@ -3584,26 +4341,104 @@ body.touring .fab { display: none; }
       const back = h('button', 'btn', row, '← Back'); back.addEventListener('click', () => { step = 1; PIQ.go('upload'); });
       const next = h('button', 'btn primary', row, 'Validate →');
       next.addEventListener('click', () => {
-        const miss = FIELDS.filter((f) => f.req && mapping[f.id] == null);
+        const miss = T.fields.filter((f) => f.req && mapping[f.id] == null);
         if (miss.length) { alert('Please map: ' + miss.map((m) => m.name).join(', ')); return; }
         step = 3; PIQ.go('upload');
       });
       return;
     }
+    if (kind !== 'custom') return renderPR(root, T);
     const res = analyse();
+    PIQ.lastUpload = 'custom';
     if (step === 3) {
       const c = h('div', 'card', root);
       h('h3', null, c, 'Validation');
       const ok = res.recs.length, tot = parsed.rows.length;
       const g = h('div', 'grid g4', c); g.style.marginTop = '12px';
-      [['Rows matched to bureau keys', fmt.int(ok) + ' / ' + fmt.int(tot)], ['Match rate', fmt.pct(ok / tot, 1)], ['Months covered', ml(res.months[0]) + ' – ' + ml(res.months[res.months.length - 1])], ['Balance covered (latest)', fmt.cr(res.recs.filter((r) => r.m === res.months[res.months.length - 1]).reduce((a, r) => a + r.bal, 0))]].forEach(([k, v]) => { const s = h('div', 'stat', g); h('div', 'stat-label', s, k); h('div', 'stat-value', s, v).style.fontSize = '20px'; });
+      [['Rows matched to bureau keys', fmt.int(ok) + ' / ' + fmt.int(tot)], ['Match rate', fmt.pct(ok / tot, 1)], ['Months covered', ml(res.months[0]) + ' – ' + ml(res.months[res.months.length - 1])], ['Balance covered (latest)', fmt.cr(res.recs.filter((r) => r.m === res.months[res.months.length - 1]).reduce((a, r) => a + r.bal, 0))]].forEach(([k, v]) => { const st = h('div', 'stat', g); h('div', 'stat-label', st, k); h('div', 'stat-value', st, v).style.fontSize = '20px'; });
       if (res.unmatched) h('p', 'small bad', c, `${res.unmatched} rows could not be matched (unknown state, band, product or month) and are excluded.`);
       const row = h('div', null, c); row.style.cssText = 'display:flex;gap:10px;margin-top:14px';
       const back = h('button', 'btn', row, '← Back'); back.addEventListener('click', () => { step = 2; PIQ.go('upload'); });
       const next = h('button', 'btn primary', row, 'Generate insights →'); next.addEventListener('click', () => { step = 4; PIQ.go('upload'); });
       return;
     }
-    // step 4: insights
+    customInsights(root);
+  }
+
+  // PR: validate, submit, then insights from the uploaded file only
+  function renderPR(root, T) {
+    const tr = PIQ.pr.toRecords(T, parsed.rows, mapping);
+    const months = [...new Set(tr.recs.map((r) => r.m))].sort();
+    if (step === 3) {
+      const c = h('div', 'card', root);
+      h('h3', null, c, `Validation: ${T.label}`);
+      const ok = tr.recs.length, tot = parsed.rows.length;
+      const g = h('div', 'grid g4', c); g.style.marginTop = '12px';
+      [['Valid rows', fmt.int(ok) + ' / ' + fmt.int(tot)], ['Valid share', fmt.pct(tot ? ok / tot : 0, 1)], ['Months covered', months.length ? `${ml(months[0])} – ${ml(months[months.length - 1])} (${months.length})` : '—'], ['Fields mapped', `${Object.keys(mapping).length} of ${T.fields.length}`]].forEach(([k, v]) => { const st = h('div', 'stat', g); h('div', 'stat-label', st, k); h('div', 'stat-value', st, v).style.fontSize = '20px'; });
+      const issues = [];
+      if (tr.bad.month) issues.push(`${fmt.int(tr.bad.month)} rows with a month that isn't YYYY-MM`);
+      if (tr.bad.number) issues.push(`${fmt.int(tr.bad.number)} rows with a missing or negative number`);
+      if (tr.bad.blank) issues.push(`${fmt.int(tr.bad.blank)} rows with a blank category`);
+      if (issues.length) h('p', 'small bad', c, issues.join(' · ') + '. These rows are excluded.');
+      if (tr.unknownStates.length) h('p', 'small muted', c, `Kept as written (not a recognised state name): ${tr.unknownStates.slice(0, 6).join(', ')}${tr.unknownStates.length > 6 ? '…' : ''}.`);
+      if (months.length < 2) h('p', 'small bad', c, 'The file needs at least two months to show trends.');
+      const row = h('div', null, c); row.style.cssText = 'display:flex;gap:10px;margin-top:14px';
+      const back = h('button', 'btn', row, '← Back'); back.addEventListener('click', () => { step = 2; PIQ.go('upload'); });
+      const next = h('button', 'btn primary', row, 'Submit & analyse →');
+      next.disabled = !ok || months.length < 2;
+      next.addEventListener('click', () => {
+        prRes = T.analyse(tr.recs);
+        PIQ.uploadedPR = { kind, label: T.label, name: fileName, rows: tr.recs.length, months, analysis: prRes };
+        PIQ.lastUpload = 'pr';
+        S.log('upload.pr', { type: T.label, file: fileName, rows: tr.recs.length });
+        step = 4; PIQ.go('upload');
+      });
+      return;
+    }
+    const A = prRes || (PIQ.uploadedPR && PIQ.uploadedPR.kind === kind ? PIQ.uploadedPR.analysis : T.analyse(tr.recs));
+    const src = `Source: your uploaded ${T.label} (${fileName}) only · no other data used`;
+    const meta = h('div', 'small muted', root, `${T.icon} ${T.label} · ${fileName} · ${fmt.int(tr.recs.length)} rows · ${months.length ? ml(months[0]) + ' – ' + ml(months[months.length - 1]) : ''} · insights computed only from this file`);
+    meta.style.marginBottom = '10px';
+    if (A.headline) {
+      const top = h('div', 'callout ' + A.headline.tone, root);
+      const th = h('div', null, top); th.style.cssText = 'display:flex;gap:10px;justify-content:space-between;align-items:flex-start';
+      h('h4', null, th, A.headline.title);
+      if (PIQ.actions) PIQ.actions.pinButton(th, () => ({ text: A.headline.title, detail: A.headline.text + ' (' + T.label + ')' }));
+      h('p', null, top, A.headline.text);
+    }
+    const sg = h('div', 'grid g4', root); sg.style.marginTop = '16px';
+    A.stats.forEach((x) => stat(sg, { label: x.label, value: x.value, delta: x.note, deltaTone: x.bad ? 'bad' : '' }));
+    const cg = h('div', 'grid g2', root); cg.style.marginTop = '16px';
+    const COL = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+    const vf = (k) => (k === 'pct0' ? (v) => fmt.pct(v, 0) : k === 'cr' ? fmt.cr : (v) => fmt.pct(v));
+    A.charts.forEach((ch) => {
+      const c = card(cg, { title: ch.title, sub: ch.sub, source: src });
+      if (ch.type === 'line') PIQ.charts.line(c.viz, { series: ch.series.map((x, i) => ({ name: x.name, color: COL[i % 4], points: x.points })), xLabel: (x) => ml(x), yFmt: (v) => fmt.pct(v), yTickFmt: (v) => (v * 100).toFixed(1) + '%', height: 240, endLabels: true, zero: true });
+      else PIQ.charts.bars(c.viz, Object.assign({ items: ch.items.map((x) => (x.ref == null ? { label: x.label, value: x.value } : x)), fmt: vf(ch.fmt), color: 'var(--s1)', valueName: ch.valueName }, ch.refName ? { refName: ch.refName } : {}));
+    });
+    if (A.findings.length) {
+      h('div', 'section-title', root, 'What the file says').style.marginTop = '22px';
+      const fg = h('div', 'grid g2', root);
+      A.findings.forEach((f) => { const d = h('div', 'callout ' + f.tone, fg); h('h4', null, d, f.title); h('p', null, d, f.text); });
+    }
+    A.tables.forEach((tb) => {
+      const c = card(root, { title: tb.title, sub: tb.sub, source: src });
+      c.el.style.marginTop = '16px';
+      const t = h('table', 'tbl', h('div', 'table-wrap', c.viz));
+      const hr = h('tr', null, h('thead', null, t));
+      tb.cols.forEach((x, i) => h('th', i ? 'r' : '', hr, x));
+      const body = h('tbody', null, t);
+      tb.rows.forEach((r) => { const tr2 = h('tr', null, body); r.forEach((v, i) => { const o = v && typeof v === 'object' ? v : { v }; h('td', (i ? 'r' : '') + (o.bad ? ' bad' : o.good ? ' good' : ''), tr2, o.v); }); });
+    });
+    const row = h('div', null, root); row.style.cssText = 'display:flex;gap:10px;margin-top:16px;flex-wrap:wrap';
+    const ask = h('button', 'btn primary', row, '✦ Ask the AI about this file');
+    ask.addEventListener('click', () => PIQ.openDrawer(`What does my uploaded ${T.label} say?`));
+    const again = h('button', 'btn', row, 'Upload another file');
+    again.addEventListener('click', () => { kind = null; step = 0; parsed = null; prRes = null; PIQ.go('upload'); });
+  }
+
+  // Custom file (e.g. sourcing channel) joined to industry benchmarks
+  function customInsights(root) {
     const ins = PIQ.uploadInsights();
     const dimName = (PIQ.uploaded.dimName || 'segment').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
     const [wDim, wS, wB] = ins.worst.k.split('|');
@@ -3647,9 +4482,25 @@ body.touring .fab { display: none; }
     const ask = h('button', 'btn primary', row, '✦ Ask the AI about this file');
     ask.addEventListener('click', () => PIQ.openDrawer(`Which ${dimName.toLowerCase()} is performing worst in my uploaded file?`));
     const again = h('button', 'btn', row, 'Upload another file');
-    again.addEventListener('click', () => { step = 1; parsed = null; PIQ.go('upload'); });
+    again.addEventListener('click', () => { kind = null; step = 0; parsed = null; PIQ.go('upload'); });
   }
-  PIQ.views.upload = { title: 'Bring Your Data', render };
+
+  // Jump straight to a sample's insights (used by the guided tour)
+  function demo(k) {
+    kind = k || 'custom';
+    const T = typeOf();
+    fileName = T.file; parsed = parseCSV(sampleOf()); mapping = autoMapFor(parsed.head, T.fields);
+    if (kind !== 'custom') {
+      const tr = PIQ.pr.toRecords(T, parsed.rows, mapping);
+      prRes = T.analyse(tr.recs);
+      PIQ.uploadedPR = { kind, label: T.label, name: fileName, rows: tr.recs.length, months: [...new Set(tr.recs.map((r) => r.m))].sort(), analysis: prRes };
+      PIQ.lastUpload = 'pr';
+    }
+    step = 4;
+    PIQ.go('upload');
+  }
+
+  PIQ.views.upload = { title: 'Bring Your Data', render, demo };
 })();
 
 </script>
@@ -3979,6 +4830,8 @@ body.touring .fab { display: none; }
       'Where is the surge in applications coming from?',
       'How many of my applicants have multiple enquiries?',
       'How many applications came from high-risk PIN codes?',
+      'How many applicants had more than one enquiry on the same day in the last 7 days?',
+      'How many applicants had more than one enquiry on the same day in the last 30 days?',
       'What is the probability of default of my last 7 days\' logins?',
       'Which pool are my recent applications coming from?',
       'What is the score banding of my last 7 days\' logins?',
@@ -3999,6 +4852,7 @@ body.touring .fab { display: none; }
     ] },
     { cat: 'Your data & definitions', qs: [
       'Which sourcing channel is performing worst in my uploaded file?',
+      'What does my uploaded PR say?',
       'What is 30+ DPD?',
       'How is the cure rate defined?',
       'Which datasets can you answer from?'
@@ -4258,11 +5112,13 @@ body.touring .fab { display: none; }
     product: P_PRODUCT, state: P_STATE, cutoff: { type: 'integer', description: '600–800; 0 = find best' }
   }, ['product'], (a) => {
     const p = !a.product || a.product === 'ALL' ? 'PL' : a.product, s = a.state || 'ALL'; // cut-offs are product-specific
-    const cur = C.currentCutoff[p];
+    // current policy comes from the member's product × state grid (Policy Simulator page)
+    const CO = PIQ.cutoffs, curFn = s === 'ALL' && CO.varies(p) ? CO.fn(p) : CO.get(p, s);
+    const cur = typeof curFn === 'function' ? 'your state-wise grid' : curFn;
     let c = a.cutoff || 0;
     if (!c) { const curve = S.simulateCurve(p, s); c = curve.reduce((m, r) => (r.netCr > m.netCr ? r : m), curve[0]).cutoff; }
     c = Math.max(600, Math.min(800, Math.round(c / 10) * 10));
-    const A = S.simulate(p, s, cur), B = S.simulate(p, s, c);
+    const A = S.simulate(p, s, curFn), B = S.simulate(p, s, c);
     S.log('simulate', { p, s, cutoff: c }, 'ai');
     const gain = B.netCr - A.netCr;
     const curve = S.simulateCurve(p, s);
@@ -4305,6 +5161,29 @@ body.touring .fab { display: none; }
         link: { view: 'logins', params: { p, s } }
       },
       facts: { memberChange: F().chg(c.mem.change, 0), industryChange: F().chg(c.ind.change, 0), memberApproval: F().pct(c.mem.recent.apprRate, 1), industryApproval: F().pct(c.ind.recent.apprRate, 1), memberHighEnquiry: F().pct(c.mem.recent.hiEnqShare, 0), industryHighEnquiry: F().pct(c.ind.recent.hiEnqShare, 0), surgeIn: hot.map((x) => x.st.name) }
+    };
+  });
+
+  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, with the sourcing pools that drive it.', {
+    product: P_PRODUCT, state: P_STATE, days: { type: 'integer', enum: [7, 15, 30], description: 'login window in days' }
+  }, [], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', n = [7, 15, 30].includes(+a.days) ? +a.days : 7;
+    const q = S.loginQualityWin({ p, s }, n);
+    S.log('loginQualityWin', { p, s, days: n }, 'ai');
+    const pp = (x, d) => F().pct(x, d == null ? 1 : d);
+    const pools = q.mem.pools.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
+    const paras = [`In the last ${n} days, **${F().int(q.mem.sameDayCount)}** of your ${pName(p)} applicants in ${sName(s)} made more than one enquiry on the same day: **${pp(q.mem.sameDay)}** of applicants, against ${pp(q.ind.sameDay)} across the industry${q.memPrior ? ` and ${pp(q.memPrior.sameDay)} in your prior ${q.priorDays} days` : ''}.`];
+    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping through several DSAs, or loans being stacked before the bureau updates, so check these applications before disbursal.');
+    return {
+      answer: {
+        paras,
+        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of the pool's logins)`),
+        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.pools.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
+        sources: src('logins'), filters: `${pLong(p)} · ${sName(s)} · last ${n} days · to ${C.loginsAsOf}`,
+        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'Which pool are my recent applications coming from?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
+        link: { view: 'logins', params: { p, s, win: n } }
+      },
+      facts: { days: n, memberCount: Math.round(q.mem.sameDayCount), memberShare: pp(q.mem.sameDay), industryShare: pp(q.ind.sameDay), priorShare: q.memPrior ? pp(q.memPrior.sameDay) : null }
     };
   });
 
@@ -4477,10 +5356,24 @@ body.touring .fab { display: none; }
     facts: { datasets: Object.values(S.DATASETS).map((d) => d.name) }
   }));
 
-  def('uploaded_insight', 'Insights from the file the member uploaded (e.g. sourcing channel), joined to industry benchmarks.', {}, [], () => {
+  def('uploaded_insight', 'Insights from the file the member uploaded: a Portfolio Review output (Consumer, Commercial, Microfinance or MFI + Consumer PR, analysed on its own) or a custom file (e.g. sourcing channel) joined to industry benchmarks.', {}, [], () => {
+    const U = PIQ.uploadedPR;
+    if (U && PIQ.lastUpload === 'pr') {
+      const A = U.analysis;
+      return {
+        answer: {
+          paras: [`From your uploaded **${U.label}** (${U.name}, ${U.rows.toLocaleString('en-IN')} rows, ${ml(U.months[0])} – ${ml(U.months[U.months.length - 1])}), using that file only:`].concat(A.headline ? [`**${A.headline.title}.** ${A.headline.text}`] : []),
+          bullets: A.stats.map((x) => `**${x.label}:** ${x.value} (${x.note})`).concat(A.findings.map((f) => f.title)),
+          sources: ['Your uploaded ' + U.label + ' (private)'], filters: U.label + ' · ' + ml(U.months[U.months.length - 1]),
+          followups: ['What should I do about it?', 'What should I worry about this week?'],
+          link: { view: 'upload', params: {} }
+        },
+        facts: { type: U.label, summary: A.ai }
+      };
+    }
     const ins = PIQ.uploadInsights ? PIQ.uploadInsights() : null;
     if (!ins) return {
-      answer: { paras: ['You haven\'t uploaded a file yet. Sourcing channel isn\'t in bureau data, but if you upload your channel split I can benchmark each channel against the market, like for like.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
+      answer: { paras: ['You haven\'t uploaded a file yet. On Bring Your Data, upload a Consumer, Commercial, Microfinance or MFI + Consumer PR output and I\'ll summarise what it says, or upload a custom file such as your sourcing-channel split and I\'ll benchmark it against the market.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
       facts: { uploaded: false }
     };
     const dims = Object.keys(ins.byDim);
@@ -4614,7 +5507,7 @@ body.touring .fab { display: none; }
       const term = /cure/.test(t) ? 'cure' : /90/.test(t) ? 'dpd90' : /30|dpd/.test(t) ? 'dpd30' : /mix/.test(t) ? 'mix' : /market effect/.test(t) ? 'market' : /prime|band/.test(t) ? 'bands' : 'dpd30';
       return call('define', { term });
     }
-    if (/upload|my file|sourcing channel|\bchannel|\bdsa\b/.test(t)) return call('uploaded_insight', {});
+    if (/upload|my file|sourcing channel|\bchannel|\bdsa\b|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
     if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
       return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });
@@ -4623,6 +5516,8 @@ body.touring .fab { display: none; }
     if (/worry|alert|early.?warning|attention|concern|red flag/.test(t)) return call('alerts', {});
     if (/board|summary|summari[sz]e|brief/.test(t)) return call('board_summary', {});
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
+    if (/same.?day|more than (one|1) (enquir|inquir)|multiple (enquir|inquir)|1\+ (enquir|inquir)|loan.?stack|rate.?shop/.test(t))
+      return call('same_day_enquiries', { product: p, state: st, days: /30|month/.test(t) ? 30 : /15|fortnight/.test(t) ? 15 : 7 });
     if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
       return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });
@@ -4864,6 +5759,63 @@ Rules:
     renderAll();
   }
 
+  // Voice input: the browser's speech recognition fills the text box, then asks once the user stops talking.
+  // Typing still works; the mic is a second way in. Chrome / Edge / Safari support it; Firefox doesn't.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let activeRec = null;
+  function voiceButton(form, inp) {
+    const mic = h('button', 'btn mic', form, '🎤');
+    mic.type = 'button';
+    mic.title = 'Speak your question';
+    mic.setAttribute('aria-label', 'Speak your question');
+    const toast = (m) => (PIQ.actions && PIQ.actions.toast ? PIQ.actions.toast(m, true) : alert(m));
+    const placeholder = inp.placeholder;
+    const reset = () => { mic.classList.remove('on'); mic.textContent = '🎤'; mic.title = 'Speak your question'; inp.placeholder = placeholder; activeRec = null; };
+    mic.addEventListener('click', () => {
+      if (!SR) { toast('Voice input needs Chrome, Edge or Safari. You can keep typing your question.'); return; }
+      if (activeRec) { activeRec.stop(); return; }
+      const rec = new SR();
+      rec.lang = 'en-IN';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 1;
+      let finalText = '', failed = false;
+      rec.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
+        }
+        inp.value = (finalText + interim).trim();
+      };
+      rec.onerror = (e) => {
+        failed = true;
+        const msg = {
+          'not-allowed': 'Microphone access is blocked. Allow the microphone for this site in your browser settings.',
+          'service-not-allowed': 'Voice input isn\'t available on this page. Open the app over https or localhost.',
+          'no-speech': 'Didn\'t catch that. Tap 🎤 and try again.',
+          'audio-capture': 'No microphone found.',
+          network: 'Voice recognition needs an internet connection in this browser.'
+        }[e.error] || 'Voice input stopped (' + e.error + ').';
+        toast(msg);
+      };
+      rec.onend = () => {
+        reset();
+        const q = finalText.trim() || inp.value.trim();
+        if (!failed && q) { inp.value = ''; ask(q); }
+      };
+      try { rec.start(); } catch (err) { toast('Couldn\'t start voice input: ' + err.message); return; }
+      activeRec = rec;
+      mic.classList.add('on');
+      mic.textContent = '■';
+      mic.title = 'Stop listening';
+      inp.value = '';
+      inp.placeholder = 'Listening… speak your question';
+      if (PIQ.sem) PIQ.sem.log('voice.input', {});
+    });
+    return mic;
+  }
+
   function mount(container, opts) {
     const main = h('div', 'chat-main', container);
     main.style.flex = '1';
@@ -4873,6 +5825,7 @@ Rules:
     const inp = h('input', null, form);
     inp.placeholder = 'Ask about the market, your portfolio, peers, applications…';
     inp.setAttribute('aria-label', 'Ask a question');
+    voiceButton(form, inp);
     const send = h('button', 'btn primary', form, 'Ask');
     send.type = 'submit';
     form.addEventListener('submit', (e) => { e.preventDefault(); const q = inp.value; inp.value = ''; ask(q); });
@@ -4996,7 +5949,7 @@ Rules:
         title: 'MSME promoters slip first',
         say: `"Directors and partners borrow personally. In ${pct(N.ms.stats.precededPct, 0)} of MSME defaults, a promoter slipped on a personal loan or card first, about ${N.ms.stats.medianLeadMonths} months earlier. Tamil Nadu tops Sahyadri's watchlist, which is exactly where its MSME book broke."`,
         tip: 'Connects back to the Tamil Nadu alert on the Command Centre.' },
-      { view: 'upload', setup: async () => { clickText('Use the sample file'); await wait(200); clickText('Validate'); await wait(200); clickText('Generate insights'); await wait(300); }, target: () => q('.callout.danger'),
+      { view: 'upload', setup: async () => { PIQ.views.upload.demo('custom'); await wait(300); }, target: () => q('.callout.danger'),
         title: 'Bring your own data',
         say: '"Sourcing channel isn\'t bureau data. The bank uploads it, the platform joins it to the market like-for-like, and there\'s the root cause for Gujarat: the DSA channel. The file never leaves the bank\'s tenant."',
         tip: 'The sample file is built in, so there is no need to carry a CSV.' },

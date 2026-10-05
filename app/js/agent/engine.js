@@ -248,11 +248,13 @@
     product: P_PRODUCT, state: P_STATE, cutoff: { type: 'integer', description: '600–800; 0 = find best' }
   }, ['product'], (a) => {
     const p = !a.product || a.product === 'ALL' ? 'PL' : a.product, s = a.state || 'ALL'; // cut-offs are product-specific
-    const cur = C.currentCutoff[p];
+    // current policy comes from the member's product × state grid (Policy Simulator page)
+    const CO = PIQ.cutoffs, curFn = s === 'ALL' && CO.varies(p) ? CO.fn(p) : CO.get(p, s);
+    const cur = typeof curFn === 'function' ? 'your state-wise grid' : curFn;
     let c = a.cutoff || 0;
     if (!c) { const curve = S.simulateCurve(p, s); c = curve.reduce((m, r) => (r.netCr > m.netCr ? r : m), curve[0]).cutoff; }
     c = Math.max(600, Math.min(800, Math.round(c / 10) * 10));
-    const A = S.simulate(p, s, cur), B = S.simulate(p, s, c);
+    const A = S.simulate(p, s, curFn), B = S.simulate(p, s, c);
     S.log('simulate', { p, s, cutoff: c }, 'ai');
     const gain = B.netCr - A.netCr;
     const curve = S.simulateCurve(p, s);
@@ -295,6 +297,29 @@
         link: { view: 'logins', params: { p, s } }
       },
       facts: { memberChange: F().chg(c.mem.change, 0), industryChange: F().chg(c.ind.change, 0), memberApproval: F().pct(c.mem.recent.apprRate, 1), industryApproval: F().pct(c.ind.recent.apprRate, 1), memberHighEnquiry: F().pct(c.mem.recent.hiEnqShare, 0), industryHighEnquiry: F().pct(c.ind.recent.hiEnqShare, 0), surgeIn: hot.map((x) => x.st.name) }
+    };
+  });
+
+  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, with the sourcing pools that drive it.', {
+    product: P_PRODUCT, state: P_STATE, days: { type: 'integer', enum: [7, 15, 30], description: 'login window in days' }
+  }, [], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', n = [7, 15, 30].includes(+a.days) ? +a.days : 7;
+    const q = S.loginQualityWin({ p, s }, n);
+    S.log('loginQualityWin', { p, s, days: n }, 'ai');
+    const pp = (x, d) => F().pct(x, d == null ? 1 : d);
+    const pools = q.mem.pools.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
+    const paras = [`In the last ${n} days, **${F().int(q.mem.sameDayCount)}** of your ${pName(p)} applicants in ${sName(s)} made more than one enquiry on the same day: **${pp(q.mem.sameDay)}** of applicants, against ${pp(q.ind.sameDay)} across the industry${q.memPrior ? ` and ${pp(q.memPrior.sameDay)} in your prior ${q.priorDays} days` : ''}.`];
+    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping through several DSAs, or loans being stacked before the bureau updates, so check these applications before disbursal.');
+    return {
+      answer: {
+        paras,
+        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of the pool's logins)`),
+        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.pools.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
+        sources: src('logins'), filters: `${pLong(p)} · ${sName(s)} · last ${n} days · to ${C.loginsAsOf}`,
+        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'Which pool are my recent applications coming from?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
+        link: { view: 'logins', params: { p, s, win: n } }
+      },
+      facts: { days: n, memberCount: Math.round(q.mem.sameDayCount), memberShare: pp(q.mem.sameDay), industryShare: pp(q.ind.sameDay), priorShare: q.memPrior ? pp(q.memPrior.sameDay) : null }
     };
   });
 
@@ -467,10 +492,24 @@
     facts: { datasets: Object.values(S.DATASETS).map((d) => d.name) }
   }));
 
-  def('uploaded_insight', 'Insights from the file the member uploaded (e.g. sourcing channel), joined to industry benchmarks.', {}, [], () => {
+  def('uploaded_insight', 'Insights from the file the member uploaded: a Portfolio Review output (Consumer, Commercial, Microfinance or MFI + Consumer PR, analysed on its own) or a custom file (e.g. sourcing channel) joined to industry benchmarks.', {}, [], () => {
+    const U = PIQ.uploadedPR;
+    if (U && PIQ.lastUpload === 'pr') {
+      const A = U.analysis;
+      return {
+        answer: {
+          paras: [`From your uploaded **${U.label}** (${U.name}, ${U.rows.toLocaleString('en-IN')} rows, ${ml(U.months[0])} – ${ml(U.months[U.months.length - 1])}), using that file only:`].concat(A.headline ? [`**${A.headline.title}.** ${A.headline.text}`] : []),
+          bullets: A.stats.map((x) => `**${x.label}:** ${x.value} (${x.note})`).concat(A.findings.map((f) => f.title)),
+          sources: ['Your uploaded ' + U.label + ' (private)'], filters: U.label + ' · ' + ml(U.months[U.months.length - 1]),
+          followups: ['What should I do about it?', 'What should I worry about this week?'],
+          link: { view: 'upload', params: {} }
+        },
+        facts: { type: U.label, summary: A.ai }
+      };
+    }
     const ins = PIQ.uploadInsights ? PIQ.uploadInsights() : null;
     if (!ins) return {
-      answer: { paras: ['You haven\'t uploaded a file yet. Sourcing channel isn\'t in bureau data, but if you upload your channel split I can benchmark each channel against the market, like for like.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
+      answer: { paras: ['You haven\'t uploaded a file yet. On Bring Your Data, upload a Consumer, Commercial, Microfinance or MFI + Consumer PR output and I\'ll summarise what it says, or upload a custom file such as your sourcing-channel split and I\'ll benchmark it against the market.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
       facts: { uploaded: false }
     };
     const dims = Object.keys(ins.byDim);
@@ -604,7 +643,7 @@
       const term = /cure/.test(t) ? 'cure' : /90/.test(t) ? 'dpd90' : /30|dpd/.test(t) ? 'dpd30' : /mix/.test(t) ? 'mix' : /market effect/.test(t) ? 'market' : /prime|band/.test(t) ? 'bands' : 'dpd30';
       return call('define', { term });
     }
-    if (/upload|my file|sourcing channel|\bchannel|\bdsa\b/.test(t)) return call('uploaded_insight', {});
+    if (/upload|my file|sourcing channel|\bchannel|\bdsa\b|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
     if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
       return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });
@@ -613,6 +652,8 @@
     if (/worry|alert|early.?warning|attention|concern|red flag/.test(t)) return call('alerts', {});
     if (/board|summary|summari[sz]e|brief/.test(t)) return call('board_summary', {});
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
+    if (/same.?day|more than (one|1) (enquir|inquir)|multiple (enquir|inquir)|1\+ (enquir|inquir)|loan.?stack|rate.?shop/.test(t))
+      return call('same_day_enquiries', { product: p, state: st, days: /30|month/.test(t) ? 30 : /15|fortnight/.test(t) ? 15 : 7 });
     if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
       return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });

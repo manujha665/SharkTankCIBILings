@@ -68,6 +68,8 @@
       'Where is the surge in applications coming from?',
       'How many of my applicants have multiple enquiries?',
       'How many applications came from high-risk PIN codes?',
+      'How many applicants had more than one enquiry on the same day in the last 7 days?',
+      'How many applicants had more than one enquiry on the same day in the last 30 days?',
       'What is the probability of default of my last 7 days\' logins?',
       'Which pool are my recent applications coming from?',
       'What is the score banding of my last 7 days\' logins?',
@@ -88,6 +90,7 @@
     ] },
     { cat: 'Your data & definitions', qs: [
       'Which sourcing channel is performing worst in my uploaded file?',
+      'What does my uploaded PR say?',
       'What is 30+ DPD?',
       'How is the cure rate defined?',
       'Which datasets can you answer from?'

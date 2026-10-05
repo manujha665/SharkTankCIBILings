@@ -183,20 +183,22 @@
   function simulate(p, s, cutoff, assumptions) {
     const A = Object.assign({}, DEFAULT_ASSUMPTIONS[p], assumptions || {});
     const states = !s || s === 'ALL' ? D.STATES.map((x) => x.id) : [s];
+    // cutoff: one score for every state, or a function state -> score (the member's product × state policy grid)
+    const cutOf = typeof cutoff === 'function' ? cutoff : () => cutoff;
     let apps = 0, approved = 0, bad = 0, badInd = 0;
-    states.forEach((st) => (scoreIdx[p + '|' + st] || []).forEach((r) => {
+    states.forEach((st) => { const cut = cutOf(st); (scoreIdx[p + '|' + st] || []).forEach((r) => {
       apps += r.apps;
-      const pass = r.lo >= cutoff ? 1 : r.hi > cutoff ? (r.hi - cutoff) / (r.hi - r.lo) : 0;
+      const pass = r.lo >= cut ? 1 : r.hi > cut ? (r.hi - cut) / (r.hi - r.lo) : 0;
       const a = r.apps * pass * A.otherPass;
       approved += a; bad += a * r.badMem; badInd += a * r.badInd;
-    }));
+    }); });
     const perMonth = approved / 3;
     const disb = (perMonth * A.ticket) / 100; // ₹ crore (ticket in lakh)
     const badRate = approved ? bad / approved : 0;
     const loss = disb * badRate * A.lgd;
     const margin = disb * (A.yield - A.cof - A.opex);
     return {
-      p, s, cutoff, apps: apps / 3, approvalRate: apps ? approved / apps : 0,
+      p, s, cutoff: typeof cutoff === 'function' ? null : cutoff, apps: apps / 3, approvalRate: apps ? approved / apps : 0,
       approvedPerMonth: perMonth, disbursalCr: disb, badRate, badRateInd: approved ? badInd / approved : 0,
       expLossCr: loss, netCr: margin - loss, assumptions: A
     };
@@ -250,7 +252,7 @@
   function loginQuality(who, f, days) {
     const base = Object.assign({}, f, { who, d: days });
     const tot = agg('logins', base);
-    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0 }; };
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0 }; };
     const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
     D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
       const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
@@ -262,6 +264,7 @@
     return {
       who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
       pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
+      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0,
       bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
       pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
       pools: D.POOLS.map((x) => {
@@ -273,11 +276,18 @@
       pdBuckets: buckets
     };
   }
-  // Convenience: last 7 days vs the prior 23 days for the member, and the industry's last 7 days
-  function loginQuality7(f) {
-    const last = D.DAYS.slice(-7), prior = D.DAYS.slice(0, -7);
-    return { mem: loginQuality('mem', f, last), memPrior: loginQuality('mem', f, prior), ind: loginQuality('ind', f, last) };
+  // Login window: last N days (7, 15 or 30) vs the rest of the 30-day feed for the member, and the
+  // industry over the same N days. With N = 30 there is no prior window, so memPrior is null.
+  const LOGIN_WINDOWS = [7, 15, 30];
+  function loginQualityWin(f, n) {
+    n = Math.min(D.DAYS.length, n || 7);
+    const last = D.DAYS.slice(-n), prior = D.DAYS.slice(0, -n);
+    return {
+      n, days: last, priorDays: prior.length,
+      mem: loginQuality('mem', f, last), memPrior: prior.length ? loginQuality('mem', f, prior) : null, ind: loginQuality('ind', f, last)
+    };
   }
+  const loginQuality7 = (f) => loginQualityWin(f, 7);
 
   // ---------------- Alerts (early warning runs on 30+ DPD, the earliest bucket) ----------------
   let alertCache = null;
@@ -343,6 +353,6 @@
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,
-    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, PD_BUCKETS, alerts
+    loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, loginQualityWin, LOGIN_WINDOWS, PD_BUCKETS, alerts
   };
 })(typeof window !== 'undefined' ? window : globalThis);

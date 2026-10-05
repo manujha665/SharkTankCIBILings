@@ -96,6 +96,63 @@
     renderAll();
   }
 
+  // Voice input: the browser's speech recognition fills the text box, then asks once the user stops talking.
+  // Typing still works; the mic is a second way in. Chrome / Edge / Safari support it; Firefox doesn't.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let activeRec = null;
+  function voiceButton(form, inp) {
+    const mic = h('button', 'btn mic', form, '🎤');
+    mic.type = 'button';
+    mic.title = 'Speak your question';
+    mic.setAttribute('aria-label', 'Speak your question');
+    const toast = (m) => (PIQ.actions && PIQ.actions.toast ? PIQ.actions.toast(m, true) : alert(m));
+    const placeholder = inp.placeholder;
+    const reset = () => { mic.classList.remove('on'); mic.textContent = '🎤'; mic.title = 'Speak your question'; inp.placeholder = placeholder; activeRec = null; };
+    mic.addEventListener('click', () => {
+      if (!SR) { toast('Voice input needs Chrome, Edge or Safari. You can keep typing your question.'); return; }
+      if (activeRec) { activeRec.stop(); return; }
+      const rec = new SR();
+      rec.lang = 'en-IN';
+      rec.interimResults = true;
+      rec.continuous = false;
+      rec.maxAlternatives = 1;
+      let finalText = '', failed = false;
+      rec.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
+          else interim += e.results[i][0].transcript;
+        }
+        inp.value = (finalText + interim).trim();
+      };
+      rec.onerror = (e) => {
+        failed = true;
+        const msg = {
+          'not-allowed': 'Microphone access is blocked. Allow the microphone for this site in your browser settings.',
+          'service-not-allowed': 'Voice input isn\'t available on this page. Open the app over https or localhost.',
+          'no-speech': 'Didn\'t catch that. Tap 🎤 and try again.',
+          'audio-capture': 'No microphone found.',
+          network: 'Voice recognition needs an internet connection in this browser.'
+        }[e.error] || 'Voice input stopped (' + e.error + ').';
+        toast(msg);
+      };
+      rec.onend = () => {
+        reset();
+        const q = finalText.trim() || inp.value.trim();
+        if (!failed && q) { inp.value = ''; ask(q); }
+      };
+      try { rec.start(); } catch (err) { toast('Couldn\'t start voice input: ' + err.message); return; }
+      activeRec = rec;
+      mic.classList.add('on');
+      mic.textContent = '■';
+      mic.title = 'Stop listening';
+      inp.value = '';
+      inp.placeholder = 'Listening… speak your question';
+      if (PIQ.sem) PIQ.sem.log('voice.input', {});
+    });
+    return mic;
+  }
+
   function mount(container, opts) {
     const main = h('div', 'chat-main', container);
     main.style.flex = '1';
@@ -105,6 +162,7 @@
     const inp = h('input', null, form);
     inp.placeholder = 'Ask about the market, your portfolio, peers, applications…';
     inp.setAttribute('aria-label', 'Ask a question');
+    voiceButton(form, inp);
     const send = h('button', 'btn primary', form, 'Ask');
     send.type = 'submit';
     form.addEventListener('submit', (e) => { e.preventDefault(); const q = inp.value; inp.value = ''; ask(q); });
