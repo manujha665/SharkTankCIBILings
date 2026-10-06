@@ -36,7 +36,11 @@
   }
 
   function steps(N) {
-    const worstPool = N.lq.mem.pools.map((x, i) => ({ x, pr: N.lq.memPrior.pools[i] })).sort((a, b) => (b.x.pd - b.pr.pd) * b.x.share - (a.x.pd - a.pr.pd) * a.x.share)[0];
+    const worstProf = N.lq.mem.profiles.map((x, i) => ({ x, pr: N.lq.memPrior.profiles[i] })).sort((a, b) => (b.x.pd - b.pr.pd) * b.x.share - (a.x.pd - a.pr.pd) * a.x.share)[0];
+    const S = PIQ.sem, F = PIQ.ui.fmt, tt = S.latest(), W = ['NP', 'SB'];
+    const tk = (src, ff, m) => S.value(src, 'ats', Object.assign({ p: 'PL' }, ff, { m }));
+    const upW0 = tk('member', { s: 'UP', b: W }, PIQ.config.policyChangeMonth), upW1 = tk('member', { s: 'UP', b: W }, tt), upWi = tk('industry', { s: 'UP', b: W }, tt);
+    const wR = tk('member', { b: W }, tt) / tk('industry', { b: W }, tt);
     return [
       { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
         title: 'The Monday-morning question',
@@ -72,8 +76,12 @@
         tip: 'Drag the cut-off slider live; the curves and the table update instantly.' },
       { view: 'logins', state: { p: 'ALL', s: 'ALL' }, target: () => q('.callout.danger'),
         title: 'The next wave, visible today',
-        say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by the ${worstPool.x.name} pool and high-risk PIN codes."`,
-        tip: 'Scroll to show score banding, PD distribution, PIN-code risk tiers and the sourcing-pool table.' },
+        say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by ${worstProf.x.name.split(' (')[0].toLowerCase()} applicants and high-risk PIN codes. Every one of these signals comes from bureau enquiry data, nothing extra to submit."`,
+        tip: 'Scroll to show same-day multiple enquiries, score banding, PD distribution, PIN-code risk tiers and the bureau credit-profile table. Switch the Logins dropdown to 15 or 30 days.' },
+      { view: 'tickets', state: { p: 'PL', s: 'ALL' }, target: () => q('#view .callout'),
+        title: 'Bigger loans to riskier borrowers',
+        say: `"Ticket size is the variable everyone forgets. Sahyadri's near-prime and subprime personal loans are ${wR.toFixed(2)}× the market's ticket size. In Uttar Pradesh they went from ${F.inr(upW0)} to ${F.inr(upW1)} since February, while the market sits at ${F.inr(upWi)}. Riskier borrowers, bigger loans: the loss per default goes up too."`,
+        tip: 'Ticket size now also sits on the Command Centre, in Peer Benchmarking and Industry Intelligence (metric picker), and in the AI analyst.' },
       { view: 'fresh', state: { p: 'PL', s: 'UP' }, target: () => q('.callout'),
         title: 'Weekly beats monthly',
         say: `"The August monthly file says ${pct(N.monthlyUP)} in Uttar Pradesh. Weekly submissions say ${pct(N.hf.mem.now.dpd30)} as of last Sunday, with fresh EMI bounces at ${pct(N.hf.mem.now.bounce, 1)} and climbing. Next month's file is already written; weekly data lets you act now."`,

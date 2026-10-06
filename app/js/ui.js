@@ -31,13 +31,14 @@
       return Math.round(v).toString();
     },
     int: (v) => inr.format(Math.round(v)),
+    inr: (v) => (v == null || !isFinite(v) ? '—' : v >= 1e7 ? '₹' + (v / 1e7).toFixed(2) + ' Cr' : v >= 1e5 ? '₹' + (v / 1e5).toFixed(2) + ' L' : '₹' + inr.format(Math.round(v))),
     metric: (id, v) => {
       const M = PIQ.sem.METRICS[id];
-      return M.unit === 'pct' ? fmt.pct(v) : M.unit === 'cr' ? fmt.cr(v) : fmt.count(v);
+      return M.unit === 'pct' ? fmt.pct(v) : M.unit === 'cr' ? fmt.cr(v) : M.unit === 'inr' ? fmt.inr(v) : fmt.count(v);
     },
     metricTick: (id) => {
       const M = PIQ.sem.METRICS[id];
-      return M.unit === 'pct' ? (v) => (v * 100).toFixed(v * 100 < 10 ? 1 : 0) + '%' : M.unit === 'cr' ? (v) => (v >= 100000 ? (v / 100000).toFixed(1) + 'L' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v.toFixed(0)) : fmt.count;
+      return M.unit === 'pct' ? (v) => (v * 100).toFixed(v * 100 < 10 ? 1 : 0) + '%' : M.unit === 'inr' ? (v) => (v >= 1e5 ? (v / 1e5).toFixed(v >= 1e6 ? 0 : 1) + 'L' : (v / 1e3).toFixed(0) + 'K') : M.unit === 'cr' ? (v) => (v >= 100000 ? (v / 100000).toFixed(1) + 'L' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v.toFixed(0)) : fmt.count;
     },
     delta: (id, d) => {
       const M = PIQ.sem.METRICS[id];

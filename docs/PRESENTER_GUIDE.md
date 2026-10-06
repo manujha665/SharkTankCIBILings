@@ -30,7 +30,8 @@ All numbers below are from the synthetic demo data and are also computed live in
 | 6 | Why · Gujarat | **2.1% → 6.2%**, market +35 bps, 61% member-specific | "Same symptom, different disease." |
 | 7 | What should I do? | Ranked, quantified actions | "Every insight ends in an action." |
 | 8 | Policy Simulator | Tighten only UP & Gujarat: **~+₹0.45 Cr/month**; blanket tightening loses money | "Surgical, not blanket." |
-| 9 | Login & Application Pulse | Weak-band PL apps in UP **+95% in 5 days** vs +5%; last-7-day expected PD **5.2% vs 4.6%**; DSA pool + high-risk PIN codes | "The next wave, visible today." |
+| 9 | Login & Application Pulse | Weak-band PL apps in UP **+95% in 5 days** vs +5%; last-7-day expected PD **5.2% vs 4.6%**; already-leveraged applicants + high-risk PIN codes (all bureau data) | "The next wave, visible today." |
+| 9b | Ticket Size | Near-prime & subprime PL tickets **1.5× the market's**; UP ₹2.0 L → ₹2.9 L since Feb | "Bigger loans to riskier borrowers." |
 | 10 | Fresh Signals (PL, UP) | Monthly file **8.2%**, weekly **9.4%**; bounces **14.9%** | "Weekly beats monthly." |
 | 11 | Overlap · Retail × MFI | **8 Cr** MFI borrowers → **50%** retail footprint → **25%** live-to-live; retail DPD **2.7×** | "Only a bureau sees this." |
 | 12 | Overlap · MSME promoters | **41%** of MSME defaults preceded by a promoter's retail slip, **~4 months** earlier; Tamil Nadu tops the watchlist | "Promoters slip first." |
@@ -79,7 +80,7 @@ The AI doesn't calculate or invent numbers. It chooses from a fixed set of appro
 - **How is privacy protected?** Tenant isolation in the data layer, anonymised peers with minimum-size and dominance rules, no borrower-level data, a full audit log.
 - **Is it feasible?** The data exists; the prototype needs no installation; the AI layer is provider-agnostic (any approved LLM).
 - **How does it make money?** Tiered subscription (Standard / Pro / Enterprise) plus usage-based AI queries.
-- **What's the PD model?** Illustrative: score-band default rate × PIN-code tier × sourcing pool. In production, the bureau's own scorecards.
+- **What's the PD model?** Illustrative: score-band default rate × PIN-code tier × the applicant's bureau credit profile. In production, the bureau's own scorecards.
 - **Where do the MFI overlap numbers come from?** 8 Cr base, 50% footprint, 25% live-to-live are the team's working estimates; other overlap figures are illustrative.
 
 ---

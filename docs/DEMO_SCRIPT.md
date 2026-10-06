@@ -33,7 +33,7 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 
 - *"Delinquency is a lagging indicator. This is the leading one."*
 - Show near-prime and subprime applications up ~95% in 5 days vs ~5% for the market, and more than half of those applicants with 3+ enquiries in 30 days.
-- Scroll to **Last 7 days' logins**: expected PD is 5.2% vs 4.6% before; the DSA / connector pool's PD jumped from 6.3% to 7.7%, and more logins come from high-risk PIN codes. *"This is what next quarter's delinquency looks like, today."*
+- Scroll to **Last 7 days' logins**: expected PD is 5.2% vs 4.6% before; already-leveraged applicants (3+ live loans in the bureau) went from a 6.3% to a 7.7% PD, and more logins come from high-risk PIN codes. Then open **Ticket Size**: near-prime and subprime PL tickets are 1.5× the market's. *"This is what next quarter's delinquency looks like, today."*
 - *"No bureau product shows a lender this today. We already receive the enquiries; we just aren't showing them back."*
 
 ## Optional (+90 sec) — Fresh Signals and Overlap Intelligence

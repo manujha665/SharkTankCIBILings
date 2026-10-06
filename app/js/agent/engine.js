@@ -300,31 +300,59 @@
     };
   });
 
-  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, with the sourcing pools that drive it.', {
+  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, by the applicant\'s bureau credit profile (new to credit, thin file, established, already leveraged, existing customer).', {
     product: P_PRODUCT, state: P_STATE, days: { type: 'integer', enum: [7, 15, 30], description: 'login window in days' }
   }, [], (a) => {
     const p = a.product || 'ALL', s = a.state || 'ALL', n = [7, 15, 30].includes(+a.days) ? +a.days : 7;
     const q = S.loginQualityWin({ p, s }, n);
     S.log('loginQualityWin', { p, s, days: n }, 'ai');
     const pp = (x, d) => F().pct(x, d == null ? 1 : d);
-    const pools = q.mem.pools.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
+    const pools = q.mem.profiles.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
     const paras = [`In the last ${n} days, **${F().int(q.mem.sameDayCount)}** of your ${pName(p)} applicants in ${sName(s)} made more than one enquiry on the same day: **${pp(q.mem.sameDay)}** of applicants, against ${pp(q.ind.sameDay)} across the industry${q.memPrior ? ` and ${pp(q.memPrior.sameDay)} in your prior ${q.priorDays} days` : ''}.`];
-    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping through several DSAs, or loans being stacked before the bureau updates, so check these applications before disbursal.');
+    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping with several lenders, or loans being stacked before the bureau updates, so check these applications before disbursal.');
     return {
       answer: {
         paras,
-        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of the pool's logins)`),
-        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.pools.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
+        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of that profile's logins)`),
+        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.profiles.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
         sources: src('logins'), filters: `${pLong(p)} · ${sName(s)} · last ${n} days · to ${C.loginsAsOf}`,
-        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'Which pool are my recent applications coming from?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
+        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'What is the credit profile of my recent applicants?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
         link: { view: 'logins', params: { p, s, win: n } }
       },
       facts: { days: n, memberCount: Math.round(q.mem.sameDayCount), memberShare: pp(q.mem.sameDay), industryShare: pp(q.ind.sameDay), priorShare: q.memPrior ? pp(q.memPrior.sameDay) : null }
     };
   });
 
-  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, and sourcing pool (branch, DSA, digital, fintech partner, existing customer).', {
-    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'pool', 'score'] }
+  def('ticket_size', 'Average ticket size of new loans (value disbursed ÷ new accounts, bureau-reported at opening) for the member vs peers and the industry, by risk band and state, plus the loan amount applicants request in their enquiries.', {
+    product: P_PRODUCT, state: P_STATE
+  }, [], (a) => {
+    const p = !a.product || a.product === 'ALL' ? 'PL' : a.product, s = a.state || 'ALL';
+    const t = S.latest(), t12 = S.monthsAgo(12), t0 = C.policyChangeMonth, f = { p, s };
+    const v = (src, ff, m) => S.value(src, 'ats', Object.assign({}, f, ff, { m }));
+    const m1 = v('member', {}, t), m0 = v('member', {}, t12), i1 = v('industry', {}, t), i0 = v('industry', {}, t12);
+    const W = ['NP', 'SB'], ST = ['SP', 'PP', 'PR'];
+    const wR = v('member', { b: W }, t) / v('industry', { b: W }, t), sR = v('member', { b: ST }, t) / v('industry', { b: ST }, t);
+    const wM = v('member', { b: W }, t) / v('member', { b: W }, t0) - 1, wI = v('industry', { b: W }, t) / v('industry', { b: W }, t0) - 1;
+    const lq = S.loginQualityWin(f, 30);
+    S.log('ticketSize', f, 'ai');
+    const paras = [`Your average ${pName(p)} ticket in ${sName(s)} is **${F().inr(m1)}** (${ml(t)}), ${F().chg(m1 / m0 - 1)} in a year, against **${F().inr(i1)}** for the industry (${F().chg(i1 / i0 - 1)}).`];
+    if (wR > sR * 1.12 && wM > wI + 0.05) paras.push(`The gap is widest where risk is highest: near-prime & subprime tickets are **${wR.toFixed(2)}×** the market's vs ${sR.toFixed(2)}× in prime bands, and they grew ${F().chg(wM, 0)} since ${ml(t0)} vs ${F().chg(wI, 0)} for the market. Bigger loans to riskier borrowers: consider a ticket cap by score band.`);
+    else paras.push(`The gap is similar across bands (${sR.toFixed(2)}× in prime, ${wR.toFixed(2)}× in near-prime & subprime), which points to customer mix rather than extra risk.`);
+    return {
+      answer: {
+        paras,
+        bullets: D.BANDS.map((b) => `**${b.name}:** ${F().inr(v('member', { b: b.id }, t))} vs market ${F().inr(v('industry', { b: b.id }, t))}`).concat([`**Amount asked in enquiries (30 days):** ${F().inr(lq.mem.ticket)} vs ${F().inr(lq.ind.ticket)} for the industry`]),
+        chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: S.series('member', 'ats', f) }, { name: 'Industry', color: 'var(--s3)', points: S.series('industry', 'ats', f) }], xLabel: ml, yFmt: F().inr, yTickFmt: F().metricTick('ats'), height: 200, endLabels: true }),
+        sources: src('member', 'industry', 'logins'), filters: `${pLong(p)} · ${sName(s)} · ${ml(t)}`,
+        followups: ['Where are my tickets biggest vs the market?', 'What is the credit profile of my recent applicants?', 'What should I do about it?'],
+        link: { view: 'tickets', params: {} }
+      },
+      facts: { member: F().inr(m1), industry: F().inr(i1), memberYoY: F().chg(m1 / m0 - 1), industryYoY: F().chg(i1 / i0 - 1), weakBandRatio: wR.toFixed(2), primeBandRatio: sR.toFixed(2), amountAsked: F().inr(lq.mem.ticket), industryAmountAsked: F().inr(lq.ind.ticket) }
+    };
+  });
+
+  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, the applicant\'s bureau credit profile (new to credit, thin file, established, already leveraged, existing customer) and the loan amount requested.', {
+    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'profile', 'score'] }
   }, [], (a) => {
     const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
     const q = S.loginQuality7({ p, s });
@@ -340,10 +368,11 @@
       bullets.push(`**Score bands:** ${q.mem.bands.map((b) => `${b.name} ${pp(b.share, 0)}`).join(' · ')} (near-prime + subprime ${pp(q.mem.bands[3].share + q.mem.bands[4].share, 0)} vs industry ${pp(q.ind.bands[3].share + q.ind.bands[4].share, 0)})`);
       if (focus === 'score') chart = (el) => PIQ.charts.dots(el, { rows: D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
     }
-    if (focus === 'all' || focus === 'pool') {
-      const pools = q.mem.pools.map((x, i) => ({ x, pr: q.memPrior.pools[i] })).sort((u, v) => v.x.share - u.x.share);
-      bullets.push(`**Sourcing pools:** ${pools.map(({ x, pr }) => `${x.name} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''})`).join(' · ')}`);
-      if (focus === 'pool') chart = (el) => PIQ.charts.bars(el, { items: pools.map(({ x }, i) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.pools.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
+    if (focus === 'all' || focus === 'profile') {
+      const profs = q.mem.profiles.map((x, i) => ({ x, pr: q.memPrior.profiles[i] })).sort((u, v) => v.x.share - u.x.share);
+      bullets.push(`**Bureau credit profile:** ${profs.map(({ x, pr }) => `${x.name.split(' (')[0]} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''}, asking ${F().inr(x.ticket)})`).join(' · ')}`);
+      bullets.push(`**Amount requested:** ${F().inr(q.mem.ticket)} on average vs ${F().inr(q.memPrior.ticket)} in your prior 23 days and ${F().inr(q.ind.ticket)} for the industry`);
+      if (focus === 'profile') chart = (el) => PIQ.charts.bars(el, { items: profs.map(({ x }) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.profiles.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
     }
     if (focus === 'all' || focus === 'pd') {
       bullets.push(`**PD distribution:** ${q.mem.pdBuckets.map((k) => `${k.label} ${pp(k.share, 0)}`).join(' · ')} (PD above 10%: industry ${pp(q.ind.pdBuckets[4].share, 0)})`);
@@ -353,10 +382,10 @@
       answer: {
         paras, bullets, chart,
         sources: src('logins', 'scores'), filters: `${pLong(p)} · ${sName(s)} · last 7 days vs prior 23 days · to ${C.loginsAsOf}`,
-        followups: ['Which pool are my recent applications coming from?', 'How many applications came from high-risk PIN codes?', 'What should I do about it?'],
+        followups: ['What is the credit profile of my recent applicants?', 'How many applications came from high-risk PIN codes?', 'What is my average ticket size vs the market?'],
         link: { view: 'logins', params: { p, s } }
       },
-      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), pools: q.mem.pools.map((x) => ({ pool: x.name, share: pp(x.share, 0), pd: pp(x.pd) })), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
+      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), profiles: q.mem.profiles.map((x) => ({ profile: x.name, share: pp(x.share, 0), pd: pp(x.pd), amountAsked: F().inr(x.ticket) })), amountAsked: F().inr(q.mem.ticket), industryAmountAsked: F().inr(q.ind.ticket), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
     };
   });
 
@@ -654,8 +683,10 @@
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
     if (/same.?day|more than (one|1) (enquir|inquir)|multiple (enquir|inquir)|1\+ (enquir|inquir)|loan.?stack|rate.?shop/.test(t))
       return call('same_day_enquiries', { product: p, state: st, days: /30|month/.test(t) ? 30 : /15|fortnight/.test(t) ? 15 : 7 });
-    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
-      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
+    if (/ticket|loan size|size of (the |my )?loans|average loan|amount (asked|requested)|loan amount/.test(t))
+      return call('ticket_size', { product: p === 'ALL' ? 'PL' : p, state: st });
+    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|credit profile|new.to.credit|thin.file|leveraged|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
+      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /profile|new.to.credit|thin.file|leveraged/.test(t) ? 'profile' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });
     if (/what should i do|recommend|action|what to do|where should|what do you suggest|how (do|can) i fix|\bgrow my/.test(t) || /what should .* do/.test(t))
       return call('recommend', { product: /credit card|card/.test(t) && /grow/.test(t) ? 'CC' : p, state: e.states[0] || 'ALL', focus: /collection/.test(t) ? 'collections' : /grow/.test(t) ? 'growth' : 'all' });

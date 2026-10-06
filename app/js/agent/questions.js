@@ -71,7 +71,9 @@
       'How many applicants had more than one enquiry on the same day in the last 7 days?',
       'How many applicants had more than one enquiry on the same day in the last 30 days?',
       'What is the probability of default of my last 7 days\' logins?',
-      'Which pool are my recent applications coming from?',
+      'What is the credit profile of my recent applicants?',
+      'What is my average ticket size vs the market?',
+      'Where are my tickets biggest vs the market?',
       'What is the score banding of my last 7 days\' logins?',
       'Show me housing loan application trends'
     ] },

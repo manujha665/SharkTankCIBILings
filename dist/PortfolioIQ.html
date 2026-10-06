@@ -479,8 +479,10 @@ body.touring .fab { display: none; }
  *  industry : month x product x state x riskBand x lenderCategory
  *  member   : month x product x state x riskBand
  *  peers    : peer x month x product x state            (never shown individually)
- *  logins   : who x day x product x state x riskBand x PIN tier x pool (industry + member);
- *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day
+ *  logins   : who x day x product x state x riskBand x PIN tier x applicant credit profile (industry + member);
+ *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day,
+ *             amount requested (₹ lakh). Every dimension is derived from bureau enquiry and tradeline data.
+ *  industry / member also carry newAcc (new accounts opened) so average ticket size = orig ÷ newAcc.
  *  scores   : product x state x 20-pt score bin (member applications, last 90 days)
  *
  * Amounts are stored as sums (balance, DPD balances, ...) so any slice aggregates
@@ -664,8 +666,16 @@ body.touring .fab { display: none; }
     }
   }
 
+  // ---------------- Ticket size (new loans) ----------------
+  // Average ticket = product base ticket × risk band × state × lender category × ticket inflation.
+  // Deterministic (no random draws), so adding it leaves every other number unchanged.
+  const TK_BAND = { pl: [1.4, 1.18, 1, 0.84, 0.7], cc: [1.5, 1.2, 1, 0.8, 0.62], secured: [1.22, 1.1, 1, 0.9, 0.8], mid: [1.2, 1.08, 1, 0.92, 0.85], mass: [1.06, 1.03, 1, 0.97, 0.94], mf: [1.04, 1.02, 1, 0.98, 0.96] };
+  const TK_STATE = { MH: 1.25, DL: 1.3, KA: 1.2, TG: 1.15, TN: 1.1, GJ: 1.1, HR: 1.12, KL: 1.05, GA: 1.15, PB: 1.05, AP: 1, WB: 0.92, RJ: 0.9, MP: 0.86, UP: 0.86, BR: 0.76, OD: 0.8, JH: 0.8, CG: 0.82, UK: 0.95, HP: 0.95, JK: 0.92, NE: 0.85, UT: 1.05 };
+  const TK_LENDER = { PSU: 1.05, PVT: 1.12, NBFC: 0.95, FIN: 0.55, SFB: 0.78, MFI: 0.9, RRB: 0.72, HFC: 1.0 };
+  const ticketL = (prod, bi, s, l, t) => prod.ticket * TK_BAND[prod.bands][bi] * (TK_STATE[s] || 1) * (TK_LENDER[l] || 1) * (1 + 0.006 * t); // ₹ lakh
+
   // ---------------- Industry ----------------
-  const MEAS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD'];
+  const MEAS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD', 'newAcc'];
   const industry = new Cube([['m', MONTHS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['l', LIDS]], MEAS);
   const NP_ = PIDS.length, NS_ = SIDS.length, NB_ = BIDS.length, NL_ = LIDS.length;
   const ltAcc = new Float64Array(MONTHS.length * NP_ * NS_ * NL_ * 6); // m,p,s,l totals for peer baselines
@@ -686,9 +696,10 @@ body.touring .fab { display: none; }
             const cureDen = acc * d30 * 0.62;
             const cure = Math.min(0.9, Math.max(0.1, bd.cure / Math.pow(tf, 1.1)) * noise(0.03));
             const d90 = d30 * 0.46 * noise(0.04);
+            const orig = bal * prod.orig * noise(0.05);
             industry.put({ m, p: prod.id, s: st.id, b: bd.id, l: ld.id }, {
-              bal, acc, orig: bal * prod.orig * noise(0.05), d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
-              cureN: cureDen * cure, cureD: cureDen
+              bal, acc, orig, d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
+              cureN: cureDen * cure, cureD: cureDen, newAcc: (orig * 100) / ticketL(prod, bi, st.id, ld.id, t)
             });
             if (ld.id === 'PVT') { const o = (((t * NP_ + pi) * NS_ + si) * NB_ + bi) * 2; pvtRate[o] = d30; pvtRate[o + 1] = cure; }
             const lo = (((t * NP_ + pi) * NS_ + si) * NL_ + li) * 6;
@@ -744,11 +755,14 @@ body.touring .fab { display: none; }
           // weak vintages roll forward faster: 90+ share of 30+ rises in the stressed segments
           const roll = mult > 1.3 ? 0.62 : mult > 1.1 ? 0.52 : 0.45;
           const d90 = d30 * roll * noise(0.04);
+          const orig = bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05);
+          // ticket-size story: after the Feb loosening, near-prime / subprime personal loans got bigger,
+          // most in Uttar Pradesh and Gujarat (bigger loans to riskier borrowers)
+          const tkUp = prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1 + (hot ? 0.065 : 0.02) * Math.min(since, 7) : 1;
           member.put({ m, p: prod.id, s: st.id, b: bd.id }, {
-            bal, acc,
-            orig: bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05),
+            bal, acc, orig,
             d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
-            cureN: cureDen * cure, cureD: cureDen
+            cureN: cureDen * cure, cureD: cureDen, newAcc: (orig * 100) / (ticketL(prod, bi, st.id, 'PVT', t) * 0.97 * tkUp)
           });
         });
       });
@@ -798,34 +812,38 @@ body.touring .fab { display: none; }
   const appBand = { SP: 0.22, PP: 0.2, PR: 0.24, NP: 0.19, SB: 0.15 };
   const approvalByBand = { SP: 0.86, PP: 0.8, PR: 0.66, NP: 0.42, SB: 0.14 };
   const highEnqByBand = { SP: 0.05, PP: 0.08, PR: 0.13, NP: 0.22, SB: 0.34 };
-  // Applications are split by PIN-code risk tier and sourcing pool; each cell carries an expected
-  // probability of default (12-month 90+), so any slice's average PD = pdN / apps.
+  // Applications are split by PIN-code risk tier and by the applicant's credit profile as seen in the
+  // bureau at the time of the enquiry (all bureau-derived, nothing the lender has to report separately).
+  // Each cell carries an expected probability of default (12-month 90+): any slice's PD = pdN / apps.
   const PINS = [
     { id: 'H', name: 'High-risk PIN codes', pd: 1.45 }, { id: 'M', name: 'Medium-risk PIN codes', pd: 1.0 }, { id: 'L', name: 'Low-risk PIN codes', pd: 0.8 }
   ];
-  const POOLS = [
-    { id: 'BR', name: 'Branch', pd: 0.95 }, { id: 'DSA', name: 'DSA / connector', pd: 1.2 }, { id: 'DIG', name: 'Digital (own app & web)', pd: 1.0 },
-    { id: 'FP', name: 'Fintech partner', pd: 1.15 }, { id: 'ETB', name: 'Existing customer (pre-approved)', pd: 0.6 }
+  const PROFILES = [
+    { id: 'EST', name: 'Established (3+ accounts, ≤2 live loans)', pd: 0.95 }, { id: 'LEV', name: 'Already leveraged (3+ live loans)', pd: 1.2 },
+    { id: 'THIN', name: 'Thin file (1–2 accounts)', pd: 1.0 }, { id: 'NTC', name: 'New to credit (no bureau history)', pd: 1.15 },
+    { id: 'ETB', name: 'Existing customer (live loan with you)', pd: 0.6 }
   ];
   const PIN_BY_BAND = { SP: [0.08, 0.32, 0.6], PP: [0.1, 0.34, 0.56], PR: [0.14, 0.36, 0.5], NP: [0.2, 0.38, 0.42], SB: [0.28, 0.4, 0.32] };
   const PIN_SURGE = [0.5, 0.33, 0.17];
-  const POOL_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
-  const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
+  const PROF_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
+  const PROF_IND = [0.25, 0.3, 0.22, 0.13, 0.1], PROF_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], PROF_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
   const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
-  const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay']);
-  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
-  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
+  const splitProf = (base, bi) => { const w = base.map((x, j) => x * PROF_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['prof', PROFILES.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay', 'amt']);
+  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = PROFILES.length;
+  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge, tkReq) => {
     const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
     for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
       const apps = tot * pinW[a] * poolW[c];
       const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
-      const o = (base + a * LS[5] + c * LS[6]) * 5;
+      const o = (base + a * LS[5] + c * LS[6]) * 6;
       LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
-      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * PROFILES[c].pd * (surge ? 1.25 : 1));
       // applicants who made more than one enquiry on the same day (rate-shopping or loan stacking);
-      // deterministic share of the high-enquiry rate, higher in surges and DSA / fintech-partner pools
+      // deterministic share of the high-enquiry rate, higher in surges and for leveraged / new-to-credit applicants
       LD[o + 4] += apps * Math.min(0.5, enqRate * risky * (surge ? 0.62 : 0.4) + 0.012);
+      // loan amount requested in the enquiry (₹ lakh); leveraged and surge applicants ask for more
+      LD[o + 5] += apps * tkReq * (c === 1 ? 1.12 : c === 3 ? 0.8 : c === 4 ? 1.08 : 1) * (surge ? 1.3 : 1);
     }
   };
   DAYS.forEach((d, i) => {
@@ -845,16 +863,17 @@ body.touring .fab { display: none; }
           // riskier states have more applications from high-risk PIN codes
           const r = S[s].risk, pw = PIN_BY_BAND[bd.id], pwt = [pw[0] * r * r, pw[1], pw[2] / r], pws = pwt[0] + pwt[1] + pwt[2];
           const pinW = pwt.map((x) => x / pws);
-          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitPool(POOL_IND, bi), pdBase, false);
+          const tkI = ticketL(prod, bi, s, 'ALL', 0) * 1.08, tkM = ticketL(prod, bi, s, 'PVT', 0) * (prod.id === 'PL' && weak ? 1.18 : 1);
+          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitProf(PROF_IND, bi), pdBase, false, tkI);
           if (surge) {
-            // the surge: normal flow plus an extra wave that is DSA-led and from high-risk PIN codes
+            // the surge: normal flow plus an extra wave of already-leveraged and new-to-credit applicants from high-risk PIN codes
             const normal = memApps / 1.95;
-            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitPool(POOL_MEM, bi), pdBase, false);
-            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, POOL_SURGE, pdBase, true);
+            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitProf(PROF_MEM, bi), pdBase, false, tkM);
+            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, PROF_SURGE, pdBase, true, tkM);
           } else {
-            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitPool(POOL_MEM, bi), pdBase, false);
-            // milder book-wide wave: in the last 7 days DSA / fintech-partner PL sourcing pushes weak-band logins everywhere
-            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, POOL_SURGE, pdBase, true);
+            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitProf(PROF_MEM, bi), pdBase, false, tkM);
+            // milder book-wide wave: in the last 7 days more already-leveraged weak-band PL applicants log in everywhere
+            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, PROF_SURGE, pdBase, true, tkM);
           }
         });
       });
@@ -892,7 +911,7 @@ body.touring .fab { display: none; }
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, POOLS,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores
@@ -924,6 +943,8 @@ body.touring .fab { display: none; }
       def: 'Balance 90 or more days past due ÷ total balance, by value, at month end (the NPA threshold).' },
     dpd180: { id: 'dpd180', name: '180+ DPD rate', short: '180+ DPD', unit: 'pct', kind: 'ratio', num: 'd180', den: 'bal', bad: true,
       def: 'Balance 180 or more days past due ÷ total balance, by value, at month end — deep delinquency, close to loss.' },
+    ats: { id: 'ats', name: 'Average ticket size (new loans)', short: 'Avg ticket', unit: 'inr', kind: 'ratio', num: 'orig', den: 'newAcc', mult: 1e7, bad: false, neutral: true, peerFromIndustry: true,
+      def: 'Value disbursed ÷ number of new accounts opened in the month (₹ per loan; cards = sanctioned limit). Bureau-reported at account opening.' },
     cure: { id: 'cure', name: 'Collection cure rate', short: 'Cure rate', unit: 'pct', kind: 'ratio', num: 'cureN', den: 'cureD', bad: false,
       def: 'Share of accounts 30–89 DPD last month that returned to current this month — a collections effectiveness measure.' }
   };
@@ -933,7 +954,7 @@ body.touring .fab { display: none; }
     industry: { name: 'Industry Credit Dataset', grain: 'month × product (10) × state (24) × risk band × lender category (8)', refresh: 'Monthly', asOf: C.dataAsOf },
     member: { name: 'Member Portfolio Dataset', grain: 'month × product × state × risk band', refresh: 'Monthly', asOf: C.dataAsOf },
     peers: { name: 'Anonymised Peer Aggregates', grain: 'peer group × month × product × state', refresh: 'Monthly', asOf: C.dataAsOf },
-    logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
+    logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band × PIN-code tier × bureau credit profile (amount requested included)', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
     scores: { name: 'Application Score Distribution', grain: 'product × state × 20-pt score bin', refresh: 'Weekly', asOf: 'last 90 days' }
   };
 
@@ -954,7 +975,7 @@ body.touring .fab { display: none; }
   function metricOf(agg, metric) {
     const M = METRICS[metric];
     if (M.kind === 'sum') return agg[M.field];
-    return agg[M.den] ? agg[M.num] / agg[M.den] : null;
+    return agg[M.den] ? (agg[M.num] / agg[M.den]) * (M.mult || 1) : null;
   }
   const cube = (source) => {
     const c = D.cube[source];
@@ -1012,6 +1033,7 @@ body.touring .fab { display: none; }
     const chk = peerCheck(g.types, g.sizes, f);
     if (!chk.ok) return { suppressed: true, check: chk, points: [] };
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
+    if (METRICS[metric].peerFromIndustry) return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('industry', Object.assign({}, f, { l: g.types, m })), metric) })) };
     return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric) })) };
   }
   function peerValue(groupId, metric, f) {
@@ -1019,6 +1041,7 @@ body.touring .fab { display: none; }
     const chk = peerCheck(g.types, g.sizes, f);
     if (!chk.ok) return null;
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
+    if (METRICS[metric].peerFromIndustry) return metricOf(agg('industry', Object.assign({}, f, { l: g.types, m: (f && f.m) || latest() })), metric);
     return metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: (f && f.m) || latest() })), metric);
   }
 
@@ -1149,16 +1172,17 @@ body.touring .fab { display: none; }
     return D.BANDS.map((b) => ({ key: b.id, name: b.name, y: agg('logins', Object.assign({}, f, { who, d: days, b: b.id })).apps / tot }));
   }
 
-  // Quality of recent logins: score bands, expected PD, PIN-code risk tier and sourcing pool.
+  // Quality of recent logins: score bands, expected PD, PIN-code risk tier, the applicant's bureau credit
+  // profile and the loan amount requested (all from bureau enquiry and tradeline data).
   // who: 'mem' | 'ind'; days: array of dates. PD = expected 12-month 90+ probability (apps-weighted).
   const PD_BUCKETS = [[0, 0.01, '< 1%'], [0.01, 0.03, '1–3%'], [0.03, 0.06, '3–6%'], [0.06, 0.1, '6–10%'], [0.1, 1, '10%+']];
   function loginQuality(who, f, days) {
     const base = Object.assign({}, f, { who, d: days });
     const tot = agg('logins', base);
-    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0 }; };
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0, ticket: a.apps ? (a.amt / a.apps) * 1e5 : 0 }; };
     const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
-    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
-      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
+    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.PROFILES.forEach((pl) => {
+      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, prof: pl.id }));
       if (!a.apps) return;
       const pd = a.pdN / a.apps;
       buckets.find((k) => pd >= k.lo && pd < k.hi).apps += a.apps;
@@ -1167,12 +1191,12 @@ body.touring .fab { display: none; }
     return {
       who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
       pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
-      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0,
+      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0, ticket: tot.apps ? (tot.amt / tot.apps) * 1e5 : 0,
       bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
       pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
-      pools: D.POOLS.map((x) => {
-        const o = Object.assign({ id: x.id, name: x.name }, part('src', x.id));
-        const hp = agg('logins', Object.assign({}, base, { src: x.id, pin: 'H' })).apps;
+      profiles: D.PROFILES.map((x) => {
+        const o = Object.assign({ id: x.id, name: x.name }, part('prof', x.id));
+        const hp = agg('logins', Object.assign({}, base, { prof: x.id, pin: 'H' })).apps;
         o.highPin = o.apps ? hp / o.apps : 0;
         return o;
       }),
@@ -1398,13 +1422,14 @@ body.touring .fab { display: none; }
       return Math.round(v).toString();
     },
     int: (v) => inr.format(Math.round(v)),
+    inr: (v) => (v == null || !isFinite(v) ? '—' : v >= 1e7 ? '₹' + (v / 1e7).toFixed(2) + ' Cr' : v >= 1e5 ? '₹' + (v / 1e5).toFixed(2) + ' L' : '₹' + inr.format(Math.round(v))),
     metric: (id, v) => {
       const M = PIQ.sem.METRICS[id];
-      return M.unit === 'pct' ? fmt.pct(v) : M.unit === 'cr' ? fmt.cr(v) : fmt.count(v);
+      return M.unit === 'pct' ? fmt.pct(v) : M.unit === 'cr' ? fmt.cr(v) : M.unit === 'inr' ? fmt.inr(v) : fmt.count(v);
     },
     metricTick: (id) => {
       const M = PIQ.sem.METRICS[id];
-      return M.unit === 'pct' ? (v) => (v * 100).toFixed(v * 100 < 10 ? 1 : 0) + '%' : M.unit === 'cr' ? (v) => (v >= 100000 ? (v / 100000).toFixed(1) + 'L' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v.toFixed(0)) : fmt.count;
+      return M.unit === 'pct' ? (v) => (v * 100).toFixed(v * 100 < 10 ? 1 : 0) + '%' : M.unit === 'inr' ? (v) => (v >= 1e5 ? (v / 1e5).toFixed(v >= 1e6 ? 0 : 1) + 'L' : (v / 1e3).toFixed(0) + 'K') : M.unit === 'cr' ? (v) => (v >= 100000 ? (v / 100000).toFixed(1) + 'L' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v.toFixed(0)) : fmt.count;
     },
     delta: (id, d) => {
       const M = PIQ.sem.METRICS[id];
@@ -3073,6 +3098,27 @@ body.touring .fab { display: none; }
       const tot = items.reduce((a, x) => a + x.bal, 0);
       const bc = card(g2, { title: 'Where your book is', sub: 'Share of outstanding balance by product', source: sourceText(['member']) });
       PIQ.charts.bars(bc.viz, { items: items.map((x) => ({ label: x.label, value: x.bal / tot })), fmt: (v) => fmt.pct(v, 1), color: 'var(--s1)' });
+      // average ticket size: one bureau variable that belongs on every front page
+      const tk = card(root, { title: 'Average ticket size by product', sub: `New loans opened in ${ml(t)} · you vs industry · YoY = vs ${ml(S.monthsAgo(12))}`, source: sourceText(['member', 'industry'], 'ticket = value disbursed ÷ new accounts') });
+      tk.el.style.marginTop = '16px';
+      const tt = h('table', 'tbl', h('div', 'table-wrap', tk.viz));
+      const th = h('tr', null, h('thead', null, tt));
+      ['Product', 'Your ticket', 'Industry', 'You ÷ market', 'Your YoY', 'Market YoY'].forEach((x, i) => h('th', i ? 'r' : '', th, x));
+      const tbd = h('tbody', null, tt);
+      const t12 = S.monthsAgo(12);
+      items.forEach((x) => {
+        const pid = D.PRODUCTS.find((q) => q.name === x.label).id, ff = { p: pid, s };
+        const m1 = S.value('member', 'ats', Object.assign({ m: t }, ff)), m0 = S.value('member', 'ats', Object.assign({ m: t12 }, ff));
+        const i1 = S.value('industry', 'ats', Object.assign({ m: t }, ff)), i0 = S.value('industry', 'ats', Object.assign({ m: t12 }, ff));
+        if (!m1 || !i1) return;
+        const r = h('tr', null, tbd);
+        h('td', null, r, x.label);
+        h('td', 'r', r, fmt.inr(m1)); h('td', 'r', r, fmt.inr(i1)); h('td', 'r', r, (m1 / i1).toFixed(2) + '×');
+        h('td', 'r ' + (m1 / m0 - 1 > i1 / i0 - 1 + 0.03 ? 'bad' : ''), r, fmt.chg(m1 / m0 - 1)); h('td', 'r', r, fmt.chg(i1 / i0 - 1));
+      });
+      const go = h('button', 'btn sm', tk.body, 'Open Ticket Size →');
+      go.style.marginTop = '10px';
+      go.addEventListener('click', () => PIQ.go('tickets'));
     }
 
     // What to do this week — full width
@@ -3235,7 +3281,7 @@ body.touring .fab { display: none; }
     const p = state.p, s = state.s;
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
     const bar = productStateFilters(root);
-    select(bar, 'Metric', S.DPD_METRICS.concat(['cure']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (S.DPD_METRICS.includes(v)) setState({ dpd: v }); else PIQ.go('benchmark'); });
+    select(bar, 'Metric', S.DPD_METRICS.concat(['cure', 'ats']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (S.DPD_METRICS.includes(v)) setState({ dpd: v }); else PIQ.go('benchmark'); });
     select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
     const group = state.peer === 'custom' ? Object.assign({ id: 'custom', name: 'Custom group' }, custom) : S.PEER_GROUPS.find((g) => g.id === state.peer);
@@ -3286,11 +3332,17 @@ body.touring .fab { display: none; }
     const pv6 = ps.suppressed ? null : ps.points[ps.points.length - 7].y;
 
     const tiles = h('div', 'grid g4', root);
+    // unit-aware: rates show pp / bps gaps; ticket size shows % change and a ratio (neither good nor bad on its own)
+    const isPct = M.unit === 'pct', V = (v) => fmt.metric(metric, v);
+    const chgV = (a, b) => (isPct ? fmt.pp(a - b) : fmt.chg(a / b - 1));
+    const gapV = (a, b) => (isPct ? fmt.bps(a - b) : (a / b).toFixed(2) + '×');
     const good = (d) => (M.bad ? d < 0 : d > 0);
-    stat(tiles, { label: `You · ${M.short}`, value: fmt.pct(mv), delta: fmt.pp(mv - mv6), deltaTone: good(mv - mv6) ? 'good' : 'bad', deltaNote: '6m' });
-    stat(tiles, { label: `Peer group · ${M.short}`, value: pvv == null ? 'Suppressed' : fmt.pct(pvv), delta: pvv == null ? 'privacy rule' : fmt.pp(pvv - pv6), deltaTone: '', deltaNote: pvv == null ? '' : '6m' });
-    stat(tiles, { label: 'Gap to peers', value: pvv == null ? '—' : fmt.bps(mv - pvv), delta: pvv == null ? '' : good(mv - pvv) ? 'better than peers' : 'worse than peers', deltaTone: pvv == null ? '' : good(mv - pvv) ? 'good' : 'bad' });
-    stat(tiles, { label: 'Gap to industry', value: fmt.bps(mv - iv), delta: good(mv - iv) ? 'better than industry' : 'worse than industry', deltaTone: good(mv - iv) ? 'good' : 'bad' });
+    const toneOf = (d) => (M.neutral ? '' : good(d) ? 'good' : 'bad');
+    const word = (d, who) => (M.neutral ? (d > 0 ? 'larger than ' : 'smaller than ') + who : (good(d) ? 'better than ' : 'worse than ') + who);
+    stat(tiles, { label: `You · ${M.short}`, value: V(mv), delta: chgV(mv, mv6), deltaTone: toneOf(mv - mv6), deltaNote: '6m' });
+    stat(tiles, { label: `Peer group · ${M.short}`, value: pvv == null ? 'Suppressed' : V(pvv), delta: pvv == null ? 'privacy rule' : chgV(pvv, pv6), deltaTone: '', deltaNote: pvv == null ? '' : '6m' });
+    stat(tiles, { label: 'Gap to peers', value: pvv == null ? '—' : gapV(mv, pvv), delta: pvv == null ? '' : word(mv - pvv, 'peers'), deltaTone: pvv == null ? '' : toneOf(mv - pvv) });
+    stat(tiles, { label: 'Gap to industry', value: gapV(mv, iv), delta: word(mv - iv, 'industry'), deltaTone: toneOf(mv - iv) });
 
     const g = h('div', 'grid g2', root);
     g.style.marginTop = '16px';
@@ -3298,11 +3350,11 @@ body.touring .fab { display: none; }
     const c1 = card(g, {
       title: `${M.name}: trend`, sub: `${prodLong(p)} · ${stateName(s)}`,
       source: sourceText(['member', 'peers', 'industry']),
-      table: () => ({ cols: [{ name: 'Month' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: mS.map((x, i) => [ml(x.x), fmt.pct(x.y), ps.suppressed ? 'Suppressed' : fmt.pct(ps.points[i].y), fmt.pct(iS[i].y)]) })
+      table: () => ({ cols: [{ name: 'Month' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: mS.map((x, i) => [ml(x.x), V(x.y), ps.suppressed ? 'Suppressed' : V(ps.points[i].y), V(iS[i].y)]) })
     });
     PIQ.charts.line(c1.viz, {
       series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: group.name, color: 'var(--s2)', points: ps.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
-      xLabel: ml, yFmt: (v) => fmt.pct(v), yTickFmt: fmt.metricTick(metric), endLabels: true, height: 270
+      xLabel: ml, yFmt: V, yTickFmt: fmt.metricTick(metric), endLabels: true, height: 270
     });
 
     const topStates = D.STATES.slice().sort((a, b) => S.value('member', 'bal', { p, s: b.id, m: t }) - S.value('member', 'bal', { p, s: a.id, m: t })).slice(0, 12);
@@ -3313,15 +3365,15 @@ body.touring .fab { display: none; }
     const c2 = card(g, {
       title: `${M.short} by state`, sub: ml(t) + ' · your 12 largest states · the gap between dots is your story',
       source: sourceText(['member', 'peers', 'industry']),
-      table: () => ({ cols: [{ name: 'State' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: rows.map((r) => [r.label, fmt.pct(r.values.mem), fmt.pct(r.values.peer), fmt.pct(r.values.ind)]) })
+      table: () => ({ cols: [{ name: 'State' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: rows.map((r) => [r.label, V(r.values.mem), V(r.values.peer), V(r.values.ind)]) })
     });
-    PIQ.charts.dots(c2.viz, { rows, series: [{ key: 'mem', name: C.member.name, color: 'var(--s1)' }, { key: 'peer', name: 'Peers', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v) });
+    PIQ.charts.dots(c2.viz, { rows, series: [{ key: 'mem', name: C.member.name, color: 'var(--s1)' }, { key: 'peer', name: 'Peers', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: V });
 
     // Diverging heatmap: member vs industry ratio
     // Rows are products for the whole book (like-for-like needs the same product), states otherwise
     const byProd = p === 'ALL';
     const rowList = byProd ? D.PRODUCTS.map((x) => ({ id: x.id, name: x.name, f: { p: x.id, s } })) : topStates.map((x) => ({ id: x.id, name: x.name, f: { p, s: x.id } }));
-    const c3 = card(g, { cls: 'span2', title: `Where you differ from the market: ${byProd ? 'product' : 'state'} × risk band`, sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
+    const c3 = card(g, { cls: 'span2', title: `Where you differ from the market: ${byProd ? 'product' : 'state'} × risk band`, sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.neutral ? 'Red = larger than the market, blue = smaller.' : M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
     const tb = h('table', 'tbl heat', h('div', 'table-wrap', c3.viz));
     const hr = h('tr', null, h('thead', null, tb));
     h('th', null, hr, byProd ? 'Product' : 'State');
@@ -3333,16 +3385,140 @@ body.touring .fab { display: none; }
       D.BANDS.forEach((b) => {
         const a = S.value('member', metric, Object.assign({ b: b.id, m: t }, x.f)), ii = S.value('industry', metric, Object.assign({ b: b.id, m: t }, x.f));
         const ratio = a / ii;
-        const worse = M.bad ? ratio > 1 : ratio < 1;
+        const worse = M.neutral ? ratio > 1 : M.bad ? ratio > 1 : ratio < 1;
         const k = Math.min(1, Math.abs(Math.log(ratio)) / Math.log(1.8));
         const td = h('td', 'cell', r, ratio.toFixed(2) + '×');
         td.style.background = `color-mix(in oklab, ${worse ? 'var(--div-pos)' : 'var(--div-neg)'} ${Math.round(k * 85)}%, var(--div-mid))`;
         td.style.color = k > 0.55 ? '#fff' : 'var(--ink)';
-        td.title = `You ${fmt.pct(a)} vs industry ${fmt.pct(ii)}`;
+        td.title = `You ${V(a)} vs industry ${V(ii)}`;
       });
     });
   }
   PIQ.views.benchmark = { title: 'Peer Benchmarking', render };
+})();
+
+</script>
+  <script>/* js/views/tickets.js */
+/* Ticket Size — average loan size at account opening (bureau-reported new accounts) and the amount
+   applicants ask for in their enquiries, vs peers and the market. */
+(function () {
+  const PIQ = window.PIQ;
+  const { h, fmt, ml, state, card, stat, sourceText, pageHead, productStateFilters, stateName, prodName, prodLong } = PIQ.ui;
+  const S = PIQ.sem, D = PIQ.data, C = PIQ.config;
+  const WEAK = ['NP', 'SB'], STRONG = ['SP', 'PP', 'PR'];
+
+  function render(root) {
+    const p = state.p === 'ALL' ? 'PL' : state.p, s = state.s;
+    pageHead(root, 'Ticket Size', 'Average loan size at account opening, from bureau-reported new accounts, and the amount applicants ask for in their enquiries. Bigger loans going to riskier borrowers is one of the earliest signs of a loosening book.');
+    productStateFilters(root, { allProducts: false });
+    const t = S.latest(), t12 = S.monthsAgo(12), t0 = C.policyChangeMonth;
+    const f = { p, s };
+    const ats = (src, ff, m) => S.value(src, 'ats', Object.assign({}, f, ff, { m }));
+    const group = S.PEER_GROUPS.find((g) => g.id === state.peer) || S.PEER_GROUPS[0];
+    S.log('ticketSize', { p, s });
+
+    // headline: are the bigger tickets going to the weaker bands?
+    const wR = ats('member', { b: WEAK }, t) / ats('industry', { b: WEAK }, t);
+    const sR = ats('member', { b: STRONG }, t) / ats('industry', { b: STRONG }, t);
+    const wM = ats('member', { b: WEAK }, t) / ats('member', { b: WEAK }, t0) - 1;
+    const wI = ats('industry', { b: WEAK }, t) / ats('industry', { b: WEAK }, t0) - 1;
+    const stRows = D.STATES.map((x) => {
+      const mo = S.value('member', 'orig', { p, s: x.id, m: t });
+      return { x, mo, m: ats('member', { s: x.id }, t), i: ats('industry', { s: x.id }, t), mw: ats('member', { s: x.id, b: WEAK }, t), mw0: ats('member', { s: x.id, b: WEAK }, t0), iw: ats('industry', { s: x.id, b: WEAK }, t) };
+    });
+    const totO = stRows.reduce((a, r) => a + r.mo, 0);
+    const mat = stRows.filter((r) => r.mo >= totO * 0.02 && r.m && r.i);
+    const hot = mat.filter((r) => r.mw && r.mw0).sort((a, b) => b.mw / b.mw0 - a.mw / a.mw0)[0];
+    const flag = wR > sR * 1.12 && wM > wI + 0.05;
+    const cl = h('div', 'callout ' + (flag ? 'danger' : 'insight'), root);
+    const ch = h('div', null, cl); ch.style.cssText = 'display:flex;gap:10px;justify-content:space-between;align-items:flex-start';
+    const title = flag
+      ? `${prodName(p)}: your near-prime & subprime tickets are ${wR.toFixed(2)}× the market's, against ${sR.toFixed(2)}× in prime bands`
+      : `${prodName(p)}: your ticket sizes are ${sR.toFixed(2)}× the market's in prime bands and ${wR.toFixed(2)}× in near-prime & subprime`;
+    h('h4', null, ch, title);
+    const body = flag
+      ? `Since ${ml(t0)}, your weak-band ticket grew ${fmt.chg(wM, 0)} while the market's grew ${fmt.chg(wI, 0)}. Bigger loans to riskier borrowers raise loss given default and repayment burden at the same time.${hot && s === 'ALL' ? ` Steepest in ${hot.x.name}: ${fmt.inr(hot.mw0)} → ${fmt.inr(hot.mw)} (market ${fmt.inr(hot.iw)}).` : ''} Consider a ticket cap by score band alongside the cut-off.`
+      : `Ticket sizes move with the market in ${stateName(s)}. A gap that is the same across bands usually reflects your customer mix (metro, salaried), not extra risk.`;
+    if (PIQ.actions) PIQ.actions.pinButton(ch, () => ({ text: title, detail: body }));
+    h('p', null, cl, body);
+
+    // tiles
+    const tiles = h('div', 'grid g4', root);
+    tiles.style.marginTop = '16px';
+    const mT = ats('member', {}, t), mT12 = ats('member', {}, t12), iT = ats('industry', {}, t), iT12 = ats('industry', {}, t12);
+    const pv = S.peerValue(group.id, 'ats', Object.assign({ m: t }, f));
+    const lq = S.loginQualityWin({ p, s }, 30);
+    stat(tiles, { label: `Your avg ticket · ${ml(t)}`, value: fmt.inr(mT), delta: fmt.chg(mT / mT12 - 1), deltaNote: 'YoY', deltaTone: mT / mT12 - 1 > iT / iT12 - 1 + 0.03 ? 'bad' : '' });
+    stat(tiles, { label: 'Industry avg ticket', value: fmt.inr(iT), delta: fmt.chg(iT / iT12 - 1), deltaNote: 'YoY' });
+    stat(tiles, { label: `Peers · ${group.name}`, value: pv == null ? 'Suppressed' : fmt.inr(pv), delta: pv == null ? 'privacy rule' : `You ${(mT / pv).toFixed(2)}× peers` });
+    stat(tiles, { label: 'Amount asked in enquiries · 30 days', value: fmt.inr(lq.mem.ticket), delta: 'Industry ' + fmt.inr(lq.ind.ticket), deltaTone: lq.mem.ticket > lq.ind.ticket * 1.2 ? 'bad' : '' });
+
+    const g = h('div', 'grid g2', root);
+    g.style.marginTop = '16px';
+    const ps = S.peerSeries(group, 'ats', f);
+    const ser = [
+      { name: C.member.name, color: 'var(--s1)', points: S.series('member', 'ats', f) },
+      ps.suppressed ? null : { name: 'Peers (' + group.name + ')', color: 'var(--s2)', points: ps.points },
+      { name: 'Industry', color: 'var(--s3)', points: S.series('industry', 'ats', f) }
+    ].filter(Boolean);
+    const c1 = card(g, {
+      title: 'Average ticket size, 24 months', sub: `${prodLong(p)} · ${stateName(s)} · new accounts opened each month`,
+      source: sourceText(['member', 'industry', 'peers'], 'ticket = value disbursed ÷ new accounts'),
+      table: () => ({ cols: [{ name: 'Month' }].concat(ser.map((x) => ({ name: x.name, r: 1 }))), rows: D.MONTHS.map((m, i) => [ml(m)].concat(ser.map((x) => fmt.inr(x.points[i].y)))) })
+    });
+    PIQ.charts.line(c1.viz, { series: ser, xLabel: ml, yFmt: fmt.inr, yTickFmt: fmt.metricTick('ats'), height: 250, endLabels: true, annotations: [{ x: t0, label: p === 'PL' ? `Cut-off ${C.previousCutoff.PL}→${C.currentCutoff.PL}` : 'Feb 26' }] });
+
+    const bandRows = D.BANDS.map((b) => ({ b, m: ats('member', { b: b.id }, t), i: ats('industry', { b: b.id }, t), md: S.value('member', 'dpd30', Object.assign({ b: b.id, m: t }, f)), id: S.value('industry', 'dpd30', Object.assign({ b: b.id, m: t }, f)) }));
+    const c2 = card(g, {
+      title: 'Ticket size by risk band', sub: `${ml(t)} · you vs industry (tick) · are bigger loans going to weaker borrowers?`,
+      source: sourceText(['member', 'industry']),
+      table: () => ({ cols: [{ name: 'Band' }, { name: 'Your ticket', r: 1 }, { name: 'Industry ticket', r: 1 }, { name: 'You ÷ market', r: 1 }, { name: 'Your 30+ DPD', r: 1 }, { name: 'Industry 30+ DPD', r: 1 }], rows: bandRows.map((r) => [`${r.b.name} (${r.b.range})`, fmt.inr(r.m), fmt.inr(r.i), (r.m / r.i).toFixed(2) + '×', fmt.pct(r.md), fmt.pct(r.id)]) })
+    });
+    PIQ.charts.bars(c2.viz, { items: bandRows.map((r) => ({ label: r.b.name, value: r.m, ref: r.i })), fmt: fmt.inr, color: 'var(--s1)', valueName: 'You', refName: 'Industry' });
+
+    if (s === 'ALL') {
+      const rows = mat.slice().sort((a, b) => b.m / b.i - a.m / a.i).slice(0, 12);
+      const c3 = card(g, {
+        title: 'By state: where are your loans biggest vs the market?', sub: `${ml(t)} · states with at least 2% of your disbursal · tick = industry`,
+        source: sourceText(['member', 'industry']),
+        table: () => ({ cols: [{ name: 'State' }, { name: 'Your ticket', r: 1 }, { name: 'Industry', r: 1 }, { name: 'You ÷ market', r: 1 }, { name: `Weak bands ${ml(t0)} → ${ml(t)}`, r: 1 }], rows: rows.map((r) => [r.x.name, fmt.inr(r.m), fmt.inr(r.i), (r.m / r.i).toFixed(2) + '×', `${fmt.inr(r.mw0)} → ${fmt.inr(r.mw)}`]) })
+      });
+      PIQ.charts.bars(c3.viz, { items: rows.map((r) => ({ label: r.x.name, value: r.m, ref: r.i })), fmt: fmt.inr, color: 'var(--s1)', valueName: 'You', refName: 'Industry' });
+    }
+
+    const lRows = D.LENDERS.map((l) => ({ l, v: S.value('industry', 'ats', Object.assign({ l: l.id, m: t }, f)), r: S.value('industry', 'ats', Object.assign({ l: l.id, m: t12 }, f)) })).filter((x) => x.v);
+    const c4 = card(g, {
+      title: 'Market structure: ticket size by lender category', sub: `${ml(t)} · tick = a year ago · anonymised category aggregates`,
+      source: sourceText(['industry']),
+      table: () => ({ cols: [{ name: 'Lender category' }, { name: ml(t), r: 1 }, { name: ml(t12), r: 1 }, { name: 'YoY', r: 1 }], rows: lRows.map((x) => [x.l.name, fmt.inr(x.v), fmt.inr(x.r), fmt.chg(x.v / x.r - 1)]) })
+    });
+    PIQ.charts.bars(c4.viz, { items: lRows.map((x) => ({ label: x.l.name, value: x.v, ref: x.r })), fmt: fmt.inr, color: 'var(--s3)', valueName: ml(t), refName: ml(t12) });
+
+    // all products
+    const pc = card(root, { title: 'Across your book: ticket size by product', sub: `${ml(t)} · ${stateName(s)} · YoY = change vs ${ml(t12)}`, source: sourceText(['member', 'industry']) });
+    pc.el.style.marginTop = '16px';
+    const tb = h('table', 'tbl', h('div', 'table-wrap', pc.viz));
+    const hr = h('tr', null, h('thead', null, tb));
+    ['Product', 'Your ticket', 'Industry', 'You ÷ market', 'Your YoY', 'Market YoY', 'Amount asked (30d, you)'].forEach((x, i) => h('th', i ? 'r' : '', hr, x));
+    const bd = h('tbody', null, tb);
+    D.PRODUCTS.forEach((pr) => {
+      const ff = { p: pr.id, s };
+      const m1 = S.value('member', 'ats', Object.assign({ m: t }, ff)), m0 = S.value('member', 'ats', Object.assign({ m: t12 }, ff));
+      const i1 = S.value('industry', 'ats', Object.assign({ m: t }, ff)), i0 = S.value('industry', 'ats', Object.assign({ m: t12 }, ff));
+      if (!m1 || !i1) return;
+      const req = S.loginQualityWin(ff, 30).mem.ticket;
+      const r = h('tr', pr.id === p ? 'sel' : '', bd);
+      const a = h('td', null, r); const ln = h('a', null, a, pr.name); ln.href = '#'; ln.addEventListener('click', (e) => { e.preventDefault(); PIQ.ui.setState({ p: pr.id }); });
+      h('td', 'r', r, fmt.inr(m1));
+      h('td', 'r', r, fmt.inr(i1));
+      h('td', 'r', r, (m1 / i1).toFixed(2) + '×');
+      h('td', 'r ' + (m1 / m0 - 1 > i1 / i0 - 1 + 0.03 ? 'bad' : ''), r, fmt.chg(m1 / m0 - 1));
+      h('td', 'r', r, fmt.chg(i1 / i0 - 1));
+      h('td', 'r', r, fmt.inr(req));
+    });
+    h('div', 'small muted', pc.body, 'All figures come from bureau data: new accounts and amounts reported by lenders at opening, and the loan amount stated in each enquiry. Nothing extra needs to be submitted.').style.marginTop = '8px';
+  }
+  PIQ.views.tickets = { title: 'Ticket Size', render };
 })();
 
 </script>
@@ -3738,7 +3914,7 @@ body.touring .fab { display: none; }
       const cl = h('div', 'callout ' + (gap > 0 ? 'danger' : 'insight'), root);
       cl.style.marginTop = '16px';
       h('h4', null, cl, gap > 0 ? `Your applications are running ${fmt.chg(gap, 0).replace('+', '')} ahead of the market in the last 5 days` : 'Your application flow is lagging the market');
-      h('p', null, cl, gap > 0 ? `Market demand explains only ${fmt.chg(c.ind.change, 0)}. Check for a new sourcing campaign, a DSA push or organised applications, and make sure the extra volume isn't concentrated in weaker bands (see the mix chart below).` : 'Check if competitors are pricing more aggressively or if a sourcing channel has slowed.');
+      h('p', null, cl, gap > 0 ? `Market demand explains only ${fmt.chg(c.ind.change, 0)}. Check for a new campaign or organised applications, and make sure the extra volume isn't concentrated in weaker bands or already-leveraged applicants (see below).` : 'Check if competitors are pricing more aggressively in your segments.');
     }
 
     const g = h('div', 'grid g2', root);
@@ -3785,20 +3961,20 @@ body.touring .fab { display: none; }
       sub: `Same applicant, 2+ credit enquiries on one calendar day, at any lender. A rate-shopping and loan-stacking signal · ${stateName(s)} · ${PIQ.ui.prodName(p)}`,
       source: sourceText(['logins'], 'enquiries matched across all lenders on the same day'),
       pinDetail: () => `${fmt.int(q.mem.sameDayCount)} applicants (${pp(q.mem.sameDay)}) in the ${winTxt}; industry ${pp(q.ind.sameDay)}`,
-      table: () => ({ cols: [{ name: 'Sourcing pool' }, { name: 'Applicants (you)', r: 1 }, { name: 'Share of pool logins', r: 1 }].concat(hasPrior ? [{ name: 'Share, ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry share', r: 1 }]),
-        rows: q.mem.pools.map((x, i) => [x.name, fmt.int(x.sameDay * x.apps), pp(x.sameDay)].concat(hasPrior ? [pp(QP.pools[i].sameDay)] : []).concat([pp(q.ind.pools[i].sameDay)])) })
+      table: () => ({ cols: [{ name: 'Bureau credit profile' }, { name: 'Applicants (you)', r: 1 }, { name: 'Share of the profile\'s logins', r: 1 }].concat(hasPrior ? [{ name: 'Share, ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry share', r: 1 }]),
+        rows: q.mem.profiles.map((x, i) => [x.name, fmt.int(x.sameDay * x.apps), pp(x.sameDay)].concat(hasPrior ? [pp(QP.profiles[i].sameDay)] : []).concat([pp(q.ind.profiles[i].sameDay)])) })
     });
     const sdg = h('div', 'grid g3', sd.viz);
     const tile = (label, value, note, bad) => { const t = h('div', 'stat', sdg); h('div', 'stat-label', t, label); h('div', 'stat-value', t, value); const d = h('div', 'stat-delta ' + (bad ? 'bad' : ''), t, note); return d; };
     tile(`Count · ${winTxt}`, fmt.int(q.mem.sameDayCount), `${fmt.int(q.mem.sameDayCount / win)} a day · of ${fmt.int(q.mem.apps)} applicants`, false);
     tile('Share of your applicants', pp(q.mem.sameDay), vsPrior(pp(QP ? QP.sameDay : 0)) + 'industry ' + pp(q.ind.sameDay), q.mem.sameDay > q.ind.sameDay * 1.2);
-    const sdTop = q.mem.pools.slice().sort((a, b) => b.sameDay * b.apps - a.sameDay * a.apps)[0];
-    tile('Biggest source', sdTop.name.split(' (')[0], `${fmt.int(sdTop.sameDay * sdTop.apps)} applicants · ${pp(sdTop.sameDay)} of the pool`, sdTop.sameDay > q.ind.sameDay * 1.3);
+    const sdTop = q.mem.profiles.slice().sort((a, b) => b.sameDay * b.apps - a.sameDay * a.apps)[0];
+    tile('Most common profile', sdTop.name.split(' (')[0], `${fmt.int(sdTop.sameDay * sdTop.apps)} applicants · ${pp(sdTop.sameDay)} of that profile`, sdTop.sameDay > q.ind.sameDay * 1.3);
     if (q.mem.sameDay > q.ind.sameDay * 1.2) {
       const cl = h('div', 'callout danger', sd.body);
       cl.style.marginTop = '12px';
       h('h4', null, cl, `${pp(q.mem.sameDay)} of your applicants enquired more than once on the same day, vs ${pp(q.ind.sameDay)} for the market`);
-      h('p', null, cl, `Same-day multiple enquiries usually mean an applicant is shopping the same loan through several DSAs or apps, or stacking loans before the bureau reflects them. Hold disbursal on these ${fmt.int(q.mem.sameDayCount)} applicants until a fresh bureau pull confirms no new loans, and review the ${sdTop.name.split(' (')[0]} pool first.`);
+      h('p', null, cl, `Same-day multiple enquiries usually mean an applicant is shopping the same loan with several lenders, or stacking loans before the bureau reflects them. Hold disbursal on these ${fmt.int(q.mem.sameDayCount)} applicants until a fresh bureau pull confirms no new loans; ${sdTop.name.split(' (')[0].toLowerCase()} applicants first.`);
     }
 
     const qt = h('div', 'grid g4', root);
@@ -3807,17 +3983,16 @@ body.touring .fab { display: none; }
     stat(qt, { label: 'From high-risk PIN codes', value: pp(q.mem.pins[0].share, 0), delta: vsPrior(pp(QP ? QP.pins[0].share : 0, 0)) + 'industry ' + pp(q.ind.pins[0].share, 0), deltaTone: q.mem.pins[0].share > q.ind.pins[0].share * 1.15 ? 'bad' : '' });
     const weak = (o) => o.bands[3].share + o.bands[4].share;
     stat(qt, { label: 'Near-prime + subprime logins', value: pp(weak(q.mem), 0), delta: vsPrior(pp(QP ? weak(QP) : 0, 0)) + 'industry ' + pp(weak(q.ind), 0), deltaTone: weak(q.mem) > weak(q.ind) * 1.15 ? 'bad' : '' });
-    const topPool = q.mem.pools.slice().sort((a, b) => b.share - a.share)[0];
-    stat(qt, { label: 'Largest sourcing pool', value: topPool.name.split(' (')[0], delta: pp(topPool.share, 0) + ' of logins · PD ' + pp(topPool.pd), deltaTone: topPool.pd > q.ind.pd * 1.2 ? 'bad' : '' });
+    stat(qt, { label: 'Avg loan amount requested', value: fmt.inr(q.mem.ticket), delta: vsPrior(fmt.inr(QP ? QP.ticket : 0)) + 'industry ' + fmt.inr(q.ind.ticket), deltaTone: p !== 'ALL' && q.mem.ticket > q.ind.ticket * 1.2 ? 'bad' : '' });
 
     // compare with the member's prior period when there is one, else with the industry
     const ref = QP || q.ind, refName = hasPrior ? `the ${priorTxt}` : 'the industry';
-    const worst = q.mem.pools.map((x, i) => ({ x, prior: ref.pools[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
+    const worst = q.mem.profiles.map((x, i) => ({ x, prior: ref.profiles[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
     if (q.mem.pd > ref.pd * 1.08) {
       const cl = h('div', 'callout danger', root);
       cl.style.marginTop = '16px';
       h('h4', null, cl, `Recent logins are riskier: expected PD ${pp(q.mem.pd)} vs ${pp(ref.pd)} in ${refName}${hasPrior ? ` (industry ${pp(q.ind.pd)})` : ''}`);
-      h('p', null, cl, `The biggest contributor is the ${worst.x.name} pool: ${pp(worst.x.share, 0)} of logins (${refName}: ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (${refName}: ${pp(worst.prior.pd)}), and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review this pool's approvals before they book.`);
+      h('p', null, cl, `The biggest contributor is ${worst.x.name.split(' (')[0].toLowerCase()} applicants (${worst.x.name.split(' (')[1].replace(')', '')}): ${pp(worst.x.share, 0)} of logins (${refName}: ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (${refName}: ${pp(worst.prior.pd)}), asking for ${fmt.inr(worst.x.ticket)} on average, and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review these approvals before they book.`);
     }
 
     const g2 = h('div', 'grid g2', root);
@@ -3826,13 +4001,13 @@ body.touring .fab { display: none; }
     const cb = card(g2, {
       title: 'Score banding of logins', sub: 'Share of applications by bureau score band',
       source: sourceText(['logins']),
-      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }]), rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share)].concat(QP ? [pp(QP.bands[i].share)] : []).concat([pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd)])) })
+      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }, { name: 'Amount asked (you)', r: 1 }, { name: 'Amount asked (industry)', r: 1 }]), rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share)].concat(QP ? [pp(QP.bands[i].share)] : []).concat([pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd), fmt.inr(q.mem.bands[i].ticket), fmt.inr(q.ind.bands[i].ticket)])) })
     });
     PIQ.charts.dots(cb.viz, { rows: bandRows, series: [{ key: 'm', name: 'You · ' + winTxt, color: 'var(--s1)' }].concat(QP ? [{ key: 'pr', name: 'You · ' + priorTxt, color: 'var(--s2)' }] : []).concat([{ key: 'ind', name: 'Industry · ' + winTxt, color: 'var(--s3)' }]), fmt: (v) => fmt.pct(v, 0) });
 
     const cp = card(g2, {
       title: `Probability of default: distribution of the ${winTxt}' logins`, sub: 'Share of applications by expected 12-month PD (90+) · tick = industry',
-      source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and sourcing pool'),
+      source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and bureau credit profile'),
       table: () => ({ cols: [{ name: 'PD bucket' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }]), rows: q.mem.pdBuckets.map((k, i) => [k.label, pp(k.share)].concat(QP ? [pp(QP.pdBuckets[i].share)] : []).concat([pp(q.ind.pdBuckets[i].share)])) })
     });
     PIQ.charts.bars(cp.viz, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · ' + winTxt, refName: 'Industry' });
@@ -3846,13 +4021,13 @@ body.touring .fab { display: none; }
     const pinNote = h('div', 'small muted', cpin.body, (QP ? `Your ${priorTxt}: ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(QP.pins[i].share, 0)).join(' · ')}. ` : '') + `Expected PD by tier (you, ${winTxt}): ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.mem.pins[i].pd)).join(' · ')}.`);
     pinNote.style.marginTop = '8px';
 
-    const cpool = card(g2, { title: 'Which pool are the applications coming from?', sub: (QP ? `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs your ${priorTxt} (in brackets) and the industry · ⚠ = expected PD up 20%+` : `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs the industry (in brackets) · ⚠ = expected PD 20%+ above the industry`), source: sourceText(['logins']) });
+    const cpool = card(g2, { title: 'Who is applying? Bureau credit profile', pin: true, sub: 'Profile from the applicant\'s bureau record at enquiry: accounts, live loans, a live loan with you · ' + (QP ? `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs your ${priorTxt} (in brackets) and the industry · ⚠ = expected PD up 20%+` : `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs the industry (in brackets) · ⚠ = expected PD 20%+ above the industry`), source: sourceText(['logins']) });
     const pt = h('table', 'tbl', h('div', 'table-wrap', cpool.viz));
     const ph = h('tr', null, h('thead', null, pt));
-    ['Pool', QP ? 'Share (prior)' : 'Share', 'Industry', QP ? 'Exp. PD (prior)' : 'Exp. PD (industry)', 'High-risk PIN', '3+ enq.', 'Same-day 2+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
+    ['Profile', QP ? 'Share (prior)' : 'Share', 'Industry', QP ? 'Exp. PD (prior)' : 'Exp. PD (industry)', 'Avg amount asked', 'High-risk PIN', 'Same-day 2+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
     const pb = h('tbody', null, pt);
-    q.mem.pools.forEach((x, i) => {
-      const ind = q.ind.pools[i], pr = QP ? QP.pools[i] : ind;
+    q.mem.profiles.forEach((x, i) => {
+      const ind = q.ind.profiles[i], pr = QP ? QP.profiles[i] : ind;
       const r = h('tr', null, pb);
       const nm = h('td', null, r, (x.pd > pr.pd * 1.2 && x.share > 0.1 ? '⚠ ' : '') + x.name.split(' (')[0].replace('Existing customer', 'Existing cust.'));
       nm.title = x.name;
@@ -3860,8 +4035,8 @@ body.touring .fab { display: none; }
       h('td', 'r', r, pp(x.share, 0) + (QP ? ' (' + pp(pr.share, 0) + ')' : ''));
       h('td', 'r', r, pp(ind.share, 0));
       h('td', 'r ' + (x.pd > pr.pd * 1.2 ? 'bad' : ''), r, pp(x.pd) + ' (' + pp(pr.pd) + ')');
+      h('td', 'r ' + (p !== 'ALL' && x.ticket > ind.ticket * 1.25 ? 'bad' : ''), r, fmt.inr(x.ticket)).title = 'Industry: ' + fmt.inr(ind.ticket) + (p === 'ALL' ? ' (all products: reflects your product mix)' : '');
       h('td', 'r ' + (x.highPin > ind.highPin * 1.25 ? 'bad' : ''), r, pp(x.highPin, 0));
-      h('td', 'r', r, pp(x.hiEnq, 0));
       h('td', 'r ' + (x.sameDay > ind.sameDay * 1.3 ? 'bad' : ''), r, pp(x.sameDay));
     });
 
@@ -4833,7 +5008,9 @@ body.touring .fab { display: none; }
       'How many applicants had more than one enquiry on the same day in the last 7 days?',
       'How many applicants had more than one enquiry on the same day in the last 30 days?',
       'What is the probability of default of my last 7 days\' logins?',
-      'Which pool are my recent applications coming from?',
+      'What is the credit profile of my recent applicants?',
+      'What is my average ticket size vs the market?',
+      'Where are my tickets biggest vs the market?',
       'What is the score banding of my last 7 days\' logins?',
       'Show me housing loan application trends'
     ] },
@@ -5164,31 +5341,59 @@ body.touring .fab { display: none; }
     };
   });
 
-  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, with the sourcing pools that drive it.', {
+  def('same_day_enquiries', 'Count of the member\'s applicants who made more than one credit enquiry on the same day (a rate-shopping / loan-stacking signal) over the last 7, 15 or 30 days, vs the member\'s prior period and the industry share, by the applicant\'s bureau credit profile (new to credit, thin file, established, already leveraged, existing customer).', {
     product: P_PRODUCT, state: P_STATE, days: { type: 'integer', enum: [7, 15, 30], description: 'login window in days' }
   }, [], (a) => {
     const p = a.product || 'ALL', s = a.state || 'ALL', n = [7, 15, 30].includes(+a.days) ? +a.days : 7;
     const q = S.loginQualityWin({ p, s }, n);
     S.log('loginQualityWin', { p, s, days: n }, 'ai');
     const pp = (x, d) => F().pct(x, d == null ? 1 : d);
-    const pools = q.mem.pools.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
+    const pools = q.mem.profiles.slice().sort((u, v) => v.sameDay * v.apps - u.sameDay * u.apps);
     const paras = [`In the last ${n} days, **${F().int(q.mem.sameDayCount)}** of your ${pName(p)} applicants in ${sName(s)} made more than one enquiry on the same day: **${pp(q.mem.sameDay)}** of applicants, against ${pp(q.ind.sameDay)} across the industry${q.memPrior ? ` and ${pp(q.memPrior.sameDay)} in your prior ${q.priorDays} days` : ''}.`];
-    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping through several DSAs, or loans being stacked before the bureau updates, so check these applications before disbursal.');
+    if (q.mem.sameDay > q.ind.sameDay * 1.2) paras.push('That is well above the market. Same-day multiple enquiries often mean rate-shopping with several lenders, or loans being stacked before the bureau updates, so check these applications before disbursal.');
     return {
       answer: {
         paras,
-        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of the pool's logins)`),
-        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.pools.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
+        bullets: pools.slice(0, 3).map((x) => `**${x.name}**: ${F().int(x.sameDay * x.apps)} applicants (${pp(x.sameDay)} of that profile's logins)`),
+        chart: (el) => PIQ.charts.bars(el, { items: pools.map((x) => ({ label: x.name.split(' (')[0], value: x.sameDay, ref: q.ind.profiles.find((y) => y.id === x.id).sameDay })), fmt: (v) => F().pct(v, 1), color: 'var(--s1)', valueName: `You · last ${n}d`, refName: 'Industry' }),
         sources: src('logins'), filters: `${pLong(p)} · ${sName(s)} · last ${n} days · to ${C.loginsAsOf}`,
-        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'Which pool are my recent applications coming from?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
+        followups: n === 7 ? ['How many applicants had more than one enquiry on the same day in the last 30 days?', 'What is the credit profile of my recent applicants?'] : ['What is the quality of my last 7 days of logins?', 'What should I do about it?'],
         link: { view: 'logins', params: { p, s, win: n } }
       },
       facts: { days: n, memberCount: Math.round(q.mem.sameDayCount), memberShare: pp(q.mem.sameDay), industryShare: pp(q.ind.sameDay), priorShare: q.memPrior ? pp(q.memPrior.sameDay) : null }
     };
   });
 
-  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, and sourcing pool (branch, DSA, digital, fintech partner, existing customer).', {
-    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'pool', 'score'] }
+  def('ticket_size', 'Average ticket size of new loans (value disbursed ÷ new accounts, bureau-reported at opening) for the member vs peers and the industry, by risk band and state, plus the loan amount applicants request in their enquiries.', {
+    product: P_PRODUCT, state: P_STATE
+  }, [], (a) => {
+    const p = !a.product || a.product === 'ALL' ? 'PL' : a.product, s = a.state || 'ALL';
+    const t = S.latest(), t12 = S.monthsAgo(12), t0 = C.policyChangeMonth, f = { p, s };
+    const v = (src, ff, m) => S.value(src, 'ats', Object.assign({}, f, ff, { m }));
+    const m1 = v('member', {}, t), m0 = v('member', {}, t12), i1 = v('industry', {}, t), i0 = v('industry', {}, t12);
+    const W = ['NP', 'SB'], ST = ['SP', 'PP', 'PR'];
+    const wR = v('member', { b: W }, t) / v('industry', { b: W }, t), sR = v('member', { b: ST }, t) / v('industry', { b: ST }, t);
+    const wM = v('member', { b: W }, t) / v('member', { b: W }, t0) - 1, wI = v('industry', { b: W }, t) / v('industry', { b: W }, t0) - 1;
+    const lq = S.loginQualityWin(f, 30);
+    S.log('ticketSize', f, 'ai');
+    const paras = [`Your average ${pName(p)} ticket in ${sName(s)} is **${F().inr(m1)}** (${ml(t)}), ${F().chg(m1 / m0 - 1)} in a year, against **${F().inr(i1)}** for the industry (${F().chg(i1 / i0 - 1)}).`];
+    if (wR > sR * 1.12 && wM > wI + 0.05) paras.push(`The gap is widest where risk is highest: near-prime & subprime tickets are **${wR.toFixed(2)}×** the market's vs ${sR.toFixed(2)}× in prime bands, and they grew ${F().chg(wM, 0)} since ${ml(t0)} vs ${F().chg(wI, 0)} for the market. Bigger loans to riskier borrowers: consider a ticket cap by score band.`);
+    else paras.push(`The gap is similar across bands (${sR.toFixed(2)}× in prime, ${wR.toFixed(2)}× in near-prime & subprime), which points to customer mix rather than extra risk.`);
+    return {
+      answer: {
+        paras,
+        bullets: D.BANDS.map((b) => `**${b.name}:** ${F().inr(v('member', { b: b.id }, t))} vs market ${F().inr(v('industry', { b: b.id }, t))}`).concat([`**Amount asked in enquiries (30 days):** ${F().inr(lq.mem.ticket)} vs ${F().inr(lq.ind.ticket)} for the industry`]),
+        chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: S.series('member', 'ats', f) }, { name: 'Industry', color: 'var(--s3)', points: S.series('industry', 'ats', f) }], xLabel: ml, yFmt: F().inr, yTickFmt: F().metricTick('ats'), height: 200, endLabels: true }),
+        sources: src('member', 'industry', 'logins'), filters: `${pLong(p)} · ${sName(s)} · ${ml(t)}`,
+        followups: ['Where are my tickets biggest vs the market?', 'What is the credit profile of my recent applicants?', 'What should I do about it?'],
+        link: { view: 'tickets', params: {} }
+      },
+      facts: { member: F().inr(m1), industry: F().inr(i1), memberYoY: F().chg(m1 / m0 - 1), industryYoY: F().chg(i1 / i0 - 1), weakBandRatio: wR.toFixed(2), primeBandRatio: sR.toFixed(2), amountAsked: F().inr(lq.mem.ticket), industryAmountAsked: F().inr(lq.ind.ticket) }
+    };
+  });
+
+  def('login_quality', 'Quality of the member\'s last 7 days of logins vs its prior 23 days and the industry: score banding, expected probability of default (12-month 90+), share from high/medium/low-risk PIN codes, the applicant\'s bureau credit profile (new to credit, thin file, established, already leveraged, existing customer) and the loan amount requested.', {
+    product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'pd', 'pin', 'profile', 'score'] }
   }, [], (a) => {
     const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
     const q = S.loginQuality7({ p, s });
@@ -5204,10 +5409,11 @@ body.touring .fab { display: none; }
       bullets.push(`**Score bands:** ${q.mem.bands.map((b) => `${b.name} ${pp(b.share, 0)}`).join(' · ')} (near-prime + subprime ${pp(q.mem.bands[3].share + q.mem.bands[4].share, 0)} vs industry ${pp(q.ind.bands[3].share + q.ind.bands[4].share, 0)})`);
       if (focus === 'score') chart = (el) => PIQ.charts.dots(el, { rows: D.BANDS.map((b, i) => ({ label: `${b.name} (${b.range})`, values: { m: q.mem.bands[i].share, pr: q.memPrior.bands[i].share, ind: q.ind.bands[i].share } })), series: [{ key: 'm', name: 'You · 7d', color: 'var(--s1)' }, { key: 'pr', name: 'You · prior', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => F().pct(v, 0) });
     }
-    if (focus === 'all' || focus === 'pool') {
-      const pools = q.mem.pools.map((x, i) => ({ x, pr: q.memPrior.pools[i] })).sort((u, v) => v.x.share - u.x.share);
-      bullets.push(`**Sourcing pools:** ${pools.map(({ x, pr }) => `${x.name} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''})`).join(' · ')}`);
-      if (focus === 'pool') chart = (el) => PIQ.charts.bars(el, { items: pools.map(({ x }, i) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.pools.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
+    if (focus === 'all' || focus === 'profile') {
+      const profs = q.mem.profiles.map((x, i) => ({ x, pr: q.memPrior.profiles[i] })).sort((u, v) => v.x.share - u.x.share);
+      bullets.push(`**Bureau credit profile:** ${profs.map(({ x, pr }) => `${x.name.split(' (')[0]} ${pp(x.share, 0)} (PD ${pp(x.pd)}${x.pd > pr.pd * 1.2 ? ' ⚠ up from ' + pp(pr.pd) : ''}, asking ${F().inr(x.ticket)})`).join(' · ')}`);
+      bullets.push(`**Amount requested:** ${F().inr(q.mem.ticket)} on average vs ${F().inr(q.memPrior.ticket)} in your prior 23 days and ${F().inr(q.ind.ticket)} for the industry`);
+      if (focus === 'profile') chart = (el) => PIQ.charts.bars(el, { items: profs.map(({ x }) => ({ label: x.name.split(' (')[0], value: x.share, ref: q.ind.profiles.find((y) => y.id === x.id).share })), fmt: (v) => F().pct(v, 0), color: 'var(--s1)', valueName: 'You · 7d', refName: 'Industry' });
     }
     if (focus === 'all' || focus === 'pd') {
       bullets.push(`**PD distribution:** ${q.mem.pdBuckets.map((k) => `${k.label} ${pp(k.share, 0)}`).join(' · ')} (PD above 10%: industry ${pp(q.ind.pdBuckets[4].share, 0)})`);
@@ -5217,10 +5423,10 @@ body.touring .fab { display: none; }
       answer: {
         paras, bullets, chart,
         sources: src('logins', 'scores'), filters: `${pLong(p)} · ${sName(s)} · last 7 days vs prior 23 days · to ${C.loginsAsOf}`,
-        followups: ['Which pool are my recent applications coming from?', 'How many applications came from high-risk PIN codes?', 'What should I do about it?'],
+        followups: ['What is the credit profile of my recent applicants?', 'How many applications came from high-risk PIN codes?', 'What is my average ticket size vs the market?'],
         link: { view: 'logins', params: { p, s } }
       },
-      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), pools: q.mem.pools.map((x) => ({ pool: x.name, share: pp(x.share, 0), pd: pp(x.pd) })), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
+      facts: { memberPD7d: pp(q.mem.pd), memberPDPrior: pp(q.memPrior.pd), industryPD7d: pp(q.ind.pd), highRiskPin: pp(q.mem.pins[0].share, 0), industryHighRiskPin: pp(q.ind.pins[0].share, 0), profiles: q.mem.profiles.map((x) => ({ profile: x.name, share: pp(x.share, 0), pd: pp(x.pd), amountAsked: F().inr(x.ticket) })), amountAsked: F().inr(q.mem.ticket), industryAmountAsked: F().inr(q.ind.ticket), scoreBands: q.mem.bands.map((b) => ({ band: b.name, share: pp(b.share, 0) })) }
     };
   });
 
@@ -5518,8 +5724,10 @@ body.touring .fab { display: none; }
     if (/cut.?off|cutoff|what if|simulat|tighten|loosen/.test(t)) return call('simulate_cutoff', { product: p, state: st, cutoff: /best|optimal|optimum|ideal/.test(t) ? 0 : e.cutoff || 0 });
     if (/same.?day|more than (one|1) (enquir|inquir)|multiple (enquir|inquir)|1\+ (enquir|inquir)|loan.?stack|rate.?shop/.test(t))
       return call('same_day_enquiries', { product: p, state: st, days: /30|month/.test(t) ? 30 : /15|fortnight/.test(t) ? 15 : 7 });
-    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|\bpool\b|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
-      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /pool/.test(t) ? 'pool' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
+    if (/ticket|loan size|size of (the |my )?loans|average loan|amount (asked|requested)|loan amount/.test(t))
+      return call('ticket_size', { product: p === 'ALL' ? 'PL' : p, state: st });
+    if (/pin.?code|\bpins?\b|probability of default|\bpd\b|credit profile|new.to.credit|thin.file|leveraged|score band|last 7 days|login quality|quality of (my )?(logins|applications)/.test(t))
+      return call('login_quality', { product: p, state: st, focus: /pin/.test(t) ? 'pin' : /profile|new.to.credit|thin.file|leveraged/.test(t) ? 'profile' : /score band/.test(t) ? 'score' : /probability|\bpd\b/.test(t) ? 'pd' : 'all' });
     if (/application|login|enquir|inquir|applicant|approval rate|this week/.test(t)) return call('application_pulse', { product: p, state: st, bands: /surge|coming from/.test(t) ? 'near_prime_subprime' : e.bandPair ? 'near_prime_subprime' : 'all' });
     if (/what should i do|recommend|action|what to do|where should|what do you suggest|how (do|can) i fix|\bgrow my/.test(t) || /what should .* do/.test(t))
       return call('recommend', { product: /credit card|card/.test(t) && /grow/.test(t) ? 'CC' : p, state: e.states[0] || 'ALL', focus: /collection/.test(t) ? 'collections' : /grow/.test(t) ? 'growth' : 'all' });
@@ -5899,7 +6107,11 @@ Rules:
   }
 
   function steps(N) {
-    const worstPool = N.lq.mem.pools.map((x, i) => ({ x, pr: N.lq.memPrior.pools[i] })).sort((a, b) => (b.x.pd - b.pr.pd) * b.x.share - (a.x.pd - a.pr.pd) * a.x.share)[0];
+    const worstProf = N.lq.mem.profiles.map((x, i) => ({ x, pr: N.lq.memPrior.profiles[i] })).sort((a, b) => (b.x.pd - b.pr.pd) * b.x.share - (a.x.pd - a.pr.pd) * a.x.share)[0];
+    const S = PIQ.sem, F = PIQ.ui.fmt, tt = S.latest(), W = ['NP', 'SB'];
+    const tk = (src, ff, m) => S.value(src, 'ats', Object.assign({ p: 'PL' }, ff, { m }));
+    const upW0 = tk('member', { s: 'UP', b: W }, PIQ.config.policyChangeMonth), upW1 = tk('member', { s: 'UP', b: W }, tt), upWi = tk('industry', { s: 'UP', b: W }, tt);
+    const wR = tk('member', { b: W }, tt) / tk('industry', { b: W }, tt);
     return [
       { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
         title: 'The Monday-morning question',
@@ -5935,8 +6147,12 @@ Rules:
         tip: 'Drag the cut-off slider live; the curves and the table update instantly.' },
       { view: 'logins', state: { p: 'ALL', s: 'ALL' }, target: () => q('.callout.danger'),
         title: 'The next wave, visible today',
-        say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by the ${worstPool.x.name} pool and high-risk PIN codes."`,
-        tip: 'Scroll to show score banding, PD distribution, PIN-code risk tiers and the sourcing-pool table.' },
+        say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by ${worstProf.x.name.split(' (')[0].toLowerCase()} applicants and high-risk PIN codes. Every one of these signals comes from bureau enquiry data, nothing extra to submit."`,
+        tip: 'Scroll to show same-day multiple enquiries, score banding, PD distribution, PIN-code risk tiers and the bureau credit-profile table. Switch the Logins dropdown to 15 or 30 days.' },
+      { view: 'tickets', state: { p: 'PL', s: 'ALL' }, target: () => q('#view .callout'),
+        title: 'Bigger loans to riskier borrowers',
+        say: `"Ticket size is the variable everyone forgets. Sahyadri's near-prime and subprime personal loans are ${wR.toFixed(2)}× the market's ticket size. In Uttar Pradesh they went from ${F.inr(upW0)} to ${F.inr(upW1)} since February, while the market sits at ${F.inr(upWi)}. Riskier borrowers, bigger loans: the loss per default goes up too."`,
+        tip: 'Ticket size now also sits on the Command Centre, in Peer Benchmarking and Industry Intelligence (metric picker), and in the AI analyst.' },
       { view: 'fresh', state: { p: 'PL', s: 'UP' }, target: () => q('.callout'),
         title: 'Weekly beats monthly',
         say: `"The August monthly file says ${pct(N.monthlyUP)} in Uttar Pradesh. Weekly submissions say ${pct(N.hf.mem.now.dpd30)} as of last Sunday, with fresh EMI bounces at ${pct(N.hf.mem.now.bounce, 1)} and climbing. Next month's file is already written; weekly data lets you act now."`,
@@ -6061,6 +6277,7 @@ Rules:
     { id: 'overview', name: 'Command Centre', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
+    { id: 'tickets', name: 'Ticket Size', ico: '₹', tag: 'new' },
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
     { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },

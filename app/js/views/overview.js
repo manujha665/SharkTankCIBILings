@@ -99,6 +99,27 @@
       const tot = items.reduce((a, x) => a + x.bal, 0);
       const bc = card(g2, { title: 'Where your book is', sub: 'Share of outstanding balance by product', source: sourceText(['member']) });
       PIQ.charts.bars(bc.viz, { items: items.map((x) => ({ label: x.label, value: x.bal / tot })), fmt: (v) => fmt.pct(v, 1), color: 'var(--s1)' });
+      // average ticket size: one bureau variable that belongs on every front page
+      const tk = card(root, { title: 'Average ticket size by product', sub: `New loans opened in ${ml(t)} · you vs industry · YoY = vs ${ml(S.monthsAgo(12))}`, source: sourceText(['member', 'industry'], 'ticket = value disbursed ÷ new accounts') });
+      tk.el.style.marginTop = '16px';
+      const tt = h('table', 'tbl', h('div', 'table-wrap', tk.viz));
+      const th = h('tr', null, h('thead', null, tt));
+      ['Product', 'Your ticket', 'Industry', 'You ÷ market', 'Your YoY', 'Market YoY'].forEach((x, i) => h('th', i ? 'r' : '', th, x));
+      const tbd = h('tbody', null, tt);
+      const t12 = S.monthsAgo(12);
+      items.forEach((x) => {
+        const pid = D.PRODUCTS.find((q) => q.name === x.label).id, ff = { p: pid, s };
+        const m1 = S.value('member', 'ats', Object.assign({ m: t }, ff)), m0 = S.value('member', 'ats', Object.assign({ m: t12 }, ff));
+        const i1 = S.value('industry', 'ats', Object.assign({ m: t }, ff)), i0 = S.value('industry', 'ats', Object.assign({ m: t12 }, ff));
+        if (!m1 || !i1) return;
+        const r = h('tr', null, tbd);
+        h('td', null, r, x.label);
+        h('td', 'r', r, fmt.inr(m1)); h('td', 'r', r, fmt.inr(i1)); h('td', 'r', r, (m1 / i1).toFixed(2) + '×');
+        h('td', 'r ' + (m1 / m0 - 1 > i1 / i0 - 1 + 0.03 ? 'bad' : ''), r, fmt.chg(m1 / m0 - 1)); h('td', 'r', r, fmt.chg(i1 / i0 - 1));
+      });
+      const go = h('button', 'btn sm', tk.body, 'Open Ticket Size →');
+      go.style.marginTop = '10px';
+      go.addEventListener('click', () => PIQ.go('tickets'));
     }
 
     // What to do this week — full width

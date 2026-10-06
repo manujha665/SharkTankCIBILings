@@ -6,8 +6,10 @@
  *  industry : month x product x state x riskBand x lenderCategory
  *  member   : month x product x state x riskBand
  *  peers    : peer x month x product x state            (never shown individually)
- *  logins   : who x day x product x state x riskBand x PIN tier x pool (industry + member);
- *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day
+ *  logins   : who x day x product x state x riskBand x PIN tier x applicant credit profile (industry + member);
+ *             measures apps, approvals, 3+ enquiries in 30d, PD numerator, 2+ enquiries the same day,
+ *             amount requested (₹ lakh). Every dimension is derived from bureau enquiry and tradeline data.
+ *  industry / member also carry newAcc (new accounts opened) so average ticket size = orig ÷ newAcc.
  *  scores   : product x state x 20-pt score bin (member applications, last 90 days)
  *
  * Amounts are stored as sums (balance, DPD balances, ...) so any slice aggregates
@@ -191,8 +193,16 @@
     }
   }
 
+  // ---------------- Ticket size (new loans) ----------------
+  // Average ticket = product base ticket × risk band × state × lender category × ticket inflation.
+  // Deterministic (no random draws), so adding it leaves every other number unchanged.
+  const TK_BAND = { pl: [1.4, 1.18, 1, 0.84, 0.7], cc: [1.5, 1.2, 1, 0.8, 0.62], secured: [1.22, 1.1, 1, 0.9, 0.8], mid: [1.2, 1.08, 1, 0.92, 0.85], mass: [1.06, 1.03, 1, 0.97, 0.94], mf: [1.04, 1.02, 1, 0.98, 0.96] };
+  const TK_STATE = { MH: 1.25, DL: 1.3, KA: 1.2, TG: 1.15, TN: 1.1, GJ: 1.1, HR: 1.12, KL: 1.05, GA: 1.15, PB: 1.05, AP: 1, WB: 0.92, RJ: 0.9, MP: 0.86, UP: 0.86, BR: 0.76, OD: 0.8, JH: 0.8, CG: 0.82, UK: 0.95, HP: 0.95, JK: 0.92, NE: 0.85, UT: 1.05 };
+  const TK_LENDER = { PSU: 1.05, PVT: 1.12, NBFC: 0.95, FIN: 0.55, SFB: 0.78, MFI: 0.9, RRB: 0.72, HFC: 1.0 };
+  const ticketL = (prod, bi, s, l, t) => prod.ticket * TK_BAND[prod.bands][bi] * (TK_STATE[s] || 1) * (TK_LENDER[l] || 1) * (1 + 0.006 * t); // ₹ lakh
+
   // ---------------- Industry ----------------
-  const MEAS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD'];
+  const MEAS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD', 'newAcc'];
   const industry = new Cube([['m', MONTHS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['l', LIDS]], MEAS);
   const NP_ = PIDS.length, NS_ = SIDS.length, NB_ = BIDS.length, NL_ = LIDS.length;
   const ltAcc = new Float64Array(MONTHS.length * NP_ * NS_ * NL_ * 6); // m,p,s,l totals for peer baselines
@@ -213,9 +223,10 @@
             const cureDen = acc * d30 * 0.62;
             const cure = Math.min(0.9, Math.max(0.1, bd.cure / Math.pow(tf, 1.1)) * noise(0.03));
             const d90 = d30 * 0.46 * noise(0.04);
+            const orig = bal * prod.orig * noise(0.05);
             industry.put({ m, p: prod.id, s: st.id, b: bd.id, l: ld.id }, {
-              bal, acc, orig: bal * prod.orig * noise(0.05), d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
-              cureN: cureDen * cure, cureD: cureDen
+              bal, acc, orig, d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
+              cureN: cureDen * cure, cureD: cureDen, newAcc: (orig * 100) / ticketL(prod, bi, st.id, ld.id, t)
             });
             if (ld.id === 'PVT') { const o = (((t * NP_ + pi) * NS_ + si) * NB_ + bi) * 2; pvtRate[o] = d30; pvtRate[o + 1] = cure; }
             const lo = (((t * NP_ + pi) * NS_ + si) * NL_ + li) * 6;
@@ -271,11 +282,14 @@
           // weak vintages roll forward faster: 90+ share of 30+ rises in the stressed segments
           const roll = mult > 1.3 ? 0.62 : mult > 1.1 ? 0.52 : 0.45;
           const d90 = d30 * roll * noise(0.04);
+          const orig = bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05);
+          // ticket-size story: after the Feb loosening, near-prime / subprime personal loans got bigger,
+          // most in Uttar Pradesh and Gujarat (bigger loans to riskier borrowers)
+          const tkUp = prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1 + (hot ? 0.065 : 0.02) * Math.min(since, 7) : 1;
           member.put({ m, p: prod.id, s: st.id, b: bd.id }, {
-            bal, acc,
-            orig: bal * prod.orig * (prod.id === 'PL' && since > 0 && (bd.id === 'NP' || bd.id === 'SB') ? 1.35 : 1) * noise(0.05),
+            bal, acc, orig,
             d30: bal * d30, d90: bal * d90, d180: bal * d90 * 0.55 * noise(0.04),
-            cureN: cureDen * cure, cureD: cureDen
+            cureN: cureDen * cure, cureD: cureDen, newAcc: (orig * 100) / (ticketL(prod, bi, st.id, 'PVT', t) * 0.97 * tkUp)
           });
         });
       });
@@ -325,34 +339,38 @@
   const appBand = { SP: 0.22, PP: 0.2, PR: 0.24, NP: 0.19, SB: 0.15 };
   const approvalByBand = { SP: 0.86, PP: 0.8, PR: 0.66, NP: 0.42, SB: 0.14 };
   const highEnqByBand = { SP: 0.05, PP: 0.08, PR: 0.13, NP: 0.22, SB: 0.34 };
-  // Applications are split by PIN-code risk tier and sourcing pool; each cell carries an expected
-  // probability of default (12-month 90+), so any slice's average PD = pdN / apps.
+  // Applications are split by PIN-code risk tier and by the applicant's credit profile as seen in the
+  // bureau at the time of the enquiry (all bureau-derived, nothing the lender has to report separately).
+  // Each cell carries an expected probability of default (12-month 90+): any slice's PD = pdN / apps.
   const PINS = [
     { id: 'H', name: 'High-risk PIN codes', pd: 1.45 }, { id: 'M', name: 'Medium-risk PIN codes', pd: 1.0 }, { id: 'L', name: 'Low-risk PIN codes', pd: 0.8 }
   ];
-  const POOLS = [
-    { id: 'BR', name: 'Branch', pd: 0.95 }, { id: 'DSA', name: 'DSA / connector', pd: 1.2 }, { id: 'DIG', name: 'Digital (own app & web)', pd: 1.0 },
-    { id: 'FP', name: 'Fintech partner', pd: 1.15 }, { id: 'ETB', name: 'Existing customer (pre-approved)', pd: 0.6 }
+  const PROFILES = [
+    { id: 'EST', name: 'Established (3+ accounts, ≤2 live loans)', pd: 0.95 }, { id: 'LEV', name: 'Already leveraged (3+ live loans)', pd: 1.2 },
+    { id: 'THIN', name: 'Thin file (1–2 accounts)', pd: 1.0 }, { id: 'NTC', name: 'New to credit (no bureau history)', pd: 1.15 },
+    { id: 'ETB', name: 'Existing customer (live loan with you)', pd: 0.6 }
   ];
   const PIN_BY_BAND = { SP: [0.08, 0.32, 0.6], PP: [0.1, 0.34, 0.56], PR: [0.14, 0.36, 0.5], NP: [0.2, 0.38, 0.42], SB: [0.28, 0.4, 0.32] };
   const PIN_SURGE = [0.5, 0.33, 0.17];
-  const POOL_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
-  const POOL_IND = [0.25, 0.3, 0.22, 0.13, 0.1], POOL_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], POOL_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
+  const PROF_TILT = [[1, 1, 1, 1, 1.6], [1, 1, 1, 1, 1.3], [1, 1, 1, 1, 1], [1, 1.2, 1, 1.1, 0.6], [1, 1.4, 1, 1.2, 0.3]]; // by band
+  const PROF_IND = [0.25, 0.3, 0.22, 0.13, 0.1], PROF_MEM = [0.3, 0.25, 0.2, 0.08, 0.17], PROF_SURGE = [0.08, 0.62, 0.08, 0.18, 0.04];
   const PD_BY_BAND = [0.004, 0.01, 0.025, 0.06, 0.14];
-  const splitPool = (base, bi) => { const w = base.map((x, j) => x * POOL_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
-  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['src', POOLS.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay']);
-  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = POOLS.length;
-  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge) => {
+  const splitProf = (base, bi) => { const w = base.map((x, j) => x * PROF_TILT[bi][j]); const t = w.reduce((a, b) => a + b, 0); return w.map((x) => x / t); };
+  const logins = new Cube([['who', ['ind', 'mem']], ['d', DAYS], ['p', PIDS], ['s', SIDS], ['b', BIDS], ['pin', PINS.map((x) => x.id)], ['prof', PROFILES.map((x) => x.id)]], ['apps', 'appr', 'hiEnq', 'pdN', 'sameDay', 'amt']);
+  const LD = logins.data, LS = logins.stride, NPIN = PINS.length, NSRC = PROFILES.length;
+  const putSplit = (wi, di, pi, si, bi, tot, apprRate, enqRate, pinW, poolW, pdBase, surge, tkReq) => {
     const base = wi * LS[0] + di * LS[1] + pi * LS[2] + si * LS[3] + bi * LS[4];
     for (let a = 0; a < NPIN; a++) for (let c = 0; c < NSRC; c++) {
       const apps = tot * pinW[a] * poolW[c];
       const risky = (a === 0 ? 1.25 : 1) * (c === 1 || c === 3 ? 1.3 : 1);
-      const o = (base + a * LS[5] + c * LS[6]) * 5;
+      const o = (base + a * LS[5] + c * LS[6]) * 6;
       LD[o] += apps; LD[o + 1] += apps * apprRate; LD[o + 2] += apps * Math.min(0.9, enqRate * risky);
-      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * POOLS[c].pd * (surge ? 1.25 : 1));
+      LD[o + 3] += apps * Math.min(0.6, pdBase * PINS[a].pd * PROFILES[c].pd * (surge ? 1.25 : 1));
       // applicants who made more than one enquiry on the same day (rate-shopping or loan stacking);
-      // deterministic share of the high-enquiry rate, higher in surges and DSA / fintech-partner pools
+      // deterministic share of the high-enquiry rate, higher in surges and for leveraged / new-to-credit applicants
       LD[o + 4] += apps * Math.min(0.5, enqRate * risky * (surge ? 0.62 : 0.4) + 0.012);
+      // loan amount requested in the enquiry (₹ lakh); leveraged and surge applicants ask for more
+      LD[o + 5] += apps * tkReq * (c === 1 ? 1.12 : c === 3 ? 0.8 : c === 4 ? 1.08 : 1) * (surge ? 1.3 : 1);
     }
   };
   DAYS.forEach((d, i) => {
@@ -372,16 +390,17 @@
           // riskier states have more applications from high-risk PIN codes
           const r = S[s].risk, pw = PIN_BY_BAND[bd.id], pwt = [pw[0] * r * r, pw[1], pw[2] / r], pws = pwt[0] + pwt[1] + pwt[2];
           const pinW = pwt.map((x) => x / pws);
-          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitPool(POOL_IND, bi), pdBase, false);
+          const tkI = ticketL(prod, bi, s, 'ALL', 0) * 1.08, tkM = ticketL(prod, bi, s, 'PVT', 0) * (prod.id === 'PL' && weak ? 1.18 : 1);
+          putSplit(0, i, pi, si, bi, indApps, indAppr, highEnqByBand[bd.id] * noise(0.05), pinW, splitProf(PROF_IND, bi), pdBase, false, tkI);
           if (surge) {
-            // the surge: normal flow plus an extra wave that is DSA-led and from high-risk PIN codes
+            // the surge: normal flow plus an extra wave of already-leveraged and new-to-credit applicants from high-risk PIN codes
             const normal = memApps / 1.95;
-            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitPool(POOL_MEM, bi), pdBase, false);
-            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, POOL_SURGE, pdBase, true);
+            putSplit(1, i, pi, si, bi, normal, memAppr, highEnqByBand[bd.id], pinW, splitProf(PROF_MEM, bi), pdBase, false, tkM);
+            putSplit(1, i, pi, si, bi, memApps - normal, memAppr, highEnqByBand[bd.id] * 2.4, PIN_SURGE, PROF_SURGE, pdBase, true, tkM);
           } else {
-            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitPool(POOL_MEM, bi), pdBase, false);
-            // milder book-wide wave: in the last 7 days DSA / fintech-partner PL sourcing pushes weak-band logins everywhere
-            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, POOL_SURGE, pdBase, true);
+            putSplit(1, i, pi, si, bi, memApps, memAppr, highEnqByBand[bd.id] * noise(0.06), pinW, splitProf(PROF_MEM, bi), pdBase, false, tkM);
+            // milder book-wide wave: in the last 7 days more already-leveraged weak-band PL applicants log in everywhere
+            if (prod.id === 'PL' && weak && i >= 23) putSplit(1, i, pi, si, bi, memApps * 0.28, memAppr, highEnqByBand[bd.id] * 2, PIN_SURGE, PROF_SURGE, pdBase, true, tkM);
           }
         });
       });
@@ -419,7 +438,7 @@
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, POOLS,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores

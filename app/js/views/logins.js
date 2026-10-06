@@ -28,7 +28,7 @@
       const cl = h('div', 'callout ' + (gap > 0 ? 'danger' : 'insight'), root);
       cl.style.marginTop = '16px';
       h('h4', null, cl, gap > 0 ? `Your applications are running ${fmt.chg(gap, 0).replace('+', '')} ahead of the market in the last 5 days` : 'Your application flow is lagging the market');
-      h('p', null, cl, gap > 0 ? `Market demand explains only ${fmt.chg(c.ind.change, 0)}. Check for a new sourcing campaign, a DSA push or organised applications, and make sure the extra volume isn't concentrated in weaker bands (see the mix chart below).` : 'Check if competitors are pricing more aggressively or if a sourcing channel has slowed.');
+      h('p', null, cl, gap > 0 ? `Market demand explains only ${fmt.chg(c.ind.change, 0)}. Check for a new campaign or organised applications, and make sure the extra volume isn't concentrated in weaker bands or already-leveraged applicants (see below).` : 'Check if competitors are pricing more aggressively in your segments.');
     }
 
     const g = h('div', 'grid g2', root);
@@ -75,20 +75,20 @@
       sub: `Same applicant, 2+ credit enquiries on one calendar day, at any lender. A rate-shopping and loan-stacking signal · ${stateName(s)} · ${PIQ.ui.prodName(p)}`,
       source: sourceText(['logins'], 'enquiries matched across all lenders on the same day'),
       pinDetail: () => `${fmt.int(q.mem.sameDayCount)} applicants (${pp(q.mem.sameDay)}) in the ${winTxt}; industry ${pp(q.ind.sameDay)}`,
-      table: () => ({ cols: [{ name: 'Sourcing pool' }, { name: 'Applicants (you)', r: 1 }, { name: 'Share of pool logins', r: 1 }].concat(hasPrior ? [{ name: 'Share, ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry share', r: 1 }]),
-        rows: q.mem.pools.map((x, i) => [x.name, fmt.int(x.sameDay * x.apps), pp(x.sameDay)].concat(hasPrior ? [pp(QP.pools[i].sameDay)] : []).concat([pp(q.ind.pools[i].sameDay)])) })
+      table: () => ({ cols: [{ name: 'Bureau credit profile' }, { name: 'Applicants (you)', r: 1 }, { name: 'Share of the profile\'s logins', r: 1 }].concat(hasPrior ? [{ name: 'Share, ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry share', r: 1 }]),
+        rows: q.mem.profiles.map((x, i) => [x.name, fmt.int(x.sameDay * x.apps), pp(x.sameDay)].concat(hasPrior ? [pp(QP.profiles[i].sameDay)] : []).concat([pp(q.ind.profiles[i].sameDay)])) })
     });
     const sdg = h('div', 'grid g3', sd.viz);
     const tile = (label, value, note, bad) => { const t = h('div', 'stat', sdg); h('div', 'stat-label', t, label); h('div', 'stat-value', t, value); const d = h('div', 'stat-delta ' + (bad ? 'bad' : ''), t, note); return d; };
     tile(`Count · ${winTxt}`, fmt.int(q.mem.sameDayCount), `${fmt.int(q.mem.sameDayCount / win)} a day · of ${fmt.int(q.mem.apps)} applicants`, false);
     tile('Share of your applicants', pp(q.mem.sameDay), vsPrior(pp(QP ? QP.sameDay : 0)) + 'industry ' + pp(q.ind.sameDay), q.mem.sameDay > q.ind.sameDay * 1.2);
-    const sdTop = q.mem.pools.slice().sort((a, b) => b.sameDay * b.apps - a.sameDay * a.apps)[0];
-    tile('Biggest source', sdTop.name.split(' (')[0], `${fmt.int(sdTop.sameDay * sdTop.apps)} applicants · ${pp(sdTop.sameDay)} of the pool`, sdTop.sameDay > q.ind.sameDay * 1.3);
+    const sdTop = q.mem.profiles.slice().sort((a, b) => b.sameDay * b.apps - a.sameDay * a.apps)[0];
+    tile('Most common profile', sdTop.name.split(' (')[0], `${fmt.int(sdTop.sameDay * sdTop.apps)} applicants · ${pp(sdTop.sameDay)} of that profile`, sdTop.sameDay > q.ind.sameDay * 1.3);
     if (q.mem.sameDay > q.ind.sameDay * 1.2) {
       const cl = h('div', 'callout danger', sd.body);
       cl.style.marginTop = '12px';
       h('h4', null, cl, `${pp(q.mem.sameDay)} of your applicants enquired more than once on the same day, vs ${pp(q.ind.sameDay)} for the market`);
-      h('p', null, cl, `Same-day multiple enquiries usually mean an applicant is shopping the same loan through several DSAs or apps, or stacking loans before the bureau reflects them. Hold disbursal on these ${fmt.int(q.mem.sameDayCount)} applicants until a fresh bureau pull confirms no new loans, and review the ${sdTop.name.split(' (')[0]} pool first.`);
+      h('p', null, cl, `Same-day multiple enquiries usually mean an applicant is shopping the same loan with several lenders, or stacking loans before the bureau reflects them. Hold disbursal on these ${fmt.int(q.mem.sameDayCount)} applicants until a fresh bureau pull confirms no new loans; ${sdTop.name.split(' (')[0].toLowerCase()} applicants first.`);
     }
 
     const qt = h('div', 'grid g4', root);
@@ -97,17 +97,16 @@
     stat(qt, { label: 'From high-risk PIN codes', value: pp(q.mem.pins[0].share, 0), delta: vsPrior(pp(QP ? QP.pins[0].share : 0, 0)) + 'industry ' + pp(q.ind.pins[0].share, 0), deltaTone: q.mem.pins[0].share > q.ind.pins[0].share * 1.15 ? 'bad' : '' });
     const weak = (o) => o.bands[3].share + o.bands[4].share;
     stat(qt, { label: 'Near-prime + subprime logins', value: pp(weak(q.mem), 0), delta: vsPrior(pp(QP ? weak(QP) : 0, 0)) + 'industry ' + pp(weak(q.ind), 0), deltaTone: weak(q.mem) > weak(q.ind) * 1.15 ? 'bad' : '' });
-    const topPool = q.mem.pools.slice().sort((a, b) => b.share - a.share)[0];
-    stat(qt, { label: 'Largest sourcing pool', value: topPool.name.split(' (')[0], delta: pp(topPool.share, 0) + ' of logins · PD ' + pp(topPool.pd), deltaTone: topPool.pd > q.ind.pd * 1.2 ? 'bad' : '' });
+    stat(qt, { label: 'Avg loan amount requested', value: fmt.inr(q.mem.ticket), delta: vsPrior(fmt.inr(QP ? QP.ticket : 0)) + 'industry ' + fmt.inr(q.ind.ticket), deltaTone: p !== 'ALL' && q.mem.ticket > q.ind.ticket * 1.2 ? 'bad' : '' });
 
     // compare with the member's prior period when there is one, else with the industry
     const ref = QP || q.ind, refName = hasPrior ? `the ${priorTxt}` : 'the industry';
-    const worst = q.mem.pools.map((x, i) => ({ x, prior: ref.pools[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
+    const worst = q.mem.profiles.map((x, i) => ({ x, prior: ref.profiles[i] })).sort((a, b) => (b.x.pd - b.prior.pd) * b.x.share - (a.x.pd - a.prior.pd) * a.x.share)[0];
     if (q.mem.pd > ref.pd * 1.08) {
       const cl = h('div', 'callout danger', root);
       cl.style.marginTop = '16px';
       h('h4', null, cl, `Recent logins are riskier: expected PD ${pp(q.mem.pd)} vs ${pp(ref.pd)} in ${refName}${hasPrior ? ` (industry ${pp(q.ind.pd)})` : ''}`);
-      h('p', null, cl, `The biggest contributor is the ${worst.x.name} pool: ${pp(worst.x.share, 0)} of logins (${refName}: ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (${refName}: ${pp(worst.prior.pd)}), and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review this pool's approvals before they book.`);
+      h('p', null, cl, `The biggest contributor is ${worst.x.name.split(' (')[0].toLowerCase()} applicants (${worst.x.name.split(' (')[1].replace(')', '')}): ${pp(worst.x.share, 0)} of logins (${refName}: ${pp(worst.prior.share, 0)}), expected PD ${pp(worst.x.pd)} (${refName}: ${pp(worst.prior.pd)}), asking for ${fmt.inr(worst.x.ticket)} on average, and ${pp(worst.x.highPin, 0)} from high-risk PIN codes. Review these approvals before they book.`);
     }
 
     const g2 = h('div', 'grid g2', root);
@@ -116,13 +115,13 @@
     const cb = card(g2, {
       title: 'Score banding of logins', sub: 'Share of applications by bureau score band',
       source: sourceText(['logins']),
-      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }]), rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share)].concat(QP ? [pp(QP.bands[i].share)] : []).concat([pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd)])) })
+      table: () => ({ cols: [{ name: 'Score band' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }, { name: 'Your expected PD', r: 1 }, { name: 'Amount asked (you)', r: 1 }, { name: 'Amount asked (industry)', r: 1 }]), rows: D.BANDS.map((b, i) => [`${b.name} (${b.range})`, pp(q.mem.bands[i].share)].concat(QP ? [pp(QP.bands[i].share)] : []).concat([pp(q.ind.bands[i].share), pp(q.mem.bands[i].pd), fmt.inr(q.mem.bands[i].ticket), fmt.inr(q.ind.bands[i].ticket)])) })
     });
     PIQ.charts.dots(cb.viz, { rows: bandRows, series: [{ key: 'm', name: 'You · ' + winTxt, color: 'var(--s1)' }].concat(QP ? [{ key: 'pr', name: 'You · ' + priorTxt, color: 'var(--s2)' }] : []).concat([{ key: 'ind', name: 'Industry · ' + winTxt, color: 'var(--s3)' }]), fmt: (v) => fmt.pct(v, 0) });
 
     const cp = card(g2, {
       title: `Probability of default: distribution of the ${winTxt}' logins`, sub: 'Share of applications by expected 12-month PD (90+) · tick = industry',
-      source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and sourcing pool'),
+      source: sourceText(['logins', 'scores'], 'PD from score band, PIN-code risk tier and bureau credit profile'),
       table: () => ({ cols: [{ name: 'PD bucket' }, { name: 'You · ' + winShort, r: 1 }].concat(QP ? [{ name: 'You · ' + priorShort, r: 1 }] : []).concat([{ name: 'Industry · ' + winShort, r: 1 }]), rows: q.mem.pdBuckets.map((k, i) => [k.label, pp(k.share)].concat(QP ? [pp(QP.pdBuckets[i].share)] : []).concat([pp(q.ind.pdBuckets[i].share)])) })
     });
     PIQ.charts.bars(cp.viz, { items: q.mem.pdBuckets.map((k, i) => ({ label: 'PD ' + k.label, value: k.share, ref: q.ind.pdBuckets[i].share })), fmt: (v) => fmt.pct(v, 0), color: 'var(--s1)', valueName: 'You · ' + winTxt, refName: 'Industry' });
@@ -136,13 +135,13 @@
     const pinNote = h('div', 'small muted', cpin.body, (QP ? `Your ${priorTxt}: ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(QP.pins[i].share, 0)).join(' · ')}. ` : '') + `Expected PD by tier (you, ${winTxt}): ${D.PINS.map((x, i) => x.name.replace(' PIN codes', '') + ' ' + pp(q.mem.pins[i].pd)).join(' · ')}.`);
     pinNote.style.marginTop = '8px';
 
-    const cpool = card(g2, { title: 'Which pool are the applications coming from?', sub: (QP ? `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs your ${priorTxt} (in brackets) and the industry · ⚠ = expected PD up 20%+` : `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs the industry (in brackets) · ⚠ = expected PD 20%+ above the industry`), source: sourceText(['logins']) });
+    const cpool = card(g2, { title: 'Who is applying? Bureau credit profile', pin: true, sub: 'Profile from the applicant\'s bureau record at enquiry: accounts, live loans, a live loan with you · ' + (QP ? `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs your ${priorTxt} (in brackets) and the industry · ⚠ = expected PD up 20%+` : `${winTxt.replace(/^./, (c) => c.toUpperCase())} vs the industry (in brackets) · ⚠ = expected PD 20%+ above the industry`), source: sourceText(['logins']) });
     const pt = h('table', 'tbl', h('div', 'table-wrap', cpool.viz));
     const ph = h('tr', null, h('thead', null, pt));
-    ['Pool', QP ? 'Share (prior)' : 'Share', 'Industry', QP ? 'Exp. PD (prior)' : 'Exp. PD (industry)', 'High-risk PIN', '3+ enq.', 'Same-day 2+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
+    ['Profile', QP ? 'Share (prior)' : 'Share', 'Industry', QP ? 'Exp. PD (prior)' : 'Exp. PD (industry)', 'Avg amount asked', 'High-risk PIN', 'Same-day 2+ enq.'].forEach((x, i) => h('th', i ? 'r' : '', ph, x));
     const pb = h('tbody', null, pt);
-    q.mem.pools.forEach((x, i) => {
-      const ind = q.ind.pools[i], pr = QP ? QP.pools[i] : ind;
+    q.mem.profiles.forEach((x, i) => {
+      const ind = q.ind.profiles[i], pr = QP ? QP.profiles[i] : ind;
       const r = h('tr', null, pb);
       const nm = h('td', null, r, (x.pd > pr.pd * 1.2 && x.share > 0.1 ? '⚠ ' : '') + x.name.split(' (')[0].replace('Existing customer', 'Existing cust.'));
       nm.title = x.name;
@@ -150,8 +149,8 @@
       h('td', 'r', r, pp(x.share, 0) + (QP ? ' (' + pp(pr.share, 0) + ')' : ''));
       h('td', 'r', r, pp(ind.share, 0));
       h('td', 'r ' + (x.pd > pr.pd * 1.2 ? 'bad' : ''), r, pp(x.pd) + ' (' + pp(pr.pd) + ')');
+      h('td', 'r ' + (p !== 'ALL' && x.ticket > ind.ticket * 1.25 ? 'bad' : ''), r, fmt.inr(x.ticket)).title = 'Industry: ' + fmt.inr(ind.ticket) + (p === 'ALL' ? ' (all products: reflects your product mix)' : '');
       h('td', 'r ' + (x.highPin > ind.highPin * 1.25 ? 'bad' : ''), r, pp(x.highPin, 0));
-      h('td', 'r', r, pp(x.hiEnq, 0));
       h('td', 'r ' + (x.sameDay > ind.sameDay * 1.3 ? 'bad' : ''), r, pp(x.sameDay));
     });
 

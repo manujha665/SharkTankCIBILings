@@ -21,6 +21,8 @@
       def: 'Balance 90 or more days past due ÷ total balance, by value, at month end (the NPA threshold).' },
     dpd180: { id: 'dpd180', name: '180+ DPD rate', short: '180+ DPD', unit: 'pct', kind: 'ratio', num: 'd180', den: 'bal', bad: true,
       def: 'Balance 180 or more days past due ÷ total balance, by value, at month end — deep delinquency, close to loss.' },
+    ats: { id: 'ats', name: 'Average ticket size (new loans)', short: 'Avg ticket', unit: 'inr', kind: 'ratio', num: 'orig', den: 'newAcc', mult: 1e7, bad: false, neutral: true, peerFromIndustry: true,
+      def: 'Value disbursed ÷ number of new accounts opened in the month (₹ per loan; cards = sanctioned limit). Bureau-reported at account opening.' },
     cure: { id: 'cure', name: 'Collection cure rate', short: 'Cure rate', unit: 'pct', kind: 'ratio', num: 'cureN', den: 'cureD', bad: false,
       def: 'Share of accounts 30–89 DPD last month that returned to current this month — a collections effectiveness measure.' }
   };
@@ -30,7 +32,7 @@
     industry: { name: 'Industry Credit Dataset', grain: 'month × product (10) × state (24) × risk band × lender category (8)', refresh: 'Monthly', asOf: C.dataAsOf },
     member: { name: 'Member Portfolio Dataset', grain: 'month × product × state × risk band', refresh: 'Monthly', asOf: C.dataAsOf },
     peers: { name: 'Anonymised Peer Aggregates', grain: 'peer group × month × product × state', refresh: 'Monthly', asOf: C.dataAsOf },
-    logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
+    logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band × PIN-code tier × bureau credit profile (amount requested included)', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
     scores: { name: 'Application Score Distribution', grain: 'product × state × 20-pt score bin', refresh: 'Weekly', asOf: 'last 90 days' }
   };
 
@@ -51,7 +53,7 @@
   function metricOf(agg, metric) {
     const M = METRICS[metric];
     if (M.kind === 'sum') return agg[M.field];
-    return agg[M.den] ? agg[M.num] / agg[M.den] : null;
+    return agg[M.den] ? (agg[M.num] / agg[M.den]) * (M.mult || 1) : null;
   }
   const cube = (source) => {
     const c = D.cube[source];
@@ -109,6 +111,7 @@
     const chk = peerCheck(g.types, g.sizes, f);
     if (!chk.ok) return { suppressed: true, check: chk, points: [] };
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
+    if (METRICS[metric].peerFromIndustry) return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('industry', Object.assign({}, f, { l: g.types, m })), metric) })) };
     return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric) })) };
   }
   function peerValue(groupId, metric, f) {
@@ -116,6 +119,7 @@
     const chk = peerCheck(g.types, g.sizes, f);
     if (!chk.ok) return null;
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
+    if (METRICS[metric].peerFromIndustry) return metricOf(agg('industry', Object.assign({}, f, { l: g.types, m: (f && f.m) || latest() })), metric);
     return metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: (f && f.m) || latest() })), metric);
   }
 
@@ -246,16 +250,17 @@
     return D.BANDS.map((b) => ({ key: b.id, name: b.name, y: agg('logins', Object.assign({}, f, { who, d: days, b: b.id })).apps / tot }));
   }
 
-  // Quality of recent logins: score bands, expected PD, PIN-code risk tier and sourcing pool.
+  // Quality of recent logins: score bands, expected PD, PIN-code risk tier, the applicant's bureau credit
+  // profile and the loan amount requested (all from bureau enquiry and tradeline data).
   // who: 'mem' | 'ind'; days: array of dates. PD = expected 12-month 90+ probability (apps-weighted).
   const PD_BUCKETS = [[0, 0.01, '< 1%'], [0.01, 0.03, '1–3%'], [0.03, 0.06, '3–6%'], [0.06, 0.1, '6–10%'], [0.1, 1, '10%+']];
   function loginQuality(who, f, days) {
     const base = Object.assign({}, f, { who, d: days });
     const tot = agg('logins', base);
-    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0 }; };
+    const part = (key, id) => { const a = agg('logins', Object.assign({}, base, { [key]: id })); return { apps: a.apps, share: a.apps / tot.apps, pd: a.apps ? a.pdN / a.apps : 0, hiEnq: a.apps ? a.hiEnq / a.apps : 0, appr: a.apps ? a.appr / a.apps : 0, sameDay: a.apps ? a.sameDay / a.apps : 0, ticket: a.apps ? (a.amt / a.apps) * 1e5 : 0 }; };
     const buckets = PD_BUCKETS.map(([lo, hi, label]) => ({ label, lo, hi, apps: 0 }));
-    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.POOLS.forEach((pl) => {
-      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, src: pl.id }));
+    D.BANDS.forEach((b) => D.PINS.forEach((pn) => D.PROFILES.forEach((pl) => {
+      const a = agg('logins', Object.assign({}, base, { b: b.id, pin: pn.id, prof: pl.id }));
       if (!a.apps) return;
       const pd = a.pdN / a.apps;
       buckets.find((k) => pd >= k.lo && pd < k.hi).apps += a.apps;
@@ -264,12 +269,12 @@
     return {
       who, days: days.length, apps: tot.apps, perDay: tot.apps / days.length,
       pd: tot.apps ? tot.pdN / tot.apps : 0, hiEnq: tot.apps ? tot.hiEnq / tot.apps : 0, appr: tot.apps ? tot.appr / tot.apps : 0,
-      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0,
+      sameDayCount: tot.sameDay, sameDay: tot.apps ? tot.sameDay / tot.apps : 0, ticket: tot.apps ? (tot.amt / tot.apps) * 1e5 : 0,
       bands: D.BANDS.map((b) => Object.assign({ id: b.id, name: b.name, range: b.range }, part('b', b.id))),
       pins: D.PINS.map((x) => Object.assign({ id: x.id, name: x.name }, part('pin', x.id))),
-      pools: D.POOLS.map((x) => {
-        const o = Object.assign({ id: x.id, name: x.name }, part('src', x.id));
-        const hp = agg('logins', Object.assign({}, base, { src: x.id, pin: 'H' })).apps;
+      profiles: D.PROFILES.map((x) => {
+        const o = Object.assign({ id: x.id, name: x.name }, part('prof', x.id));
+        const hp = agg('logins', Object.assign({}, base, { prof: x.id, pin: 'H' })).apps;
         o.highPin = o.apps ? hp / o.apps : 0;
         return o;
       }),

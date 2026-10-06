@@ -12,7 +12,7 @@
     const p = state.p, s = state.s;
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
     const bar = productStateFilters(root);
-    select(bar, 'Metric', S.DPD_METRICS.concat(['cure']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (S.DPD_METRICS.includes(v)) setState({ dpd: v }); else PIQ.go('benchmark'); });
+    select(bar, 'Metric', S.DPD_METRICS.concat(['cure', 'ats']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (S.DPD_METRICS.includes(v)) setState({ dpd: v }); else PIQ.go('benchmark'); });
     select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
     const group = state.peer === 'custom' ? Object.assign({ id: 'custom', name: 'Custom group' }, custom) : S.PEER_GROUPS.find((g) => g.id === state.peer);
@@ -63,11 +63,17 @@
     const pv6 = ps.suppressed ? null : ps.points[ps.points.length - 7].y;
 
     const tiles = h('div', 'grid g4', root);
+    // unit-aware: rates show pp / bps gaps; ticket size shows % change and a ratio (neither good nor bad on its own)
+    const isPct = M.unit === 'pct', V = (v) => fmt.metric(metric, v);
+    const chgV = (a, b) => (isPct ? fmt.pp(a - b) : fmt.chg(a / b - 1));
+    const gapV = (a, b) => (isPct ? fmt.bps(a - b) : (a / b).toFixed(2) + '×');
     const good = (d) => (M.bad ? d < 0 : d > 0);
-    stat(tiles, { label: `You · ${M.short}`, value: fmt.pct(mv), delta: fmt.pp(mv - mv6), deltaTone: good(mv - mv6) ? 'good' : 'bad', deltaNote: '6m' });
-    stat(tiles, { label: `Peer group · ${M.short}`, value: pvv == null ? 'Suppressed' : fmt.pct(pvv), delta: pvv == null ? 'privacy rule' : fmt.pp(pvv - pv6), deltaTone: '', deltaNote: pvv == null ? '' : '6m' });
-    stat(tiles, { label: 'Gap to peers', value: pvv == null ? '—' : fmt.bps(mv - pvv), delta: pvv == null ? '' : good(mv - pvv) ? 'better than peers' : 'worse than peers', deltaTone: pvv == null ? '' : good(mv - pvv) ? 'good' : 'bad' });
-    stat(tiles, { label: 'Gap to industry', value: fmt.bps(mv - iv), delta: good(mv - iv) ? 'better than industry' : 'worse than industry', deltaTone: good(mv - iv) ? 'good' : 'bad' });
+    const toneOf = (d) => (M.neutral ? '' : good(d) ? 'good' : 'bad');
+    const word = (d, who) => (M.neutral ? (d > 0 ? 'larger than ' : 'smaller than ') + who : (good(d) ? 'better than ' : 'worse than ') + who);
+    stat(tiles, { label: `You · ${M.short}`, value: V(mv), delta: chgV(mv, mv6), deltaTone: toneOf(mv - mv6), deltaNote: '6m' });
+    stat(tiles, { label: `Peer group · ${M.short}`, value: pvv == null ? 'Suppressed' : V(pvv), delta: pvv == null ? 'privacy rule' : chgV(pvv, pv6), deltaTone: '', deltaNote: pvv == null ? '' : '6m' });
+    stat(tiles, { label: 'Gap to peers', value: pvv == null ? '—' : gapV(mv, pvv), delta: pvv == null ? '' : word(mv - pvv, 'peers'), deltaTone: pvv == null ? '' : toneOf(mv - pvv) });
+    stat(tiles, { label: 'Gap to industry', value: gapV(mv, iv), delta: word(mv - iv, 'industry'), deltaTone: toneOf(mv - iv) });
 
     const g = h('div', 'grid g2', root);
     g.style.marginTop = '16px';
@@ -75,11 +81,11 @@
     const c1 = card(g, {
       title: `${M.name}: trend`, sub: `${prodLong(p)} · ${stateName(s)}`,
       source: sourceText(['member', 'peers', 'industry']),
-      table: () => ({ cols: [{ name: 'Month' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: mS.map((x, i) => [ml(x.x), fmt.pct(x.y), ps.suppressed ? 'Suppressed' : fmt.pct(ps.points[i].y), fmt.pct(iS[i].y)]) })
+      table: () => ({ cols: [{ name: 'Month' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: mS.map((x, i) => [ml(x.x), V(x.y), ps.suppressed ? 'Suppressed' : V(ps.points[i].y), V(iS[i].y)]) })
     });
     PIQ.charts.line(c1.viz, {
       series: [{ name: C.member.name, color: 'var(--s1)', points: mS }, { name: group.name, color: 'var(--s2)', points: ps.points }, { name: 'Industry', color: 'var(--s3)', points: iS }],
-      xLabel: ml, yFmt: (v) => fmt.pct(v), yTickFmt: fmt.metricTick(metric), endLabels: true, height: 270
+      xLabel: ml, yFmt: V, yTickFmt: fmt.metricTick(metric), endLabels: true, height: 270
     });
 
     const topStates = D.STATES.slice().sort((a, b) => S.value('member', 'bal', { p, s: b.id, m: t }) - S.value('member', 'bal', { p, s: a.id, m: t })).slice(0, 12);
@@ -90,15 +96,15 @@
     const c2 = card(g, {
       title: `${M.short} by state`, sub: ml(t) + ' · your 12 largest states · the gap between dots is your story',
       source: sourceText(['member', 'peers', 'industry']),
-      table: () => ({ cols: [{ name: 'State' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: rows.map((r) => [r.label, fmt.pct(r.values.mem), fmt.pct(r.values.peer), fmt.pct(r.values.ind)]) })
+      table: () => ({ cols: [{ name: 'State' }, { name: 'You', r: 1 }, { name: 'Peers', r: 1 }, { name: 'Industry', r: 1 }], rows: rows.map((r) => [r.label, V(r.values.mem), V(r.values.peer), V(r.values.ind)]) })
     });
-    PIQ.charts.dots(c2.viz, { rows, series: [{ key: 'mem', name: C.member.name, color: 'var(--s1)' }, { key: 'peer', name: 'Peers', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: (v) => fmt.pct(v) });
+    PIQ.charts.dots(c2.viz, { rows, series: [{ key: 'mem', name: C.member.name, color: 'var(--s1)' }, { key: 'peer', name: 'Peers', color: 'var(--s2)' }, { key: 'ind', name: 'Industry', color: 'var(--s3)' }], fmt: V });
 
     // Diverging heatmap: member vs industry ratio
     // Rows are products for the whole book (like-for-like needs the same product), states otherwise
     const byProd = p === 'ALL';
     const rowList = byProd ? D.PRODUCTS.map((x) => ({ id: x.id, name: x.name, f: { p: x.id, s } })) : topStates.map((x) => ({ id: x.id, name: x.name, f: { p, s: x.id } }));
-    const c3 = card(g, { cls: 'span2', title: `Where you differ from the market: ${byProd ? 'product' : 'state'} × risk band`, sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
+    const c3 = card(g, { cls: 'span2', title: `Where you differ from the market: ${byProd ? 'product' : 'state'} × risk band`, sub: `Your ${M.short} ÷ industry ${M.short} in the same cell (${ml(t)}). ${M.neutral ? 'Red = larger than the market, blue = smaller.' : M.bad ? 'Red = worse than market, blue = better.' : 'Blue = better than market, red = worse.'}`, source: sourceText(['member', 'industry'], 'like-for-like segments remove mix effects') });
     const tb = h('table', 'tbl heat', h('div', 'table-wrap', c3.viz));
     const hr = h('tr', null, h('thead', null, tb));
     h('th', null, hr, byProd ? 'Product' : 'State');
@@ -110,12 +116,12 @@
       D.BANDS.forEach((b) => {
         const a = S.value('member', metric, Object.assign({ b: b.id, m: t }, x.f)), ii = S.value('industry', metric, Object.assign({ b: b.id, m: t }, x.f));
         const ratio = a / ii;
-        const worse = M.bad ? ratio > 1 : ratio < 1;
+        const worse = M.neutral ? ratio > 1 : M.bad ? ratio > 1 : ratio < 1;
         const k = Math.min(1, Math.abs(Math.log(ratio)) / Math.log(1.8));
         const td = h('td', 'cell', r, ratio.toFixed(2) + '×');
         td.style.background = `color-mix(in oklab, ${worse ? 'var(--div-pos)' : 'var(--div-neg)'} ${Math.round(k * 85)}%, var(--div-mid))`;
         td.style.color = k > 0.55 ? '#fff' : 'var(--ink)';
-        td.title = `You ${fmt.pct(a)} vs industry ${fmt.pct(ii)}`;
+        td.title = `You ${V(a)} vs industry ${V(ii)}`;
       });
     });
   }

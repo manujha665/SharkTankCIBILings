@@ -7,6 +7,7 @@
     { id: 'overview', name: 'Command Centre', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
+    { id: 'tickets', name: 'Ticket Size', ico: '₹', tag: 'new' },
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
     { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },
