@@ -7,8 +7,8 @@
 
   const USES = [
     ['📞', 'Collections', 'Call a borrower within days of a bounce, not after the month-end file. Fresh bounces are routed to the early-bucket team the same week.'],
-    ['🧭', 'Risk & policy', 'See a segment deteriorate in weeks, not quarters. Tighten a cut-off or a channel before a whole vintage is booked.'],
-    ['🕵', 'Fraud & first-payment default', 'First-EMI bounces on new loans flag organised or synthetic applications while the sourcing campaign is still live.'],
+    ['🧭', 'Risk & policy', 'See a segment deteriorate in weeks, not quarters. Tighten a cut-off before a whole vintage is booked.'],
+    ['🕵', 'Fraud & first-payment default', 'First-EMI bounces on new loans flag organised or synthetic applications while the campaign is still live.'],
     ['✅', 'Underwriting', 'A bureau report that reflects last week\'s bounce elsewhere stops you lending to someone already in trouble.'],
     ['💧', 'Treasury & portfolio', 'Current balances, repayments and prepayments give a near-real-time view of run-off and liquidity.'],
     ['🏛', 'Board & regulator', 'A stress picture that is two weeks old instead of six, with the same governed definitions as the monthly view.']

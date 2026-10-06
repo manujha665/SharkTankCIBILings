@@ -91,7 +91,7 @@
       'Do MSME promoters\' retail loans give early warning?'
     ] },
     { cat: 'Your data & definitions', qs: [
-      'Which sourcing channel is performing worst in my uploaded file?',
+      'Which approval route is performing worst in my uploaded file?',
       'What does my uploaded PR say?',
       'What is 30+ DPD?',
       'How is the cure rate defined?',

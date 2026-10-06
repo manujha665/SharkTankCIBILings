@@ -31,11 +31,11 @@ All numbers below are from the synthetic demo data and are also computed live in
 | 7 | What should I do? | Ranked, quantified actions | "Every insight ends in an action." |
 | 8 | Policy Simulator | Tighten only UP & Gujarat: **~+₹0.45 Cr/month**; blanket tightening loses money | "Surgical, not blanket." |
 | 9 | Login & Application Pulse | Weak-band PL apps in UP **+95% in 5 days** vs +5%; last-7-day expected PD **5.2% vs 4.6%**; already-leveraged applicants + high-risk PIN codes (all bureau data) | "The next wave, visible today." |
-| 9b | Ticket Size | Near-prime & subprime PL tickets **1.5× the market's**; UP ₹2.0 L → ₹2.9 L since Feb | "Bigger loans to riskier borrowers." |
+| 9b | Command Centre · Measure → Ticket size | Near-prime & subprime PL tickets **1.5× the market's**; UP ₹2.0 L → ₹2.9 L since Feb | "Bigger loans to riskier borrowers." |
 | 10 | Fresh Signals (PL, UP) | Monthly file **8.2%**, weekly **9.4%**; bounces **14.9%** | "Weekly beats monthly." |
 | 11 | Overlap · Retail × MFI | **8 Cr** MFI borrowers → **50%** retail footprint → **25%** live-to-live; retail DPD **2.7×** | "Only a bureau sees this." |
 | 12 | Overlap · MSME promoters | **41%** of MSME defaults preceded by a promoter's retail slip, **~4 months** earlier; Tamil Nadu tops the watchlist | "Promoters slip first." |
-| 13 | Bring Your Data | DSA-sourced near-prime in Gujarat at **2.36×** the market | "Root cause found." |
+| 13 | Bring Your Data | Auto-approved near-prime loans in Gujarat (bank's own approval-route file) at **2.36×** the market | "Root cause found." |
 | 14 | AI Analyst | Follow-ups keep context; the **HDFC question is refused** | "Plain English, safely." |
 | 15 | Action Board | Everything pinned, with owner and date | "Insight to action in one click." |
 | 16 | Governance | Tenant isolation, peer privacy, audit trail | "Trust is the product." |

@@ -337,6 +337,23 @@
         });
       }
     }));
+    // ticket size: bigger loans to riskier borrowers (near-prime & subprime tickets growing far faster than the market's)
+    const W = ['NP', 'SB'], t0 = C.policyChangeMonth;
+    D.PRODUCTS.forEach((pd) => D.STATES.forEach((st) => {
+      const f = { p: pd.id, s: st.id, b: W };
+      if (value('member', 'orig', Object.assign({ m: t }, f)) < value('member', 'orig', { p: pd.id, m: t }) * 0.03) return; // materiality
+      const m1 = value('member', 'ats', Object.assign({ m: t }, f)), m0 = value('member', 'ats', Object.assign({ m: t0 }, f));
+      const i1 = value('industry', 'ats', Object.assign({ m: t }, f)), i0 = value('industry', 'ats', Object.assign({ m: t0 }, f));
+      if (!m0 || !i0) return;
+      const gm = m1 / m0 - 1, gi = i1 / i0 - 1;
+      const inr = (v) => (v >= 1e5 ? '₹' + (v / 1e5).toFixed(2) + ' L' : '₹' + Math.round(v).toLocaleString('en-IN'));
+      if (gm - gi > 0.2 && m1 > i1 * 1.3) out.push({
+        sev: 'serious', kind: 'ticket', p: pd.id, s: st.id,
+        title: `Near-prime & subprime ${pd.name} tickets in ${st.name} up ${Math.round(gm * 100)}% since ${D.monthLabel(t0)}`,
+        detail: `Now ${inr(m1)} per loan vs ${inr(i1)} for the market (${(m1 / i1).toFixed(1)}×), which moved ${gi >= 0 ? '+' : ''}${Math.round(gi * 100)}%. Bigger loans to riskier borrowers raise the loss on every default.`,
+        score: (gm - gi) / 4
+      });
+    }));
     // weekly / fortnightly submissions: fresh bounces jumping ahead of the monthly file
     if (PIQ.hf) PIQ.hf.hotspots().filter((r) => r.change - r.indChange > 0.1).slice(0, 2).forEach((r) => {
       out.push({

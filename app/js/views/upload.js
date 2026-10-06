@@ -12,7 +12,7 @@
     { id: 'band', name: 'Risk band', req: true, guess: /band|tier|risk/i },
     { id: 'bal', name: 'Balance (₹ Cr)', req: true, guess: /^bal|balance(?!.*dpd)|outstanding/i },
     { id: 'd30', name: '30+ DPD balance (₹ Cr)', req: true, guess: /dpd|delinq/i },
-    { id: 'dim', name: 'New dimension to analyse', req: false, guess: /channel|source|branch|segment|campaign/i }
+    { id: 'dim', name: 'New dimension to analyse', req: false, guess: /route|hub|desk|branch|segment|campaign|agency|channel/i }
   ];
 
   function parseCSV(text) {
@@ -79,7 +79,7 @@
   // ---------- Portfolio Review (PR) uploads + custom files ----------
   // kind: null (choose) | 'consumer' | 'commercial' | 'mfi' | 'mfiConsumer' | 'custom'
   let kind = null, prRes = null;
-  const CUSTOM = { id: 'custom', label: 'Custom file', icon: '⇪', file: 'sahyadri_pl_sourcing_channel.csv', fields: FIELDS, blurb: 'Any file with a field the bureau doesn\'t hold (sourcing channel, campaign, branch), joined to industry benchmarks.' };
+  const CUSTOM = { id: 'custom', label: 'Custom file', icon: '⇪', file: 'sahyadri_pl_approval_route.csv', fields: FIELDS, blurb: 'Any file with a field the bureau doesn\'t hold (approval route, collection agency, campaign, branch), joined to industry benchmarks.' };
   const typeOf = () => (kind === 'custom' ? CUSTOM : PIQ.pr.TYPES[kind]);
   const sampleOf = () => (kind === 'custom' ? PIQ.sampleUploadCSV() : typeOf().sample());
   const autoMapFor = (head, fields) => {
@@ -126,8 +126,8 @@
       const other = h('div', 'card', root);
       other.style.marginTop = '16px';
       h('h3', null, other, 'Other data: a file with a new field');
-      h('p', 'small muted', other, CUSTOM.blurb + ' Example: your personal-loan sourcing channel, benchmarked against the market like for like.');
-      const ob = h('button', 'btn', other, 'Upload a custom file (e.g. sourcing channel) →');
+      h('p', 'small muted', other, CUSTOM.blurb + ' Example: which credit desk approved each personal loan (central hub, regional hub or auto-approved), benchmarked against the market like for like.');
+      const ob = h('button', 'btn', other, 'Upload a custom file (e.g. approval route) →');
       ob.addEventListener('click', () => { kind = 'custom'; step = 1; PIQ.go('upload'); });
       return;
     }
@@ -151,7 +151,7 @@
       drop.addEventListener('dragleave', () => drop.classList.remove('over'));
       drop.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) f.text().then((t) => load(f.name, t)); });
       const row = h('div', null, root); row.style.cssText = 'display:flex;gap:10px;margin-top:14px;flex-wrap:wrap';
-      const b1 = h('button', 'btn primary', row, kind === 'custom' ? 'Use the sample file (sourcing channel)' : `Use the sample ${T.label}`);
+      const b1 = h('button', 'btn primary', row, kind === 'custom' ? 'Use the sample file (approval route)' : `Use the sample ${T.label}`);
       b1.addEventListener('click', () => load(T.file, sampleOf()));
       const b2 = h('button', 'btn', row, kind === 'custom' ? 'Download sample CSV' : `Download sample ${T.label} (CSV)`);
       b2.addEventListener('click', () => download(T.file, sampleOf()));
@@ -273,14 +273,14 @@
     again.addEventListener('click', () => { kind = null; step = 0; parsed = null; prRes = null; PIQ.go('upload'); });
   }
 
-  // Custom file (e.g. sourcing channel) joined to industry benchmarks
+  // Custom file (e.g. approval route) joined to industry benchmarks
   function customInsights(root) {
     const ins = PIQ.uploadInsights();
     const dimName = (PIQ.uploaded.dimName || 'segment').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
     const [wDim, wS, wB] = ins.worst.k.split('|');
     const top = h('div', 'callout danger', root);
-    h('h4', null, top, `${wDim}-sourced ${wB === 'NPSB' ? 'near-prime & subprime' : 'prime'} loans in ${D.S[wS].name} run at ${ins.worst.idx.toFixed(2)}× the market's delinquency for the same segments`);
-    h('p', null, top, `That's ${fmt.pct(ins.worst.a.d30 / ins.worst.a.bal)} 30+ DPD against an industry-expected ${fmt.pct(ins.worst.a.exp / ins.worst.a.bal)} on ${fmt.cr(ins.worst.a.bal)} of balance (${ml(ins.last)}). This explains the member-specific deterioration found in "Why did it change?", and the bureau could never have seen it without your channel field.`);
+    h('h4', null, top, `${wB === 'NPSB' ? 'Near-prime & subprime' : 'Prime'} loans in ${D.S[wS].name} with ${dimName.toLowerCase()} "${wDim}" run at ${ins.worst.idx.toFixed(2)}× the market's delinquency for the same segments`);
+    h('p', null, top, `That's ${fmt.pct(ins.worst.a.d30 / ins.worst.a.bal)} 30+ DPD against an industry-expected ${fmt.pct(ins.worst.a.exp / ins.worst.a.bal)} on ${fmt.cr(ins.worst.a.bal)} of balance (${ml(ins.last)}). This explains the member-specific deterioration found in "Why did it change?", and the bureau could never have seen it without your own ${dimName.toLowerCase()} field.`);
     const g = h('div', 'grid g2', root); g.style.marginTop = '16px';
     const dims = Object.keys(ins.byDim);
     const c1 = card(g, {

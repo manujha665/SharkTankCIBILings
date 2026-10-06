@@ -55,7 +55,7 @@ Point at the **Source / Filters / Tools** chips: *"Every number is traceable. Th
 ## 5:45 — Bring Your Data (40 sec)
 
 - **Use the sample file** → **Validate** → **Generate insights**.
-- *"Sourcing channel isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: DSA-sourced near-prime in Gujarat runs at 2.36× the market."*
+- *"Which credit desk approved a loan isn't bureau data. The member uploads it, we join it to the market, and there's the root cause: near-prime loans in Gujarat auto-approved with no manual review run at 2.36× the market."*
 - Mention: the file never leaves the member's tenant.
 
 ## 6:05 — Action Board (20 sec)

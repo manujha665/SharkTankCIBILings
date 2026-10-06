@@ -7,7 +7,6 @@
     { id: 'overview', name: 'Command Centre', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
-    { id: 'tickets', name: 'Ticket Size', ico: '₹', tag: 'new' },
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
     { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
     { sec: 'Decide' },
@@ -35,7 +34,7 @@
     h('div', 'brand-tag', t, C.tagline);
     const alerts = PIQ.sem.alerts().filter((a) => a.sev === 'critical' || a.sev === 'serious').length;
     NAV.forEach((n) => {
-      if (n.sec) { h('div', 'nav-sec', side, n.sec); return; }
+      if (n.sec) { h('div', 'nav-sec' + (n === NAV[0] ? ' first' : ''), side, n.sec); return; }
       const a = h('button', 'nav-item' + (n.id === current ? ' active' : ''), side);
       a.type = 'button';
       h('span', 'ico', a, n.ico);
@@ -92,6 +91,7 @@
     PIQ.routeParams = params || {};
     if (params && params.p) state.p = params.p;
     if (params && params.s) state.s = params.s;
+    if (params && params.measure) state.measure = params.measure;
     try { history.replaceState(null, '', '#' + id); } catch (e) { /* file:// */ }
     buildSide(); buildTop(); render();
     document.getElementById('fab').style.display = id === 'analyst' ? 'none' : '';

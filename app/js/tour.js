@@ -42,7 +42,7 @@
     const upW0 = tk('member', { s: 'UP', b: W }, PIQ.config.policyChangeMonth), upW1 = tk('member', { s: 'UP', b: W }, tt), upWi = tk('industry', { s: 'UP', b: W }, tt);
     const wR = tk('member', { b: W }, tt) / tk('industry', { b: W }, tt);
     return [
-      { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
+      { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30', measure: 'dpd' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
         title: 'The Monday-morning question',
         say: `"It's Monday, 9am. Priya, CRO of ${C.member.name}, opens one screen. Her whole ₹${Math.round(S.value('member', 'bal', { m: S.latest() })).toLocaleString('en-IN')} Cr book: 30+ DPD is ${pct(N.all.R1)}, up ${bps(N.all.delta)} since February, double the industry's ${bps(N.all.indDelta)}."`,
         tip: 'Start on the whole portfolio: all products, all states. That is the default view.' },
@@ -50,9 +50,9 @@
         title: 'Is it me or the market?',
         say: `"The platform answers the first question for her: mostly you. ${N.allSplit[0]}% of the rise is a riskier mix, ${N.allSplit[1]}% the market, ${N.allSplit[2]}% her own loans doing worse than the same loans elsewhere."`,
         tip: 'Point at the three-colour bar: blue = mix, green = market, orange = member-specific.' },
-      { view: 'overview', target: () => q('.alert') && q('.alert').closest('.card'),
+      { view: 'overview', target: () => q('.alerts-hero'),
         title: 'Early-warning alerts, nobody had to ask',
-        say: `"Three critical alerts found themselves: personal loans in Uttar Pradesh at ${pct(N.up)} vs ${pct(N.upInd)} for the market, Gujarat rising while its market is flat, and MSME in Tamil Nadu at ${pct(N.tn)} vs ${pct(N.tnInd)}. Plus weekly bounce and application alerts."`,
+        say: `"Three critical alerts found themselves: personal loans in Uttar Pradesh at ${pct(N.up)} vs ${pct(N.upInd)} for the market, Gujarat rising while its market is flat, and MSME in Tamil Nadu at ${pct(N.tn)} vs ${pct(N.tnInd)}. Plus weekly bounces, application surges and ticket-size jumps. This panel is the first thing she sees."`,
         tip: 'Each alert has Open (go to the analysis) and 📌 (send to the Action Board).' },
       { view: 'overview', state: { p: 'PL' }, target: () => q('.split-bar') && q('.split-bar').closest('.card').querySelector('.viz'),
         title: 'Personal loans crossed the line',
@@ -64,7 +64,7 @@
         tip: 'If asked "how": share × rate decomposition; market = industry change in the same product-state-band.' },
       { view: 'why', state: { p: 'PL', s: 'GJ' }, target: () => q('#view .grid.g-2-1 > .card:nth-child(2)'),
         title: 'Same symptom, different disease',
-        say: `"Now Gujarat: ${pct(N.gj.R0)} to ${pct(N.gj.R1)}, while the Gujarat market moved just ${bps(N.gj.indDelta)}. ${N.gjSplit[2]}% is member-specific. This isn't the economy, it's how these loans were sourced."`,
+        say: `"Now Gujarat: ${pct(N.gj.R0)} to ${pct(N.gj.R1)}, while the Gujarat market moved just ${bps(N.gj.indDelta)}. ${N.gjSplit[2]}% is member-specific. The economy didn't do this; the way these loans were approved did."`,
         tip: 'Contrast with Uttar Pradesh, where the market is also deteriorating: two states, two different fixes.' },
       { view: 'why', state: { p: 'PL', s: 'ALL' }, target: () => q('.reco'),
         title: 'What should I do?',
@@ -78,11 +78,11 @@
         title: 'The next wave, visible today',
         say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by ${worstProf.x.name.split(' (')[0].toLowerCase()} applicants and high-risk PIN codes. Every one of these signals comes from bureau enquiry data, nothing extra to submit."`,
         tip: 'Scroll to show same-day multiple enquiries, score banding, PD distribution, PIN-code risk tiers and the bureau credit-profile table. Switch the Logins dropdown to 15 or 30 days.' },
-      { view: 'tickets', state: { p: 'PL', s: 'ALL' }, target: () => q('#view .callout'),
+      { view: 'overview', state: { p: 'PL', s: 'ALL', measure: 'ats' }, target: () => q('.ticket-risk') && q('.ticket-risk').closest('.card'),
         title: 'Bigger loans to riskier borrowers',
         say: `"Ticket size is the variable everyone forgets. Sahyadri's near-prime and subprime personal loans are ${wR.toFixed(2)}× the market's ticket size. In Uttar Pradesh they went from ${F.inr(upW0)} to ${F.inr(upW1)} since February, while the market sits at ${F.inr(upWi)}. Riskier borrowers, bigger loans: the loss per default goes up too."`,
-        tip: 'Ticket size now also sits on the Command Centre, in Peer Benchmarking and Industry Intelligence (metric picker), and in the AI analyst.' },
-      { view: 'fresh', state: { p: 'PL', s: 'UP' }, target: () => q('.callout'),
+        tip: 'Ticket size is a measure, not a page: flip Measure → Ticket size in the filter bar on the Command Centre, Industry Intelligence or Peer Benchmarking. It also raises its own early-warning alerts.' },
+      { view: 'fresh', state: { p: 'PL', s: 'UP', measure: 'dpd' }, target: () => q('.callout'),
         title: 'Weekly beats monthly',
         say: `"The August monthly file says ${pct(N.monthlyUP)} in Uttar Pradesh. Weekly submissions say ${pct(N.hf.mem.now.dpd30)} as of last Sunday, with fresh EMI bounces at ${pct(N.hf.mem.now.bounce, 1)} and climbing. Next month's file is already written; weekly data lets you act now."`,
         tip: 'Toggle Weekly / Fortnightly. Mention the uses: collections, fraud, underwriting, treasury.' },
@@ -96,7 +96,7 @@
         tip: 'Connects back to the Tamil Nadu alert on the Command Centre.' },
       { view: 'upload', setup: async () => { PIQ.views.upload.demo('custom'); await wait(300); }, target: () => q('.callout.danger'),
         title: 'Bring your own data',
-        say: '"Sourcing channel isn\'t bureau data. The bank uploads it, the platform joins it to the market like-for-like, and there\'s the root cause for Gujarat: the DSA channel. The file never leaves the bank\'s tenant."',
+        say: '"Which credit desk approved a loan isn\'t bureau data. The bank uploads it, the platform joins it to the market like-for-like, and there\'s the root cause for Gujarat: loans auto-approved with no manual review. The file never leaves the bank\'s tenant."',
         tip: 'The sample file is built in, so there is no need to carry a CSV.' },
       { view: 'analyst', setup: async () => {
           for (const x of ['What is happening in personal loans?', 'Compare that with Gujarat.', 'Now compare it with my portfolio.', "Show me HDFC's delinquency"]) { PIQ.chatUI.ask(x); await wait(900); }

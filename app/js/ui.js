@@ -50,7 +50,7 @@
 
   // --- global filter state (product + state) shared by all views ---
   // Default: the member's entire portfolio (all products, all states), 30+ DPD
-  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30' };
+  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30', measure: 'dpd' }; // measure: 'dpd' | 'ats' (average ticket size)
   const subs = [];
   function setState(patch) { Object.assign(state, patch); subs.forEach((f) => f(state)); }
   function onState(f) { subs.push(f); }
@@ -85,7 +85,8 @@
     const pv = opts.allProducts === false && state.p === 'ALL' ? 'PL' : state.p;
     select(bar, 'Product', productOptions(opts.allProducts), pv, (v) => setState({ p: v }));
     if (opts.state !== false) select(bar, 'State', stateOptions(), state.s, (v) => setState({ s: v }));
-    if (opts.dpd) seg(bar, 'Delinquency', PIQ.sem.DPD_METRICS.map((id) => ({ id, name: PIQ.sem.METRICS[id].short.replace(' DPD', '') })), state.dpd, (v) => setState({ dpd: v }));
+    if (opts.measure) seg(bar, 'Measure', [{ id: 'dpd', name: 'Delinquency' }, { id: 'ats', name: 'Ticket size' }], state.measure, (v) => setState({ measure: v }));
+    if (opts.dpd && !(opts.measure && state.measure === 'ats')) seg(bar, 'Delinquency', PIQ.sem.DPD_METRICS.map((id) => ({ id, name: PIQ.sem.METRICS[id].short.replace(' DPD', '') })), state.dpd, (v) => setState({ dpd: v }));
     return bar;
   }
 

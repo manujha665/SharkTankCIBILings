@@ -224,7 +224,7 @@
     };
   });
 
-  def('recommend', 'Ranked, quantified recommended actions (cut-off changes, sourcing audits, early-warning checks, collections, growth).', {
+  def('recommend', 'Ranked, quantified recommended actions (cut-off changes, approval audits, early-warning checks, collections, growth).', {
     product: P_PRODUCT, state: P_STATE, focus: { type: 'string', enum: ['all', 'collections', 'growth', 'policy'] }
   }, [], (a) => {
     const p = a.product || 'ALL', s = a.state || 'ALL', focus = a.focus || 'all';
@@ -345,7 +345,7 @@
         chart: (el) => PIQ.charts.line(el, { series: [{ name: C.member.name, color: 'var(--s1)', points: S.series('member', 'ats', f) }, { name: 'Industry', color: 'var(--s3)', points: S.series('industry', 'ats', f) }], xLabel: ml, yFmt: F().inr, yTickFmt: F().metricTick('ats'), height: 200, endLabels: true }),
         sources: src('member', 'industry', 'logins'), filters: `${pLong(p)} · ${sName(s)} · ${ml(t)}`,
         followups: ['Where are my tickets biggest vs the market?', 'What is the credit profile of my recent applicants?', 'What should I do about it?'],
-        link: { view: 'tickets', params: {} }
+        link: { view: 'overview', params: { p, s, measure: 'ats' } }
       },
       facts: { member: F().inr(m1), industry: F().inr(i1), memberYoY: F().chg(m1 / m0 - 1), industryYoY: F().chg(i1 / i0 - 1), weakBandRatio: wR.toFixed(2), primeBandRatio: sR.toFixed(2), amountAsked: F().inr(lq.mem.ticket), industryAmountAsked: F().inr(lq.ind.ticket) }
     };
@@ -521,7 +521,7 @@
     facts: { datasets: Object.values(S.DATASETS).map((d) => d.name) }
   }));
 
-  def('uploaded_insight', 'Insights from the file the member uploaded: a Portfolio Review output (Consumer, Commercial, Microfinance or MFI + Consumer PR, analysed on its own) or a custom file (e.g. sourcing channel) joined to industry benchmarks.', {}, [], () => {
+  def('uploaded_insight', 'Insights from the file the member uploaded: a Portfolio Review output (Consumer, Commercial, Microfinance or MFI + Consumer PR, analysed on its own) or a custom file (e.g. approval route) joined to industry benchmarks.', {}, [], () => {
     const U = PIQ.uploadedPR;
     if (U && PIQ.lastUpload === 'pr') {
       const A = U.analysis;
@@ -538,14 +538,14 @@
     }
     const ins = PIQ.uploadInsights ? PIQ.uploadInsights() : null;
     if (!ins) return {
-      answer: { paras: ['You haven\'t uploaded a file yet. On Bring Your Data, upload a Consumer, Commercial, Microfinance or MFI + Consumer PR output and I\'ll summarise what it says, or upload a custom file such as your sourcing-channel split and I\'ll benchmark it against the market.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
+      answer: { paras: ['You haven\'t uploaded a file yet. On Bring Your Data, upload a Consumer, Commercial, Microfinance or MFI + Consumer PR output and I\'ll summarise what it says, or upload a custom file such as your approval-route split and I\'ll benchmark it against the market.'], sources: [], filters: '—', followups: [], link: { view: 'upload', params: {} } },
       facts: { uploaded: false }
     };
     const dims = Object.keys(ins.byDim);
     const [wd, ws, wb] = ins.worst.k.split('|');
     return {
       answer: {
-        paras: [`From **${PIQ.uploaded.name}** (${ml(ins.last)}), joined to industry rates for the same product, state and risk band:`, `The weakest slice is **${wd}-sourced ${wb === 'NPSB' ? 'near-prime & subprime' : 'prime'} in ${D.S[ws].name}**, at **${ins.worst.idx.toFixed(2)}×** the market's delinquency for the same segments.`],
+        paras: [`From **${PIQ.uploaded.name}** (${ml(ins.last)}), joined to industry rates for the same product, state and risk band:`, `The weakest slice is **${wb === 'NPSB' ? 'near-prime & subprime' : 'prime'} loans in ${D.S[ws].name} via "${wd}"**, at **${ins.worst.idx.toFixed(2)}×** the market's delinquency for the same segments.`],
         bullets: dims.map((d) => { const x = ins.byDim[d]; return `**${d}**: 30+ DPD ${F().pct(x.d30 / x.bal)} vs market-expected ${F().pct(x.exp / x.bal)} (${(x.d30 / x.exp).toFixed(2)}×)`; }),
         chart: (el) => PIQ.charts.bars(el, { items: dims.map((d) => ({ label: d, value: ins.byDim[d].d30 / ins.byDim[d].bal, ref: ins.byDim[d].exp / ins.byDim[d].bal })), fmt: (v) => F().pct(v), color: 'var(--s1)', valueName: 'Yours', refName: 'Market-expected' }),
         sources: ['Your uploaded file (private)', S.DATASETS.industry.name], filters: `${PIQ.uploaded.dimName || 'segment'} · ${ml(ins.last)}`,
@@ -672,7 +672,7 @@
       const term = /cure/.test(t) ? 'cure' : /90/.test(t) ? 'dpd90' : /30|dpd/.test(t) ? 'dpd30' : /mix/.test(t) ? 'mix' : /market effect/.test(t) ? 'market' : /prime|band/.test(t) ? 'bands' : 'dpd30';
       return call('define', { term });
     }
-    if (/upload|my file|sourcing channel|\bchannel|\bdsa\b|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
+    if (/upload|my file|approval route|credit hub|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
     if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
       return call('overlap', { segment: /director|promoter|related part|msme|commercial/.test(t) ? 'msme_retail' : 'retail_mfi' });

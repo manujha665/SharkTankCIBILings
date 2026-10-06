@@ -20,7 +20,7 @@
  *    subprime, mostly in Uttar Pradesh and Gujarat. PL and MSME also grow faster than the
  *    rest of the book, so the whole portfolio's mix gets riskier.
  *  - Uttar Pradesh: the market itself is deteriorating AND the member added risk.
- *  - Gujarat: the market is benign; the member's deterioration is idiosyncratic (DSA sourcing).
+ *  - Gujarat: the market is benign; the member's deterioration is idiosyncratic (approval process).
  *  - Microfinance: a market-wide stress cycle (strongest in Bihar, Odisha, West Bengal...).
  *  - Last 5 days of logins: near-prime / subprime PL applications in UP & GJ spike, with
  *    high enquiry intensity — an early-warning signal before it shows up in DPD.

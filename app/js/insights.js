@@ -81,12 +81,12 @@
         states: tighten.map((x) => x.st.id), score: gain
       });
     }
-    // 2) idiosyncratic deterioration with a flat market -> sourcing audit
+    // 2) idiosyncratic deterioration with a flat market -> approvals audit
     perState.filter((x) => x.dec.own > 0.003 && Math.abs(x.dec.indDelta) < 0.002 && Math.abs(x.dec.market) < x.dec.own).forEach((x) => {
       recs.push({
         id: 'sourcing-' + p + '-' + x.st.id, priority: 2, kind: 'operations', p,
-        title: `Audit ${P.name} sourcing in ${x.st.name}: the market is flat, your book isn't`,
-        why: `Industry ${P.name} 30+ DPD in ${x.st.name} moved only ${F().bps(x.dec.indDelta)} since ${D.monthLabel(C.policyChangeMonth)}; yours rose ${F().bps(x.dec.delta)}, of which ${F().bps(x.dec.own)} is member-specific (same segments, worse performance). This points to channel / DSA or underwriting execution, not the economy.`,
+        title: `Audit ${P.name} approvals in ${x.st.name}: the market is flat, your book isn't`,
+        why: `Industry ${P.name} 30+ DPD in ${x.st.name} moved only ${F().bps(x.dec.indDelta)} since ${D.monthLabel(C.policyChangeMonth)}; yours rose ${F().bps(x.dec.delta)}, of which ${F().bps(x.dec.own)} is member-specific (same segments, worse performance). This points to underwriting or approval execution, not the economy.`,
         impact: [['Member-specific effect', F().bps(x.dec.own), 'bad'], ['Market effect', F().bps(x.dec.market), '']],
         action: { view: 'upload', params: {} },
         states: [x.st.id], score: x.dec.own * 100

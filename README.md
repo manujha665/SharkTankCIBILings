@@ -32,14 +32,14 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 - **Lender categories (8):** PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC.
 - **Delinquency buckets:** a 30+ / 90+ / 180+ switch in the filter bar (default 30+).
 
-## What's inside (14 modules)
+## What's inside
 
 | Module | What it shows | Why it matters in the pitch |
 |---|---|---|
-| **Command Centre** | Monday-morning view: the headline number, "is it me or the market", auto alerts, top 3 actions | Opens the story in 30 seconds |
+| **Command Centre** | Monday-morning view led by the early-warning alerts, then the headline number, "is it me or the market" and the top 3 actions | Opens the story in 30 seconds |
 | **Industry Intelligence** | Market trends by product, state, lender type and risk band; standard vs self-service modes with saved views | Replaces static industry reports |
 | **Peer Benchmarking** | You vs a peer group vs industry across 8 lender categories (PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC); custom peer builder; state × band heatmap | Privacy guardrails enforced live |
-| **Ticket Size** ⭐ | Average ticket of new loans (value disbursed ÷ new accounts, bureau-reported at opening) vs peers and industry, by risk band, state, lender category and product, plus the amount asked in enquiries. Also on the Command Centre, in Peer Benchmarking and Industry Intelligence, and in the AI analyst | Bigger loans to riskier borrowers is an early warning |
+| **Ticket size (a measure, not a page)** | Average ticket of new loans (value disbursed ÷ new accounts, bureau-reported at opening). Switch **Measure → Ticket size** in the filter bar on the Command Centre, Industry Intelligence and Peer Benchmarking; ticket-size alerts (bigger loans to riskier borrowers), amount asked in enquiries on the login pulse, and in the AI analyst | One bureau variable every dashboard was missing |
 | **Fresh Signals (weekly)** ⭐ | What weekly & fortnightly submissions add: latest DPD vs the monthly file, fresh EMI bounces, repayments vs dues, current balances, first-payment defaults, bounce hotspots, uses by team | Stress seen weeks before the monthly file |
 | **Overlap Intelligence** ⭐ | Retail × Microfinance (8 Cr MFI base → 50% retail footprint → 25% live-to-live; products, states, MFI lender count, stress spill-over, member exposure) and Commercial × Retail (MSME promoters' retail loans as early warning) | Only a bureau can see these |
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
@@ -47,7 +47,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state. The member's **current cut-offs by product × state** can be typed into a grid or imported as CSV (long or wide layout), with a feasibility assessment on the page | "Surgical, not blanket" policy |
 | **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a **last 7 / 15 / 30 days** quality check (dropdown): applicants with more than one enquiry on the same day, score banding, expected probability of default, PIN-code risk tier (high / medium / low), the applicant's bureau credit profile (new to credit, thin file, established, already leveraged, existing customer) and the loan amount requested. Everything comes from bureau enquiry and tradeline data | Earliest warning signal; no competitor shows it |
 | **AI Analyst** | Chat or **speak** (🎤 voice input), 70-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
-| **Bring Your Data** | Four upload buttons for bureau Portfolio Review outputs (**Consumer PR, Commercial PR, Microfinance PR, MFI + Consumer PR**), each with its own layout, sample file and analysis computed from that file alone; plus custom files (e.g. sourcing channel) joined to industry | Extends the platform beyond bureau fields |
+| **Bring Your Data** | Four upload buttons for bureau Portfolio Review outputs (**Consumer PR, Commercial PR, Microfinance PR, MFI + Consumer PR**), each with its own layout, sample file and analysis computed from that file alone; plus custom files with the bank's own fields (e.g. approval route) joined to industry | Extends the platform beyond bureau fields |
 | **Action Board** ⭐ | Pin anything from any module (📌 buttons or right-click → "Send to Action Board"; highlight text to send just that). Each action keeps its source module and filters, gets priority, owner, due date, status and notes; export to CSV, print, feeds the Board Brief | Insight → action in one click |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
 | **Governance & Trust** | Tenant isolation, peer privacy rules, metric catalogue, live audit trail | Answers the "can we trust AI?" question |
@@ -61,8 +61,8 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 2. **Why?** 38% mix shift, 14% market, 48% member-specific. It's mostly within the bank's control.
 3. **Uttar Pradesh**: the market is deteriorating *and* the bank added risk. **Gujarat**: the market is flat; the deterioration is the bank's own.
 4. **Logins**: near-prime and subprime applications in UP & Gujarat are up ~95% in 5 days, with high enquiry intensity. The **last 7 days' logins** carry an expected PD of 5.2% vs 4.6% before (UP personal loans: 8.8%), driven by **already-leveraged applicants** (3+ live loans in the bureau) and **high-risk PIN codes**. Their near-prime and subprime PL tickets are also **1.5× the market's** (UP: ₹2.0 L → ₹2.9 L since Feb). That's the next wave, visible now.
-5. **What to do**: restore 700 in UP & Gujarat only (the simulator shows net contribution rises), add checks on the application surge, and audit sourcing in Gujarat.
-6. **Bring your data**: upload the channel file and DSA-sourced near-prime in Gujarat runs at **2.36×** the market. Root cause found.
+5. **What to do**: restore 700 in UP & Gujarat only (the simulator shows net contribution rises), add checks on the application surge, and audit approvals in Gujarat.
+6. **Bring your data**: upload the bank's own approval-route file: near-prime loans in Gujarat that were auto-approved with no manual review run at **2.36×** the market. Root cause found.
 7. **Credit cards** are a strength (203 bps better than PVT · Mid-size peers), so there's room to grow.
 
 ## Architecture
