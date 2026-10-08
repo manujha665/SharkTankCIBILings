@@ -31,26 +31,29 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 - **Geography (24):** every state individually, the 8 north-eastern states grouped as **North-East states**, Delhi (NCT), Jammu & Kashmir, and **Other UTs**, plus **All states** (the default).
 - **Lender categories (8):** PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC.
 - **Delinquency buckets:** a 30+ / 90+ / 180+ switch in the filter bar (default 30+).
+- **Recent disbursements:** All loans / disbursed in the last 3, 6, 9 or 12 months, on Portfolio Pulse, Industry Intelligence and Peer Benchmarking. Only those months' loans count (amortised), with delinquency adjusted for how long they have had to season. Industry and peers are filtered the same way. Greyed out on the Logins Pulse, because logins are applications, not disbursed loans.
+- **PIN-code risk:** All / low / medium / high-risk PIN codes, on the same three pages plus the Logins Pulse, to see how every number moves in a riskier geography. Early-warning alerts and the AI analyst always use the whole book.
 
 ## What's inside
 
 | Module | What it shows | Why it matters in the pitch |
 |---|---|---|
-| **Command Centre** | Monday-morning view led by the early-warning alerts, then the headline number, "is it me or the market" and the top 3 actions | Opens the story in 30 seconds |
+| **Portfolio Pulse** | Monday-morning view led by the early-warning alerts, then the headline number, "is it me or the market" and the top 3 actions | Opens the story in 30 seconds |
 | **Industry Intelligence** | Market trends by product, state, lender type and risk band; standard vs self-service modes with saved views | Replaces static industry reports |
 | **Peer Benchmarking** | You vs a peer group vs industry across 8 lender categories (PSU, PVT, NBFC, Fintech, SFB, MFI, RRB/DCCB, HFC); custom peer builder; state × band heatmap | Privacy guardrails enforced live |
-| **Ticket size (a measure, not a page)** | Average ticket of new loans (value disbursed ÷ new accounts, bureau-reported at opening). Switch **Measure → Ticket size** in the filter bar on the Command Centre, Industry Intelligence and Peer Benchmarking; ticket-size alerts (bigger loans to riskier borrowers), amount asked in enquiries on the login pulse, and in the AI analyst | One bureau variable every dashboard was missing |
+| **Ticket size (a measure, not a page)** | Average ticket of new loans (value disbursed ÷ new accounts, bureau-reported at opening). Switch **Measure → Ticket size** in the filter bar on the Portfolio Pulse, Industry Intelligence and Peer Benchmarking; ticket-size alerts (bigger loans to riskier borrowers), amount asked in enquiries on the login pulse, and in the AI analyst | One bureau variable every dashboard was missing |
 | **Fresh Signals (weekly)** ⭐ | What weekly & fortnightly submissions add: latest DPD vs the monthly file, fresh EMI bounces, repayments vs dues, current balances, first-payment defaults, bounce hotspots, uses by team | Stress seen weeks before the monthly file |
 | **Overlap Intelligence** ⭐ | Retail × Microfinance (8 Cr MFI base → 50% retail footprint → 25% live-to-live; products, states, MFI lender count, stress spill-over, member exposure) and Commercial × Retail (MSME promoters' retail loans as early warning) | Only a bureau can see these |
 | **Why did it change?** ⭐ | Splits any delinquency move into **mix shift / market-wide / member-specific** with a waterfall and segment table | The hero innovation: no bureau offers this self-serve |
 | **What should I do?** ⭐ | Ranked, quantified recommendations, each linked to a simulation | Turns insight into decisions |
 | **Policy Simulator** | Score cut-off slider → approvals, bad rate, expected loss, net contribution; best cut-off per state. The member's **current cut-offs by product × state** can be typed into a grid or imported as CSV (long or wide layout), with a feasibility assessment on the page | "Surgical, not blanket" policy |
-| **Login & Application Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a **last 7 / 15 / 30 days** quality check (dropdown): applicants with more than one enquiry on the same day, score banding, expected probability of default, PIN-code risk tier (high / medium / low), the applicant's bureau credit profile (new to credit, thin file, established, already leveraged, existing customer) and the loan amount requested. Everything comes from bureau enquiry and tradeline data | Earliest warning signal; no competitor shows it |
+| **Logins Pulse** ⭐ | Last 5 days of applications vs the market (weekday-adjusted), enquiry intensity, plus a **last 7 / 15 / 30 days** quality check (dropdown): applicants with more than one enquiry on the same day, score banding, expected probability of default, PIN-code risk tier (high / medium / low), the applicant's bureau credit profile (new to credit, thin file, established, already leveraged, existing customer) and the loan amount requested. Everything comes from bureau enquiry and tradeline data | Earliest warning signal; no competitor shows it |
 | **AI Analyst** | Chat or **speak** (🎤 voice input), 70-question library, follow-ups with memory, sources on every answer, guardrails | The new interface to all of the above |
 | **Bring Your Data** | Four upload buttons for bureau Portfolio Review outputs (**Consumer PR, Commercial PR, Microfinance PR, MFI + Consumer PR**), each with its own layout, sample file and analysis computed from that file alone; plus custom files with the bank's own fields (e.g. approval route) joined to industry | Extends the platform beyond bureau fields |
 | **Action Board** ⭐ | Pin anything from any module (📌 buttons or right-click → "Send to Action Board"; highlight text to send just that). Each action keeps its source module and filters, gets priority, owner, due date, status and notes; export to CSV, print, feeds the Board Brief | Insight → action in one click |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
 | **Governance & Trust** | Tenant isolation, peer privacy rules, metric catalogue, live audit trail | Answers the "can we trust AI?" question |
+| **Glossary** | About 80 terms and calculations in plain English (cure rate, roll-forward, SMA-2, ticket size, PIN-code risk…), with search. Hover over any dotted-underlined term anywhere in the app for a short explanation bubble that fades when you move away | Nobody gets lost in jargon |
 
 ## The demo story (built into the synthetic data)
 

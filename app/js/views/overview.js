@@ -1,4 +1,4 @@
-/* Command Centre — the Monday-morning view: what changed, is it me or the market, what to do. */
+/* Portfolio Pulse — the Monday-morning view: what changed, is it me or the market, what to do. */
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, ml, state, card, stat, tone, sourceText, pageHead, productStateFilters, stateName, prodName, prodLong } = PIQ.ui;
@@ -162,7 +162,7 @@
     const p = state.p, s = state.s, met = state.dpd, MS = S.METRICS[met].short;
     const snap = PIQ.insights.snapshot(p, s, met);
     pageHead(root, `Good morning, ${C.member.user.split(' ')[0]}`, `Here's what changed in your ${p === 'ALL' ? 'entire portfolio' : prodLong(p).toLowerCase() + ' book'}, whether it's you or the market, and what to do about it.`);
-    productStateFilters(root, { dpd: true, measure: true });
+    productStateFilters(root, { dpd: true, measure: true, scope: true });
 
     alertsBand(root);
     if (state.measure === 'ats') ticketHero(root, p, s); else dpdHero(root, p, s, met, MS, snap);
@@ -242,5 +242,5 @@
     });
   }
 
-  PIQ.views.overview = { title: 'Command Centre', render };
+  PIQ.views.overview = { title: 'Portfolio Pulse', render };
 })();

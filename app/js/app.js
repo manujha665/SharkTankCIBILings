@@ -4,7 +4,7 @@
   const C = PIQ.config;
   const NAV = [
     { sec: 'Intelligence' },
-    { id: 'overview', name: 'Command Centre', ico: '◎' },
+    { id: 'overview', name: 'Portfolio Pulse', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
@@ -13,15 +13,19 @@
     { id: 'actions', name: 'Action Board', ico: '📌', tag: 'new' },
     { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },
-    { id: 'logins', name: 'Login & Application Pulse', ico: '⚡', tag: 'new' },
+    { id: 'logins', name: 'Logins Pulse', ico: '⚡', tag: 'new' },
     { sec: 'Ask & extend' },
     { id: 'analyst', name: 'AI Analyst', ico: '✦' },
     { id: 'upload', name: 'Bring Your Data', ico: '⇪' },
     { id: 'brief', name: 'Board Brief', ico: '▤' },
     { sec: 'Trust' },
-    { id: 'governance', name: 'Governance & Trust', ico: '⛨' }
+    { id: 'governance', name: 'Governance & Trust', ico: '⛨' },
+    { id: 'glossary', name: 'Glossary', ico: '📖', tag: 'new' }
   ];
   let current = 'overview';
+  const SCOPED = ['overview', 'industry', 'benchmark', 'logins'];
+  const applyScope = () => PIQ.sem.setScope(SCOPED.includes(current) ? { vintage: state.vintage, pin: state.pin } : {});
+  PIQ.applyScope = applyScope;
   PIQ.routeParams = {};
 
   function buildSide() {
@@ -82,8 +86,16 @@
     const view = document.getElementById('view');
     view.innerHTML = '';
     PIQ.charts.hideTip();
+    // the recent-disbursement and PIN-risk filters apply only on these pages
+    applyScope();
     PIQ.views[current].render(view, PIQ.routeParams || {});
   }
+
+  // Glossary hover: mark known terms in whatever the page (or the AI drawer) shows, including content drawn later
+  let glPending = false;
+  const glRun = () => { glPending = false; ['view', 'drawer'].forEach((id) => PIQ.glossary.decorate(document.getElementById(id))); };
+  const glObs = new MutationObserver(() => { if (!glPending) { glPending = true; requestAnimationFrame(glRun); } });
+  ['view', 'drawer'].forEach((id) => { const el = document.getElementById(id); if (el) glObs.observe(el, { childList: true, subtree: true }); });
 
   function go(id, params) {
     current = id;

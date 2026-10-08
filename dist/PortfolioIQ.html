@@ -149,16 +149,16 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .span2 { grid-column: span 2; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; }
 .card-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
-.card-head h3 { font-size: 14.5px; }
-.card-head .sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.card-head h3 { font-size: 16px; font-weight: 650; color: var(--ink); }
+.card-head .sub { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
 .card-tools { margin-left: auto; display: flex; gap: 6px; }
 .source { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; }
 .source::before { content: '⛁'; }
-.section-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: 22px 0 10px; font-weight: 600; }
+.section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); margin: 22px 0 10px; font-weight: 600; }
 
 /* stat tiles */
 .stat { display: flex; flex-direction: column; gap: 2px; }
-.stat-label { font-size: 12px; color: var(--ink-3); }
+.stat-label { font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 .stat-delta { font-size: 12px; }
 .stat-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -442,6 +442,31 @@ body.touring .fab { display: none; }
 .hero-card .grid.g2 { align-items: center; }
 @media (max-width: 1100px) { .alert-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .alert-grid { grid-template-columns: minmax(0, 1fr); } .alerts-head h2 { font-size: 22px; } }
+
+/* Scope filters (recent disbursements, PIN-code risk) */
+.scope-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -6px 0 16px; padding: 10px 14px; border-radius: 10px; font-size: 13.5px; background: color-mix(in oklab, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent); }
+.scope-note > span { flex: 1 1 420px; }
+.scope-note .btn { margin-left: auto; }
+.field select:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ---------- glossary ---------- */
+.gl { border-bottom: 1px dotted color-mix(in oklab, currentColor 45%, transparent); cursor: help; }
+.gl:hover { color: var(--accent-ink); border-bottom-style: solid; }
+.bubble-gl { position: fixed; z-index: 2000; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,0.16); padding: 12px 14px; font-size: 13px; line-height: 1.45; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s; pointer-events: none; }
+.bubble-gl.on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.15s ease, transform 0.15s ease; pointer-events: auto; }
+.bg-term { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--accent-ink); }
+.bg-def { color: var(--ink); }
+.bg-calc { margin-top: 6px; color: var(--ink-2); font-size: 12.5px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; }
+.bg-more { margin-top: 8px; background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.bg-more:hover { text-decoration: underline; }
+.gl-search { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; position: sticky; top: 0; z-index: 5; background: var(--page); padding: 8px 0; }
+.gl-search input { flex: 1; max-width: 520px; padding: 10px 14px; font: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.gl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.gl-card { padding: 14px 16px; transition: box-shadow 0.3s, border-color 0.3s; }
+.gl-term { font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 2px; }
+.gl-def { margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
+.gl-calc { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.gl-card.flash { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,120,214,0.3); }
 
 </style>
 </head>
@@ -936,7 +961,7 @@ body.touring .fab { display: none; }
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES, PIN_BY_BAND,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores
@@ -1007,7 +1032,115 @@ body.touring .fab { display: none; }
     if (!c) throw new Error('Unknown source ' + source);
     return c;
   };
-  const agg = (source, f) => cube(source).sum(f);
+  const aggRaw = (source, f) => cube(source).sum(f);
+
+  // ---------------- Scope filters: recent disbursements (vintage) and PIN-code risk tier ----------------
+  // Applied on Portfolio Pulse, Industry Intelligence, Peer Benchmarking and Logins Pulse.
+  //  vintage N (3/6/9/12): only loans disbursed in the last N months. Balance = each month's disbursals,
+  //    amortised; delinquency follows a seasoning curve (young loans have had less time to go bad).
+  //  pin 'L' | 'M' | 'H': only borrowers in low / medium / high-risk PIN codes. Split by the band-and-state
+  //    PIN mix the bureau sees, with delinquency scaled by each tier's relative risk.
+  let SCOPE = {};
+  const scopeCache = new Map();
+  const scoped = () => !!(SCOPE.vintage || SCOPE.pin);
+  function setScope(sc) {
+    const next = { vintage: sc && +sc.vintage ? +sc.vintage : 0, pin: sc && sc.pin && sc.pin !== 'ALL' ? sc.pin : null };
+    if (next.vintage !== SCOPE.vintage || next.pin !== SCOPE.pin) scopeCache.clear();
+    SCOPE = next;
+  }
+  const getScope = () => Object.assign({}, SCOPE);
+  function withScope(sc, fn) { const prev = getScope(); setScope(sc); try { return fn(); } finally { setScope(prev); } }
+  const SEAS30 = (age) => Math.min(1.25, 0.35 + 0.12 * age);         // early delinquency builds up over ~8 months
+  const SEAS90 = (age) => Math.min(1.2, Math.max(0.02, (age - 2) * 0.15)); // 90+ needs at least 3 months
+  const MEAS_KEYS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD', 'newAcc'];
+  // each month's disbursals for a slice, read once and reused by every vintage window
+  const origCache = new Map();
+  function origSeries(source, f) {
+    const key = source + '|' + JSON.stringify(Object.assign({}, f, { m: null }));
+    let ser = origCache.get(key);
+    if (!ser) {
+      if (origCache.size > 50000) origCache.clear();
+      ser = D.MONTHS.map((m) => { const r = aggRaw(source, Object.assign({}, f, { m })); return { orig: r.orig, newAcc: r.newAcc }; });
+      origCache.set(key, ser);
+    }
+    return ser;
+  }
+  function vintageAgg(source, f) {
+    const cur = aggRaw(source, f);
+    const mi = D.MONTHS.indexOf(f.m);
+    if (!cur.bal || mi < 0) return cur;
+    let vb = 0, w30 = 0, w90 = 0, o = 0, na = 0;
+    // the member's post-loosening personal-loan vintages in weak bands are worse than its back book
+    const pt = D.MONTHS.indexOf(C.policyChangeMonth), weakPL = source === 'member' && f.p === 'PL' && (f.b === 'NP' || f.b === 'SB');
+    const ser = origSeries(source, f);
+    for (let k = Math.max(0, mi - SCOPE.vintage + 1); k <= mi; k++) {
+      const age = mi - k, ok = ser[k];
+      const live = ok.orig * Math.pow(0.97, age), q = weakPL && k >= pt ? 1.35 : 1;
+      vb += live; w30 += live * SEAS30(age) * q; w90 += live * SEAS90(age) * q; o += ok.orig; na += ok.newAcc || 0;
+    }
+    if (!vb) return Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+    const k = vb / cur.bal, s30 = w30 / vb, s90 = w90 / vb;
+    return {
+      bal: vb, acc: cur.acc * k, orig: o, newAcc: na,
+      d30: cur.d30 * k * s30, d90: cur.d90 * k * s90, d180: cur.d180 * k * s90 * 0.45,
+      cureN: cur.cureN * k, cureD: cur.cureD * k
+    };
+  }
+  function pinWeights(s, b) {
+    const r = D.S[s].risk, pw = D.PIN_BY_BAND[b], w = [pw[0] * r * r, pw[1], pw[2] / r], t = w[0] + w[1] + w[2];
+    const sh = w.map((x) => x / t), mult = D.PINS.map((x) => x.pd), avg = sh.reduce((a, x, i) => a + x * mult[i], 0);
+    return { sh, k: mult.map((x) => x / avg) };
+  }
+  const PIN_IDX = { H: 0, M: 1, L: 2 };
+  function aggScoped(source, f) {
+    const key = source + '|' + JSON.stringify(f) + '|' + SCOPE.vintage + '|' + SCOPE.pin;
+    if (scopeCache.has(key)) return scopeCache.get(key);
+    const out = Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+    const months = f.m == null ? D.MONTHS : asList(f.m);
+    const bands = asList(f.b) || D.BANDS.map((x) => x.id), states = asList(f.s) || D.STATES.map((x) => x.id);
+    // vintage quality differs by product, so split the whole book by product (and band) for it
+    let pcs = bands.map((b) => ({ b }));
+    if (SCOPE.vintage && asList(f.p) == null) pcs = D.PRODUCTS.flatMap((p) => pcs.map((c) => Object.assign({ p: p.id }, c)));
+    else if (SCOPE.vintage && asList(f.p).length > 1) pcs = asList(f.p).flatMap((p) => pcs.map((c) => Object.assign({ p }, c)));
+    months.forEach((m) => {
+      // PIN tiers: for each band, how the chosen tier reshapes every measure, from that band's state mix
+      const pinF = {};
+      if (SCOPE.pin) bands.forEach((b) => {
+        const fb = Object.assign({}, f, { m, b }), base = aggRaw(source, fb), acc = Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+        const pi = PIN_IDX[SCOPE.pin];
+        states.forEach((st) => {
+          const r = aggRaw(source, Object.assign({}, fb, { s: st })), pw = pinWeights(st, b), w = pw.sh[pi], k = pw.k[pi];
+          acc.bal += r.bal * w; acc.acc += r.acc * w; acc.orig += r.orig * w;
+          acc.newAcc += (r.newAcc || 0) * w * (pi === 0 ? 1.12 : pi === 2 ? 0.94 : 1);
+          acc.d30 += r.d30 * w * k; acc.d90 += r.d90 * w * k; acc.d180 += r.d180 * w * k;
+          acc.cureN += r.cureN * w * Math.min(1.3, Math.pow(1 / k, 0.35)); acc.cureD += r.cureD * w;
+        });
+        pinF[b] = Object.fromEntries(MEAS_KEYS.map((x) => [x, base[x] ? acc[x] / base[x] : 0]));
+      });
+      pcs.forEach((pc) => {
+        const ff = Object.assign({}, f, { m }, pc);
+        const a = SCOPE.vintage ? vintageAgg(source, ff) : aggRaw(source, ff);
+        MEAS_KEYS.forEach((x) => (out[x] += (a[x] || 0) * (SCOPE.pin ? pinF[pc.b][x] : 1)));
+      });
+    });
+    scopeCache.set(key, out);
+    return out;
+  }
+  function agg(source, f) {
+    if (scoped() && (source === 'member' || source === 'industry')) return aggScoped(source, f || {});
+    if (SCOPE.pin && source === 'logins') {
+      if (!f || f.pin == null) return aggRaw(source, Object.assign({}, f, { pin: SCOPE.pin }));
+      if (f.pin !== SCOPE.pin) { const z = aggRaw(source, f); return Object.fromEntries(Object.keys(z).map((x) => [x, 0])); }
+    }
+    return aggRaw(source, f);
+  }
+  // peers carry fewer dimensions: under a scope, scale the peer value by how the same scope moves the industry
+  function peerScale(metric, f, m) {
+    if (!scoped()) return 1;
+    const ff = Object.assign({}, f, { m });
+    const a = metricOf(agg('industry', ff), metric), b = metricOf(aggRaw('industry', ff), metric);
+    return a != null && b ? a / b : 1;
+  }
   function series(source, metric, f) {
     return D.MONTHS.map((m) => ({ x: m, y: metricOf(agg(source, Object.assign({}, f, { m })), metric) }));
   }
@@ -1059,7 +1192,7 @@ body.touring .fab { display: none; }
     if (!chk.ok) return { suppressed: true, check: chk, points: [] };
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
     if (METRICS[metric].peerFromIndustry) return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('industry', Object.assign({}, f, { l: g.types, m })), metric) })) };
-    return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric) })) };
+    return { suppressed: false, check: chk, points: D.MONTHS.map((m) => { const y = metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric); return { x: m, y: y == null ? y : y * peerScale(metric, f, m) }; }) };
   }
   function peerValue(groupId, metric, f) {
     const g = groupOf(groupId);
@@ -1067,7 +1200,8 @@ body.touring .fab { display: none; }
     if (!chk.ok) return null;
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
     if (METRICS[metric].peerFromIndustry) return metricOf(agg('industry', Object.assign({}, f, { l: g.types, m: (f && f.m) || latest() })), metric);
-    return metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: (f && f.m) || latest() })), metric);
+    const mm = (f && f.m) || latest(), y = metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: mm })), metric);
+    return y == null ? y : y * peerScale(metric, f, mm);
   }
 
   // ---------------- "Why did it change?" decomposition ----------------
@@ -1245,6 +1379,7 @@ body.touring .fab { display: none; }
   let alertCache = null;
   function alerts() {
     if (alertCache) return alertCache;
+    if (scoped()) return withScope({}, alerts); // alerts always run on the full book
     const out = [];
     const t = latest(), t3 = monthsAgo(3);
     const memTot = value('member', 'bal', { m: t });
@@ -1318,7 +1453,7 @@ body.touring .fab { display: none; }
   }
 
   PIQ.sem = {
-    METRICS, DPD_METRICS, DATASETS, PEER_GROUPS, DEFAULT_ASSUMPTIONS, audit, log,
+    METRICS, DPD_METRICS, DATASETS, PEER_GROUPS, DEFAULT_ASSUMPTIONS, audit, log, setScope, getScope, withScope, scoped,
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,
@@ -1483,7 +1618,9 @@ body.touring .fab { display: none; }
 
   // --- global filter state (product + state) shared by all views ---
   // Default: the member's entire portfolio (all products, all states), 30+ DPD
-  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30', measure: 'dpd' }; // measure: 'dpd' | 'ats' (average ticket size)
+  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30', measure: 'dpd', vintage: 0, pin: 'ALL' };
+  // measure: 'dpd' | 'ats' (average ticket size); vintage: 0 = all loans, or 3/6/9/12 = disbursed in the last N months;
+  // pin: 'ALL' | 'L' | 'M' | 'H' = PIN-code risk tier
   const subs = [];
   function setState(patch) { Object.assign(state, patch); subs.forEach((f) => f(state)); }
   function onState(f) { subs.push(f); }
@@ -1518,8 +1655,24 @@ body.touring .fab { display: none; }
     const pv = opts.allProducts === false && state.p === 'ALL' ? 'PL' : state.p;
     select(bar, 'Product', productOptions(opts.allProducts), pv, (v) => setState({ p: v }));
     if (opts.state !== false) select(bar, 'State', stateOptions(), state.s, (v) => setState({ s: v }));
+    if (opts.scope) {
+      const vs = select(bar, 'Recent disbursements', [{ id: '0', name: 'All loans (whole book)' }].concat([3, 6, 9, 12].map((n) => ({ id: String(n), name: `Disbursed in last ${n} months` }))), String(opts.scope === 'apps' ? 0 : state.vintage), (v) => setState({ vintage: +v }));
+      if (opts.scope === 'apps') { vs.disabled = true; vs.title = 'Logins are applications, not disbursed loans, so this filter does not apply here'; }
+      select(bar, 'PIN-code risk', [{ id: 'ALL', name: 'All PIN codes' }, { id: 'L', name: 'Low-risk PIN codes' }, { id: 'M', name: 'Medium-risk PIN codes' }, { id: 'H', name: 'High-risk PIN codes' }], state.pin, (v) => setState({ pin: v }));
+    }
     if (opts.measure) seg(bar, 'Measure', [{ id: 'dpd', name: 'Delinquency' }, { id: 'ats', name: 'Ticket size' }], state.measure, (v) => setState({ measure: v }));
     if (opts.dpd && !(opts.measure && state.measure === 'ats')) seg(bar, 'Delinquency', PIQ.sem.DPD_METRICS.map((id) => ({ id, name: PIQ.sem.METRICS[id].short.replace(' DPD', '') })), state.dpd, (v) => setState({ dpd: v }));
+    if (opts.scope && ((state.vintage && opts.scope !== 'apps') || state.pin !== 'ALL')) {
+      const parts = [];
+      if (state.vintage && opts.scope !== 'apps') parts.push(`loans disbursed in the last ${state.vintage} months only`);
+      if (state.pin !== 'ALL') parts.push(`${{ L: 'low', M: 'medium', H: 'high' }[state.pin]}-risk PIN codes only`);
+      const note = h('div', 'scope-note', parent);
+      const msg = h('span', null, note);
+      h('strong', null, msg, 'Filtered view: ');
+      msg.appendChild(document.createTextNode(parts.join(' · ') + '. Industry and peers are filtered the same way, so comparisons stay like for like. Early-warning alerts always use the whole book.'));
+      const clr = h('button', 'btn sm', note, 'Clear filters');
+      clr.addEventListener('click', () => setState({ vintage: 0, pin: 'ALL' }));
+    }
     return bar;
   }
 
@@ -2171,6 +2324,7 @@ body.touring .fab { display: none; }
   function recommendations(p) {
     p = p || 'ALL';
     if (recCache.has(p)) return recCache.get(p);
+    if (S.scoped && S.scoped()) return S.withScope({}, () => recommendations(p)); // advice uses the whole book
     let recs = p === 'ALL' ? D.PRODUCTS.flatMap((x) => productRecs(x.id)) : productRecs(p);
     const g = growthRec();
     if (g && (p === 'ALL' || p === 'CC' || p === 'PL')) recs.push(g);
@@ -3041,8 +3195,251 @@ body.touring .fab { display: none; }
 })();
 
 </script>
+  <script>/* js/glossary.js */
+/*
+ * Glossary: every term and calculation used in PortfolioIQ, in plain English.
+ *  - PIQ.glossary.TERMS: the list (term, other names, group, meaning, how it is worked out)
+ *  - PIQ.glossary.decorate(el): marks known terms inside el so hovering shows a short explanation bubble
+ *  - the Glossary page (Trust section) lists everything, with search
+ */
+(function () {
+  const PIQ = window.PIQ;
+  const T = (term, alias, cat, def, calc) => ({ term, alias: alias || [], cat, def, calc: calc || '' });
+  const TERMS = [
+    // Delinquency & collections
+    T('DPD', ['days past due'], 'Delinquency & collections', 'Days past due: how many days a borrower is late on a payment.', 'Counted from the EMI due date.'),
+    T('30+ DPD', ['30+ DPD rate', '30+'], 'Delinquency & collections', 'The share of the loan book where the borrower is at least 30 days late. The earliest standard sign of stress.', 'Balance on loans 30 or more days late ÷ total balance, by value, at month end.'),
+    T('90+ DPD', ['90+ DPD rate', '90+'], 'Delinquency & collections', 'The share of the loan book at least 90 days late. At 90 days a loan is usually classed as non-performing (NPA).', 'Balance on loans 90 or more days late ÷ total balance.'),
+    T('180+ DPD', ['180+ DPD rate', '180+'], 'Delinquency & collections', 'The share of the book at least 180 days late: deep delinquency, close to a write-off.', 'Balance on loans 180 or more days late ÷ total balance.'),
+    T('Delinquency', ['delinquency rate'], 'Delinquency & collections', 'Borrowers falling behind on payments. On these screens it means the 30+, 90+ or 180+ DPD rate you pick in the filter bar.'),
+    T('Cure rate', ['collection cure rate', 'cure'], 'Delinquency & collections', 'Of the borrowers who were 30–89 days late last month, the share who caught up and became current this month. Higher is better: it shows collections are working.', 'Accounts that returned to current ÷ accounts that were 30–89 DPD a month earlier.'),
+    T('Roll-forward', ['roll rate', '90+ ÷ 30+'], 'Delinquency & collections', 'How much of the early delinquency has already slipped into later buckets. A high number means collections are not curing accounts early.', '90+ DPD balance ÷ 30+ DPD balance.'),
+    T('NPA', ['non-performing asset'], 'Delinquency & collections', 'A loan that has stopped earning: generally 90 or more days overdue under RBI rules.'),
+    T('SMA-0', [], 'Delinquency & collections', 'Special Mention Account 0: a commercial loan 1–30 days overdue. The first early-warning stage before NPA.'),
+    T('SMA-1', [], 'Delinquency & collections', 'Special Mention Account 1: a commercial loan 31–60 days overdue.'),
+    T('SMA-2', [], 'Delinquency & collections', 'Special Mention Account 2: a commercial loan 61–90 days overdue, the last stop before NPA. A rising SMA-2 book means next quarter\'s NPAs.'),
+    T('PAR 30', ['PAR30'], 'Delinquency & collections', 'Portfolio at risk, 30 days: the share of a microfinance portfolio with a payment 30+ days late. The microfinance version of 30+ DPD.', 'Outstanding of loans 30+ days late ÷ gross loan portfolio.'),
+    T('PAR 90', ['PAR90'], 'Delinquency & collections', 'Portfolio at risk, 90 days: the share of a microfinance portfolio 90+ days late.'),
+    T('EMI bounce', ['bounce rate', 'fresh bounces', 'bounces'], 'Delinquency & collections', 'An EMI that failed to collect (cheque, mandate or auto-debit returned). Bounces show up in weekly data weeks before they become 30+ DPD.', 'Bounced EMIs ÷ EMIs due in the week.'),
+    T('First-payment default', ['FPD'], 'Delinquency & collections', 'A new loan whose very first EMI is missed. Often a sign of fraud or a badly sourced loan rather than hardship.'),
+    // "Is it me or the market?"
+    T('Mix shift', ['mix effect', 'riskier mix'], 'Why did it change?', 'The part of a change in delinquency caused by your book moving towards riskier segments (for example more near-prime loans), even if each segment performed the same.', 'Change in each segment\'s share × its delinquency rate, summed over segments.'),
+    T('Market-wide', ['market effect', 'market-wide change', 'market-wide deterioration'], 'Why did it change?', 'The part of the change that would have happened anyway, because the same segments got worse across the whole market.', 'Your starting rate × how much the industry rate moved in the same product, state and risk band.'),
+    T('Member-specific', ['member-specific performance', 'own effect'], 'Why did it change?', 'The part of the change that is yours alone: your loans did worse than other lenders\' loans in exactly the same segments. This is the part you can fix.', 'Total change − mix shift − market-wide effect.'),
+    T('Decomposition', ['mix / market / member-specific'], 'Why did it change?', 'Splitting a change in delinquency into three causes: mix shift, market-wide and member-specific. Answers "is it me or the market?"'),
+    T('bps', ['basis points', 'basis point'], 'Why did it change?', 'Basis points. 100 bps = 1 percentage point. A move from 2.00% to 2.32% is +32 bps.'),
+    T('Percentage points', ['pp'], 'Why did it change?', 'The plain difference between two percentages. 30% to 34% is +4 percentage points (not +4%).'),
+    // Risk & scores
+    T('Risk band', ['score band', 'risk bands'], 'Risk & scores', 'Borrowers grouped by bureau score: Super-prime, Prime-plus, Prime, Near-prime and Subprime.'),
+    T('Super-prime', [], 'Risk & scores', 'Bureau score 791 and above: the lowest-risk borrowers.'),
+    T('Prime-plus', [], 'Risk & scores', 'Bureau score 761–790: very low risk.'),
+    T('Prime', [], 'Risk & scores', 'Bureau score 721–760: low risk.'),
+    T('Near-prime', [], 'Risk & scores', 'Bureau score 681–720: moderate risk.'),
+    T('Subprime', [], 'Risk & scores', 'Bureau score 680 and below: the highest-risk borrowers.'),
+    T('Probability of default', ['PD', 'expected PD', 'expected probability of default'], 'Risk & scores', 'The chance a borrower goes 90+ days late within 12 months. Used to judge how risky new applications are before they are booked.', 'In the prototype: score-band default rate × PIN-code tier × bureau credit profile. In production, the bureau\'s own scorecards.'),
+    T('PIN-code risk tier', ['PIN-code risk', 'high-risk PIN codes', 'medium-risk PIN codes', 'low-risk PIN codes', 'PIN tier'], 'Risk & scores', 'Every PIN code graded high, medium or low risk from its bureau-wide 90+ DPD history. Shows whether a lender is lending more in riskier localities.'),
+    T('Score cut-off', ['cut-off', 'cutoff'], 'Risk & scores', 'The minimum bureau score a lender accepts for a product. Raising it cuts risk and volume; lowering it does the opposite.'),
+    T('Bad rate', ['expected bad rate'], 'Risk & scores', 'The share of approved loans expected to go 90+ days late within 12 months.'),
+    // Applications
+    T('Logins', ['login', 'applications'], 'Applications & enquiries', 'Loan applications, seen through the credit enquiries lenders make at the bureau when someone applies.'),
+    T('Enquiry', ['enquiries', 'credit enquiry'], 'Applications & enquiries', 'A check a lender runs on the bureau when someone applies for credit. Many enquiries in a short time can signal credit hunger.'),
+    T('3+ enquiries', ['3+ enquiries in 30d', 'enquiry intensity'], 'Applications & enquiries', 'Applicants who made three or more credit enquiries in the last 30 days.'),
+    T('Same-day enquiries', ['more than one enquiry on the same day', 'same-day 2+ enq.'], 'Applications & enquiries', 'Applicants who made two or more credit enquiries on the same day, at any lender: a sign of rate-shopping or of stacking several loans before the bureau updates.'),
+    T('Approval rate', [], 'Applications & enquiries', 'The share of applications that were approved.', 'Approved applications ÷ applications.'),
+    T('Bureau credit profile', ['credit profile'], 'Applications & enquiries', 'What the applicant\'s bureau record looks like at the time of applying: new to credit, thin file, established, already leveraged, or an existing customer.'),
+    T('New to credit', ['NTC'], 'Applications & enquiries', 'An applicant with no credit history in the bureau.'),
+    T('Thin file', [], 'Applications & enquiries', 'An applicant with only one or two accounts in the bureau.'),
+    T('Established', [], 'Applications & enquiries', 'An applicant with three or more accounts and at most two live loans.'),
+    T('Already leveraged', ['leveraged'], 'Applications & enquiries', 'An applicant who already has three or more live loans in the bureau.'),
+    T('Existing customer', [], 'Applications & enquiries', 'An applicant who already has a live loan with you, as you report it to the bureau.'),
+    T('Weekday-adjusted', ['weekday-matched baseline'], 'Applications & enquiries', 'Comparing each day with the same weekday in earlier weeks, so a quiet Sunday is not mistaken for a drop.'),
+    // Ticket size & book
+    T('Average ticket size', ['ticket size', 'avg ticket', 'ticket'], 'Ticket size & book', 'The average loan amount at the time a loan is opened. Bigger loans to riskier borrowers raise the loss on every default.', 'Value disbursed ÷ number of new accounts opened, as reported to the bureau. Cards use the sanctioned limit.'),
+    T('Amount asked', ['amount requested', 'avg loan amount requested'], 'Ticket size & book', 'The loan amount an applicant asked for, as stated in the credit enquiry.'),
+    T('Recent disbursements', ['disbursed in the last', 'vintage'], 'Ticket size & book', 'A filter that shows only loans disbursed in the last 3, 6, 9 or 12 months, so you can see how new lending performs compared with the whole book.', 'Each month\'s disbursals, reduced for repayments; young loans have had less time to go late, which the figures reflect.'),
+    T('Outstanding balance', ['balance'], 'Ticket size & book', 'The total principal still owed on live loans at month end.'),
+    T('Originations', ['disbursals', 'disbursed', 'monthly originations'], 'Ticket size & book', 'New loans disbursed (or new cards issued) in the month, by value.'),
+    T('Market share', [], 'Ticket size & book', 'Your outstanding balance as a share of the whole market\'s, for the same product and state.'),
+    T('Active accounts', ['live accounts'], 'Ticket size & book', 'Open accounts with a balance or activity in the month.'),
+    // Benchmarking
+    T('Industry', ['industry rate', 'the market'], 'Benchmarking', 'All lenders reporting to the bureau, added together. Never shows any single lender.'),
+    T('Peer group', ['peers'], 'Benchmarking', 'An anonymous group of lenders similar to you, for example private banks of a similar size. Shown only as a combined figure.'),
+    T('Peer privacy rule', ['privacy rule', 'privacy check'], 'Benchmarking', 'A peer figure appears only if the group has at least 5 lenders and no single lender is more than 25% of it, so no one can be identified.'),
+    T('Like for like', ['like-for-like'], 'Benchmarking', 'Comparing the same product, state and risk band, so differences in mix do not distort the comparison.'),
+    T('PSU', [], 'Benchmarking', 'Public sector banks.'),
+    T('PVT', [], 'Benchmarking', 'Private sector banks.'),
+    T('NBFC', [], 'Benchmarking', 'Non-banking financial companies.'),
+    T('Fintech', [], 'Benchmarking', 'Fintech lenders.'),
+    T('SFB', [], 'Benchmarking', 'Small finance banks.'),
+    T('MFI', ['microfinance institution'], 'Benchmarking', 'Microfinance institutions (and microfinance lending in general).'),
+    T('RRB/DCCB', [], 'Benchmarking', 'Regional rural banks and district central co-operative banks.'),
+    T('HFC', [], 'Benchmarking', 'Housing finance companies.'),
+    // Overlaps & PR
+    T('Live-to-live', ['live-to-live overlap'], 'Overlaps & Portfolio Reviews', 'A borrower repaying a microfinance loan and a retail loan at the same time.'),
+    T('Retail footprint', ['consumer footprint', 'consumer-credit footprint'], 'Overlaps & Portfolio Reviews', 'A microfinance borrower who also appears in retail credit: an enquiry, a live loan or a closed loan.'),
+    T('Graduation pool', [], 'Overlaps & Portfolio Reviews', 'Microfinance borrowers with a clean record and no retail loans yet: ready for a first gold loan, two-wheeler or small personal loan.'),
+    T('CMR', ['CIBIL MSME Rank', 'CMR band'], 'Overlaps & Portfolio Reviews', 'CIBIL MSME Rank: a 1–10 risk rank for businesses. CMR-1 is the lowest risk, CMR-10 the highest.'),
+    T('Portfolio Review', ['PR'], 'Overlaps & Portfolio Reviews', 'The bureau\'s Portfolio Review report on a lender\'s book. Upload it on Bring Your Data (Consumer, Commercial, Microfinance or MFI + Consumer) to get its story in seconds.'),
+    T('Promoter', ['promoters', 'directors'], 'Overlaps & Portfolio Reviews', 'The owners, directors or partners of a business. Their personal credit often slips before the business does.'),
+    T('Weekly submissions', ['weekly data', 'fortnightly submissions', 'weekly / fortnightly'], 'Overlaps & Portfolio Reviews', 'Lenders sending updates to the bureau every week or fortnight instead of monthly, so stress shows up weeks earlier.'),
+    // Policy & economics
+    T('Net contribution', [], 'Policy & money', 'What a lending policy earns after funding cost, running cost and expected credit loss, per month.', 'Disbursal × (yield − cost of funds − opex) − expected credit loss.'),
+    T('Expected credit loss', ['expected loss', 'exp. loss'], 'Policy & money', 'The money a lender expects to lose on loans that go bad.', 'Disbursal × bad rate × loss given default.'),
+    T('Loss given default', ['LGD'], 'Policy & money', 'The share of a defaulted loan that is never recovered.'),
+    T('Yield', [], 'Policy & money', 'The annual interest a loan earns, as a percentage of the amount lent.'),
+    T('Cost of funds', [], 'Policy & money', 'What the lender pays to borrow the money it lends out.'),
+    T('Opex', [], 'Policy & money', 'Operating expenses: the cost of running the lending business.'),
+    // Data & governance
+    T('Tenant isolation', [], 'Data & trust', 'Each lender can only ever see its own data. Enforced in the data layer, so no screen or AI question can reach another lender\'s numbers.'),
+    T('Synthetic data', ['synthetic demo data'], 'Data & trust', 'Made-up data that behaves like real data. Everything in this prototype is synthetic; no real borrower or lender data is used.'),
+    T('Governed tools', ['governed engine'], 'Data & trust', 'The fixed set of approved calculations the AI analyst is allowed to use. The AI picks a tool and explains the result; it never invents numbers.'),
+    T('Audit trail', [], 'Data & trust', 'A log of every question asked and every calculation run, by a person or by the AI.'),
+    T('Action Board', [], 'Data & trust', 'Your to-do list of things spotted on any page, with owner, priority, due date and status.')
+  ];
+
+  // ---------- term lookup ----------
+  const byKey = new Map();
+  const names = [];
+  TERMS.forEach((t, i) => { t.id = 'g' + i; [t.term].concat(t.alias).forEach((n) => { const k = n.toLowerCase(); if (!byKey.has(k)) { byKey.set(k, t); names.push(n); } }); });
+  // ambiguous short words only when written exactly (case-sensitive)
+  const EXACT = new Set(['PR', 'PD', 'MFI', 'PSU', 'PVT', 'NBFC', 'SFB', 'HFC', 'NPA', 'CMR', 'NTC', 'LGD', 'FPD', 'DPD', 'bps', 'RRB/DCCB']);
+  const SKIP_ALONE = new Set(['pp', 'ticket', 'balance', 'industry', 'peers', 'applications', 'login', 'disbursed', 'leveraged', 'established', 'prime', 'cure', 'cutoff', '30+', '90+', '180+', 'directors', 'promoters', 'vintage', 'the market', 'bounces', 'expected loss', 'enquiries', 'logins']);
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const ordered = names.filter((n) => !SKIP_ALONE.has(n.toLowerCase())).sort((a, b) => b.length - a.length);
+  const ci = ordered.filter((n) => !EXACT.has(n)), cs = ordered.filter((n) => EXACT.has(n));
+  const RE_CI = new RegExp('(?<![\\w+-])(' + ci.map(esc).join('|') + ')(?![\\w+-])', 'gi');
+  const RE_CS = new RegExp('(?<![\\w+/-])(' + cs.map(esc).join('|') + ')(?![\\w/-])', 'g');
+  const lookup = (txt) => byKey.get(txt.toLowerCase());
+
+  // ---------- decorate: wrap known terms so hovering explains them ----------
+  const SKIP = 'button, a, input, textarea, select, option, svg, script, style, code, .gl, .nav, .side, .tour-box, .chat-input, .bubble-gl, .brand, .filters label, .glossary-page .gl-term, .gl-alias, .sev-label, .tag, .pill, .badge, .src-chip, .seg';
+  function decorate(root) {
+    if (!root) return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest(SKIP)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT)
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach((node) => {
+      const text = node.nodeValue, ownCard = node.parentElement && node.parentElement.closest('.gl-card');
+      const hits = [];
+      [RE_CI, RE_CS].forEach((re) => { re.lastIndex = 0; let m; while ((m = re.exec(text))) hits.push({ i: m.index, s: m[0] }); });
+      if (!hits.length) return;
+      hits.sort((a, b) => a.i - b.i || b.s.length - a.s.length);
+      const frag = document.createDocumentFragment();
+      let pos = 0;
+      hits.forEach((h) => {
+        if (h.i < pos) return; // overlapping match
+        const t = lookup(h.s);
+        if (!t || (ownCard && ownCard.id === 'gl-' + t.id)) return; // no self-links inside a glossary card
+        if (h.i > pos) frag.appendChild(document.createTextNode(text.slice(pos, h.i)));
+        const span = document.createElement('span');
+        span.className = 'gl';
+        span.dataset.term = t.id;
+        span.textContent = h.s;
+        frag.appendChild(span);
+        pos = h.i + h.s.length;
+      });
+      if (!pos) return;
+      if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
+
+  // ---------- hover bubble ----------
+  let bubble = null, hideTimer = null, current = null;
+  const byId = new Map(TERMS.map((t) => [t.id, t]));
+  function ensureBubble() {
+    if (bubble) return bubble;
+    bubble = document.createElement('div');
+    bubble.className = 'bubble-gl';
+    bubble.setAttribute('role', 'tooltip');
+    document.body.appendChild(bubble);
+    bubble.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    bubble.addEventListener('mouseleave', scheduleHide);
+    return bubble;
+  }
+  function show(el) {
+    const t = byId.get(el.dataset.term);
+    if (!t) return;
+    clearTimeout(hideTimer);
+    const b = ensureBubble();
+    b.innerHTML = '';
+    const h = document.createElement('div'); h.className = 'bg-term'; h.textContent = t.term; b.appendChild(h);
+    const p = document.createElement('div'); p.className = 'bg-def'; p.textContent = t.def; b.appendChild(p);
+    if (t.calc) { const c = document.createElement('div'); c.className = 'bg-calc'; c.textContent = 'How it\'s worked out: ' + t.calc; b.appendChild(c); }
+    const a = document.createElement('button'); a.type = 'button'; a.className = 'bg-more'; a.textContent = 'Open in glossary →';
+    a.addEventListener('click', () => { hide(true); PIQ.go('glossary', { term: t.id }); });
+    b.appendChild(a);
+    b.classList.add('on');
+    const r = el.getBoundingClientRect(), bw = Math.min(340, window.innerWidth - 24);
+    b.style.width = bw + 'px';
+    let left = r.left + r.width / 2 - bw / 2;
+    left = Math.max(12, Math.min(window.innerWidth - bw - 12, left));
+    b.style.left = left + 'px';
+    const below = r.bottom + 10, bh = b.offsetHeight;
+    b.style.top = (below + bh > window.innerHeight - 8 ? Math.max(8, r.top - bh - 10) : below) + 'px';
+    current = el;
+  }
+  function scheduleHide() { clearTimeout(hideTimer); hideTimer = setTimeout(() => hide(), 220); }
+  function hide(now) { if (!bubble) return; bubble.classList.remove('on'); current = null; if (now) clearTimeout(hideTimer); }
+  document.addEventListener('mouseover', (e) => { const el = e.target.closest && e.target.closest('.gl'); if (el && el !== current) show(el); else if (el) clearTimeout(hideTimer); });
+  document.addEventListener('mouseout', (e) => { const el = e.target.closest && e.target.closest('.gl'); if (el && !(e.relatedTarget && (e.relatedTarget.closest('.bubble-gl') || e.relatedTarget.closest('.gl') === el))) scheduleHide(); });
+  document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('gl')) show(e.target); });
+  window.addEventListener('scroll', () => hide(true), true);
+
+  // ---------- Glossary page ----------
+  let query = '';
+  function render(root, params) {
+    const { h, pageHead } = PIQ.ui;
+    pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Hover over a dotted-underlined term anywhere in the app to see its meaning without leaving the page.');
+    const wrap = h('div', 'glossary-page', root);
+    const bar = h('div', 'gl-search', wrap);
+    const inp = h('input', null, bar);
+    inp.type = 'search'; inp.placeholder = 'Search a term, e.g. cure rate, ticket size, SMA-2…'; inp.value = query;
+    inp.setAttribute('aria-label', 'Search the glossary');
+    const count = h('span', 'small muted', bar);
+    const list = h('div', null, wrap);
+    const cats = [...new Set(TERMS.map((t) => t.cat))];
+    const draw = () => {
+      list.innerHTML = '';
+      const q = query.trim().toLowerCase();
+      const match = (t) => !q || [t.term].concat(t.alias).some((n) => n.toLowerCase().includes(q)) || t.def.toLowerCase().includes(q);
+      let n = 0;
+      cats.forEach((c) => {
+        const items = TERMS.filter((t) => t.cat === c && match(t));
+        if (!items.length) return;
+        n += items.length;
+        h('div', 'section-title', list, c);
+        const g = h('div', 'gl-grid', list);
+        items.forEach((t) => {
+          const card = h('div', 'card gl-card', g);
+          card.id = 'gl-' + t.id;
+          h('div', 'gl-term', card, t.term);
+          if (t.alias.length) h('div', 'small muted gl-alias', card, 'Also: ' + t.alias.join(', '));
+          h('p', 'gl-def', card, t.def);
+          if (t.calc) { const c2 = h('p', 'gl-calc', card); h('strong', null, c2, 'How it\'s worked out: '); c2.appendChild(document.createTextNode(t.calc)); }
+        });
+      });
+      count.textContent = `${n} of ${TERMS.length} terms`;
+      if (!n) h('p', 'muted', list, 'No term matches. Try a shorter word.');
+    };
+    inp.addEventListener('input', () => { query = inp.value; draw(); });
+    draw();
+    if (params && params.term) {
+      query = ''; inp.value = ''; draw();
+      setTimeout(() => { const el = document.getElementById('gl-' + params.term); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 2200); } }, 50);
+    }
+  }
+
+  PIQ.glossary = { TERMS, decorate, lookup };
+  PIQ.views = PIQ.views || {};
+  PIQ.views.glossary = { title: 'Glossary', render };
+})();
+
+</script>
   <script>/* js/views/overview.js */
-/* Command Centre — the Monday-morning view: what changed, is it me or the market, what to do. */
+/* Portfolio Pulse — the Monday-morning view: what changed, is it me or the market, what to do. */
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, ml, state, card, stat, tone, sourceText, pageHead, productStateFilters, stateName, prodName, prodLong } = PIQ.ui;
@@ -3206,7 +3603,7 @@ body.touring .fab { display: none; }
     const p = state.p, s = state.s, met = state.dpd, MS = S.METRICS[met].short;
     const snap = PIQ.insights.snapshot(p, s, met);
     pageHead(root, `Good morning, ${C.member.user.split(' ')[0]}`, `Here's what changed in your ${p === 'ALL' ? 'entire portfolio' : prodLong(p).toLowerCase() + ' book'}, whether it's you or the market, and what to do about it.`);
-    productStateFilters(root, { dpd: true, measure: true });
+    productStateFilters(root, { dpd: true, measure: true, scope: true });
 
     alertsBand(root);
     if (state.measure === 'ats') ticketHero(root, p, s); else dpdHero(root, p, s, met, MS, snap);
@@ -3286,7 +3683,7 @@ body.touring .fab { display: none; }
     });
   }
 
-  PIQ.views.overview = { title: 'Command Centre', render };
+  PIQ.views.overview = { title: 'Portfolio Pulse', render };
 })();
 
 </script>
@@ -3303,7 +3700,7 @@ body.touring .fab { display: none; }
     pageHead(root, 'Industry Intelligence', 'What is happening in the market, by product, state, lender type and risk band. Use the standard view or switch to self-service to configure your own.', (r) => {
       seg(r, null, [{ id: 'standard', name: 'Standard view' }, { id: 'custom', name: 'Self-service' }], mode, (v) => { mode = v; PIQ.go('industry'); });
     });
-    const bar = productStateFilters(root, { dpd: mode !== 'custom', measure: mode !== 'custom' });
+    const bar = productStateFilters(root, { dpd: mode !== 'custom', measure: mode !== 'custom', scope: true });
     if (mode === 'custom') {
       select(bar, 'Metric', Object.values(S.METRICS).map((m) => ({ id: m.id, name: m.name })), metric, (v) => { metric = v; PIQ.go('industry'); });
       select(bar, 'Lender category', [{ id: 'ALL', name: 'All' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
@@ -3426,7 +3823,7 @@ body.touring .fab { display: none; }
     else if (!metric || metric === 'ats' || S.DPD_METRICS.includes(metric)) metric = state.dpd;
     const p = state.p, s = state.s;
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
-    const bar = productStateFilters(root);
+    const bar = productStateFilters(root, { scope: true });
     select(bar, 'Metric', S.DPD_METRICS.concat(['cure', 'ats']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (v === 'ats') setState({ measure: 'ats' }); else if (S.DPD_METRICS.includes(v)) setState({ dpd: v, measure: 'dpd' }); else { state.measure = 'dpd'; PIQ.go('benchmark'); } });
     select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 
@@ -3906,7 +4303,7 @@ body.touring .fab { display: none; }
 
 </script>
   <script>/* js/views/logins.js */
-/* Login & Application Pulse — near-real-time benchmark of the member's applications vs industry. */
+/* Logins Pulse — near-real-time benchmark of the member's applications vs industry. */
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, state, card, stat, sourceText, pageHead, productStateFilters, seg, stateName } = PIQ.ui;
@@ -3916,8 +4313,8 @@ body.touring .fab { display: none; }
   function render(root, params) {
     if (params && [7, 15, 30].includes(+params.win)) win = +params.win;
     const p = state.p, s = state.s;
-    pageHead(root, 'Login & Application Pulse', `Your last 30 days of applications against the whole market, refreshed daily (T-1, to ${C.loginsAsOf}). This is the earliest signal a lender gets: it shows up months before delinquency does.`);
-    const bar = productStateFilters(root);
+    pageHead(root, 'Logins Pulse', `Your last 30 days of applications against the whole market, refreshed daily (T-1, to ${C.loginsAsOf}). This is the earliest signal a lender gets: it shows up months before delinquency does.`);
+    const bar = productStateFilters(root, { scope: 'apps' });
     seg(bar, 'Risk bands', [{ id: 'ALL', name: 'All bands' }, { id: 'NPSB', name: 'Near-prime + Subprime' }], bands, (v) => { bands = v; PIQ.go('logins'); });
     PIQ.ui.select(bar, 'Logins', S.LOGIN_WINDOWS.map((n) => ({ id: String(n), name: `Last ${n} days` })), String(win), (v) => { win = +v; PIQ.go('logins'); }).setAttribute('aria-label', 'Login window');
     const b = bands === 'NPSB' ? ['NP', 'SB'] : null;
@@ -4090,7 +4487,7 @@ body.touring .fab { display: none; }
     });
     if (s !== 'ALL') h('div', 'small muted', sc.body, 'Showing all states for context; the filter above applies to the charts.');
   }
-  PIQ.views.logins = { title: 'Login & Application Pulse', render };
+  PIQ.views.logins = { title: 'Logins Pulse', render };
 })();
 
 </script>
@@ -5921,7 +6318,7 @@ Rules:
       } else rich(b, p);
     });
     if (a.bullets && a.bullets.length) { const ul = h('ul', null, b); a.bullets.forEach((x) => rich(ul, x, 'li')); }
-    if (a.chart) { const v = h('div', 'viz', b); v.style.marginTop = '8px'; try { a.chart(v); } catch (e) { v.textContent = ''; } }
+    if (a.chart) { const v = h('div', 'viz', b); v.style.marginTop = '8px'; try { PIQ.sem.withScope({}, () => a.chart(v)); } catch (e) { v.textContent = ''; } }
     const meta = h('div', 'bot-meta', wrap);
     if (a.sources && a.sources.length) { const s = h('span', 'src-chip', meta); h('b', null, s, '⛁ Source: '); s.appendChild(document.createTextNode(a.sources.join(' + '))); }
     if (a.filters) { const s = h('span', 'src-chip', meta); h('b', null, s, 'Filters: '); s.appendChild(document.createTextNode(a.filters)); }
@@ -5973,6 +6370,9 @@ Rules:
     convo.push({ role: 'typing' });
     renderAll();
     let result;
+    // the analyst always answers on the whole book, whatever page filters are set
+    const prevScope = PIQ.sem.getScope();
+    PIQ.sem.setScope({});
     const g = PIQ.agent.guard(q);
     const st = await PIQ.llm.status();
     await new Promise((r) => setTimeout(r, g ? 250 : 450));
@@ -5982,6 +6382,7 @@ Rules:
       console.warn('LLM unavailable, using governed engine:', e.message);
     }
     if (!result) result = PIQ.agent.answer(q).answer;
+    if (PIQ.applyScope) PIQ.applyScope(); else PIQ.sem.setScope(prevScope);
     convo.pop();
     convo.push({ role: 'bot', a: result });
     history.push({ role: 'user', text: q }, { role: 'assistant', text: (result.paras || []).concat(result.bullets || []).join('\n').replace(/\*\*/g, '') || '(chart)' });
@@ -6296,7 +6697,7 @@ Rules:
   const C = PIQ.config;
   const NAV = [
     { sec: 'Intelligence' },
-    { id: 'overview', name: 'Command Centre', ico: '◎' },
+    { id: 'overview', name: 'Portfolio Pulse', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
     { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
@@ -6305,15 +6706,19 @@ Rules:
     { id: 'actions', name: 'Action Board', ico: '📌', tag: 'new' },
     { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },
-    { id: 'logins', name: 'Login & Application Pulse', ico: '⚡', tag: 'new' },
+    { id: 'logins', name: 'Logins Pulse', ico: '⚡', tag: 'new' },
     { sec: 'Ask & extend' },
     { id: 'analyst', name: 'AI Analyst', ico: '✦' },
     { id: 'upload', name: 'Bring Your Data', ico: '⇪' },
     { id: 'brief', name: 'Board Brief', ico: '▤' },
     { sec: 'Trust' },
-    { id: 'governance', name: 'Governance & Trust', ico: '⛨' }
+    { id: 'governance', name: 'Governance & Trust', ico: '⛨' },
+    { id: 'glossary', name: 'Glossary', ico: '📖', tag: 'new' }
   ];
   let current = 'overview';
+  const SCOPED = ['overview', 'industry', 'benchmark', 'logins'];
+  const applyScope = () => PIQ.sem.setScope(SCOPED.includes(current) ? { vintage: state.vintage, pin: state.pin } : {});
+  PIQ.applyScope = applyScope;
   PIQ.routeParams = {};
 
   function buildSide() {
@@ -6374,8 +6779,16 @@ Rules:
     const view = document.getElementById('view');
     view.innerHTML = '';
     PIQ.charts.hideTip();
+    // the recent-disbursement and PIN-risk filters apply only on these pages
+    applyScope();
     PIQ.views[current].render(view, PIQ.routeParams || {});
   }
+
+  // Glossary hover: mark known terms in whatever the page (or the AI drawer) shows, including content drawn later
+  let glPending = false;
+  const glRun = () => { glPending = false; ['view', 'drawer'].forEach((id) => PIQ.glossary.decorate(document.getElementById(id))); };
+  const glObs = new MutationObserver(() => { if (!glPending) { glPending = true; requestAnimationFrame(glRun); } });
+  ['view', 'drawer'].forEach((id) => { const el = document.getElementById(id); if (el) glObs.observe(el, { childList: true, subtree: true }); });
 
   function go(id, params) {
     current = id;

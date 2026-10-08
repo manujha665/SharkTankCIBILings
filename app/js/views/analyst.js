@@ -28,7 +28,7 @@
       } else rich(b, p);
     });
     if (a.bullets && a.bullets.length) { const ul = h('ul', null, b); a.bullets.forEach((x) => rich(ul, x, 'li')); }
-    if (a.chart) { const v = h('div', 'viz', b); v.style.marginTop = '8px'; try { a.chart(v); } catch (e) { v.textContent = ''; } }
+    if (a.chart) { const v = h('div', 'viz', b); v.style.marginTop = '8px'; try { PIQ.sem.withScope({}, () => a.chart(v)); } catch (e) { v.textContent = ''; } }
     const meta = h('div', 'bot-meta', wrap);
     if (a.sources && a.sources.length) { const s = h('span', 'src-chip', meta); h('b', null, s, '⛁ Source: '); s.appendChild(document.createTextNode(a.sources.join(' + '))); }
     if (a.filters) { const s = h('span', 'src-chip', meta); h('b', null, s, 'Filters: '); s.appendChild(document.createTextNode(a.filters)); }
@@ -80,6 +80,9 @@
     convo.push({ role: 'typing' });
     renderAll();
     let result;
+    // the analyst always answers on the whole book, whatever page filters are set
+    const prevScope = PIQ.sem.getScope();
+    PIQ.sem.setScope({});
     const g = PIQ.agent.guard(q);
     const st = await PIQ.llm.status();
     await new Promise((r) => setTimeout(r, g ? 250 : 450));
@@ -89,6 +92,7 @@
       console.warn('LLM unavailable, using governed engine:', e.message);
     }
     if (!result) result = PIQ.agent.answer(q).answer;
+    if (PIQ.applyScope) PIQ.applyScope(); else PIQ.sem.setScope(prevScope);
     convo.pop();
     convo.push({ role: 'bot', a: result });
     history.push({ role: 'user', text: q }, { role: 'assistant', text: (result.paras || []).concat(result.bullets || []).join('\n').replace(/\*\*/g, '') || '(chart)' });

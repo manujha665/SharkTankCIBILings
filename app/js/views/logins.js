@@ -1,4 +1,4 @@
-/* Login & Application Pulse — near-real-time benchmark of the member's applications vs industry. */
+/* Logins Pulse — near-real-time benchmark of the member's applications vs industry. */
 (function () {
   const PIQ = window.PIQ;
   const { h, fmt, state, card, stat, sourceText, pageHead, productStateFilters, seg, stateName } = PIQ.ui;
@@ -8,8 +8,8 @@
   function render(root, params) {
     if (params && [7, 15, 30].includes(+params.win)) win = +params.win;
     const p = state.p, s = state.s;
-    pageHead(root, 'Login & Application Pulse', `Your last 30 days of applications against the whole market, refreshed daily (T-1, to ${C.loginsAsOf}). This is the earliest signal a lender gets: it shows up months before delinquency does.`);
-    const bar = productStateFilters(root);
+    pageHead(root, 'Logins Pulse', `Your last 30 days of applications against the whole market, refreshed daily (T-1, to ${C.loginsAsOf}). This is the earliest signal a lender gets: it shows up months before delinquency does.`);
+    const bar = productStateFilters(root, { scope: 'apps' });
     seg(bar, 'Risk bands', [{ id: 'ALL', name: 'All bands' }, { id: 'NPSB', name: 'Near-prime + Subprime' }], bands, (v) => { bands = v; PIQ.go('logins'); });
     PIQ.ui.select(bar, 'Logins', S.LOGIN_WINDOWS.map((n) => ({ id: String(n), name: `Last ${n} days` })), String(win), (v) => { win = +v; PIQ.go('logins'); }).setAttribute('aria-label', 'Login window');
     const b = bands === 'NPSB' ? ['NP', 'SB'] : null;
@@ -182,5 +182,5 @@
     });
     if (s !== 'ALL') h('div', 'small muted', sc.body, 'Showing all states for context; the filter above applies to the charts.');
   }
-  PIQ.views.logins = { title: 'Login & Application Pulse', render };
+  PIQ.views.logins = { title: 'Logins Pulse', render };
 })();

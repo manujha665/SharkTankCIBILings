@@ -50,7 +50,9 @@
 
   // --- global filter state (product + state) shared by all views ---
   // Default: the member's entire portfolio (all products, all states), 30+ DPD
-  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30', measure: 'dpd' }; // measure: 'dpd' | 'ats' (average ticket size)
+  const state = { p: 'ALL', s: 'ALL', peer: 'mid-pvt', dpd: 'dpd30', measure: 'dpd', vintage: 0, pin: 'ALL' };
+  // measure: 'dpd' | 'ats' (average ticket size); vintage: 0 = all loans, or 3/6/9/12 = disbursed in the last N months;
+  // pin: 'ALL' | 'L' | 'M' | 'H' = PIN-code risk tier
   const subs = [];
   function setState(patch) { Object.assign(state, patch); subs.forEach((f) => f(state)); }
   function onState(f) { subs.push(f); }
@@ -85,8 +87,24 @@
     const pv = opts.allProducts === false && state.p === 'ALL' ? 'PL' : state.p;
     select(bar, 'Product', productOptions(opts.allProducts), pv, (v) => setState({ p: v }));
     if (opts.state !== false) select(bar, 'State', stateOptions(), state.s, (v) => setState({ s: v }));
+    if (opts.scope) {
+      const vs = select(bar, 'Recent disbursements', [{ id: '0', name: 'All loans (whole book)' }].concat([3, 6, 9, 12].map((n) => ({ id: String(n), name: `Disbursed in last ${n} months` }))), String(opts.scope === 'apps' ? 0 : state.vintage), (v) => setState({ vintage: +v }));
+      if (opts.scope === 'apps') { vs.disabled = true; vs.title = 'Logins are applications, not disbursed loans, so this filter does not apply here'; }
+      select(bar, 'PIN-code risk', [{ id: 'ALL', name: 'All PIN codes' }, { id: 'L', name: 'Low-risk PIN codes' }, { id: 'M', name: 'Medium-risk PIN codes' }, { id: 'H', name: 'High-risk PIN codes' }], state.pin, (v) => setState({ pin: v }));
+    }
     if (opts.measure) seg(bar, 'Measure', [{ id: 'dpd', name: 'Delinquency' }, { id: 'ats', name: 'Ticket size' }], state.measure, (v) => setState({ measure: v }));
     if (opts.dpd && !(opts.measure && state.measure === 'ats')) seg(bar, 'Delinquency', PIQ.sem.DPD_METRICS.map((id) => ({ id, name: PIQ.sem.METRICS[id].short.replace(' DPD', '') })), state.dpd, (v) => setState({ dpd: v }));
+    if (opts.scope && ((state.vintage && opts.scope !== 'apps') || state.pin !== 'ALL')) {
+      const parts = [];
+      if (state.vintage && opts.scope !== 'apps') parts.push(`loans disbursed in the last ${state.vintage} months only`);
+      if (state.pin !== 'ALL') parts.push(`${{ L: 'low', M: 'medium', H: 'high' }[state.pin]}-risk PIN codes only`);
+      const note = h('div', 'scope-note', parent);
+      const msg = h('span', null, note);
+      h('strong', null, msg, 'Filtered view: ');
+      msg.appendChild(document.createTextNode(parts.join(' · ') + '. Industry and peers are filtered the same way, so comparisons stay like for like. Early-warning alerts always use the whole book.'));
+      const clr = h('button', 'btn sm', note, 'Clear filters');
+      clr.addEventListener('click', () => setState({ vintage: 0, pin: 'ALL' }));
+    }
     return bar;
   }
 

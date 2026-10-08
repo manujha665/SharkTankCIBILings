@@ -438,7 +438,7 @@
   });
 
   PIQ.data = {
-    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES,
+    MONTHS, DAYS, PRODUCTS, STATES, BANDS, LENDERS, PEER_DEFS, SCORE_BINS, PINS, PROFILES, PIN_BY_BAND,
     P, S, B, L, monthLabel,
     cube: { industry, member, peers, logins },
     scores

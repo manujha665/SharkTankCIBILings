@@ -12,7 +12,7 @@
     else if (!metric || metric === 'ats' || S.DPD_METRICS.includes(metric)) metric = state.dpd;
     const p = state.p, s = state.s;
     pageHead(root, 'Peer Benchmarking', 'How you compare with a peer group you choose and with the whole market. Peers are always anonymised aggregates, and groups that could expose a single lender are blocked automatically.');
-    const bar = productStateFilters(root);
+    const bar = productStateFilters(root, { scope: true });
     select(bar, 'Metric', S.DPD_METRICS.concat(['cure', 'ats']).map((id) => ({ id, name: S.METRICS[id].name })), metric, (v) => { metric = v; if (v === 'ats') setState({ measure: 'ats' }); else if (S.DPD_METRICS.includes(v)) setState({ dpd: v, measure: 'dpd' }); else { state.measure = 'dpd'; PIQ.go('benchmark'); } });
     select(bar, 'Peer group', S.PEER_GROUPS.map((g) => ({ id: g.id, name: g.name + ' (' + S.peerMembers(g.types, g.sizes).length + ')' })).concat([{ id: 'custom', name: 'Custom…' }]), state.peer, (v) => setState({ peer: v }));
 

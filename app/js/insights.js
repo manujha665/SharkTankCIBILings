@@ -146,6 +146,7 @@
   function recommendations(p) {
     p = p || 'ALL';
     if (recCache.has(p)) return recCache.get(p);
+    if (S.scoped && S.scoped()) return S.withScope({}, () => recommendations(p)); // advice uses the whole book
     let recs = p === 'ALL' ? D.PRODUCTS.flatMap((x) => productRecs(x.id)) : productRecs(p);
     const g = growthRec();
     if (g && (p === 'ALL' || p === 'CC' || p === 'PL')) recs.push(g);

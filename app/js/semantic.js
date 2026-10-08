@@ -60,7 +60,115 @@
     if (!c) throw new Error('Unknown source ' + source);
     return c;
   };
-  const agg = (source, f) => cube(source).sum(f);
+  const aggRaw = (source, f) => cube(source).sum(f);
+
+  // ---------------- Scope filters: recent disbursements (vintage) and PIN-code risk tier ----------------
+  // Applied on Portfolio Pulse, Industry Intelligence, Peer Benchmarking and Logins Pulse.
+  //  vintage N (3/6/9/12): only loans disbursed in the last N months. Balance = each month's disbursals,
+  //    amortised; delinquency follows a seasoning curve (young loans have had less time to go bad).
+  //  pin 'L' | 'M' | 'H': only borrowers in low / medium / high-risk PIN codes. Split by the band-and-state
+  //    PIN mix the bureau sees, with delinquency scaled by each tier's relative risk.
+  let SCOPE = {};
+  const scopeCache = new Map();
+  const scoped = () => !!(SCOPE.vintage || SCOPE.pin);
+  function setScope(sc) {
+    const next = { vintage: sc && +sc.vintage ? +sc.vintage : 0, pin: sc && sc.pin && sc.pin !== 'ALL' ? sc.pin : null };
+    if (next.vintage !== SCOPE.vintage || next.pin !== SCOPE.pin) scopeCache.clear();
+    SCOPE = next;
+  }
+  const getScope = () => Object.assign({}, SCOPE);
+  function withScope(sc, fn) { const prev = getScope(); setScope(sc); try { return fn(); } finally { setScope(prev); } }
+  const SEAS30 = (age) => Math.min(1.25, 0.35 + 0.12 * age);         // early delinquency builds up over ~8 months
+  const SEAS90 = (age) => Math.min(1.2, Math.max(0.02, (age - 2) * 0.15)); // 90+ needs at least 3 months
+  const MEAS_KEYS = ['bal', 'acc', 'orig', 'd30', 'd90', 'd180', 'cureN', 'cureD', 'newAcc'];
+  // each month's disbursals for a slice, read once and reused by every vintage window
+  const origCache = new Map();
+  function origSeries(source, f) {
+    const key = source + '|' + JSON.stringify(Object.assign({}, f, { m: null }));
+    let ser = origCache.get(key);
+    if (!ser) {
+      if (origCache.size > 50000) origCache.clear();
+      ser = D.MONTHS.map((m) => { const r = aggRaw(source, Object.assign({}, f, { m })); return { orig: r.orig, newAcc: r.newAcc }; });
+      origCache.set(key, ser);
+    }
+    return ser;
+  }
+  function vintageAgg(source, f) {
+    const cur = aggRaw(source, f);
+    const mi = D.MONTHS.indexOf(f.m);
+    if (!cur.bal || mi < 0) return cur;
+    let vb = 0, w30 = 0, w90 = 0, o = 0, na = 0;
+    // the member's post-loosening personal-loan vintages in weak bands are worse than its back book
+    const pt = D.MONTHS.indexOf(C.policyChangeMonth), weakPL = source === 'member' && f.p === 'PL' && (f.b === 'NP' || f.b === 'SB');
+    const ser = origSeries(source, f);
+    for (let k = Math.max(0, mi - SCOPE.vintage + 1); k <= mi; k++) {
+      const age = mi - k, ok = ser[k];
+      const live = ok.orig * Math.pow(0.97, age), q = weakPL && k >= pt ? 1.35 : 1;
+      vb += live; w30 += live * SEAS30(age) * q; w90 += live * SEAS90(age) * q; o += ok.orig; na += ok.newAcc || 0;
+    }
+    if (!vb) return Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+    const k = vb / cur.bal, s30 = w30 / vb, s90 = w90 / vb;
+    return {
+      bal: vb, acc: cur.acc * k, orig: o, newAcc: na,
+      d30: cur.d30 * k * s30, d90: cur.d90 * k * s90, d180: cur.d180 * k * s90 * 0.45,
+      cureN: cur.cureN * k, cureD: cur.cureD * k
+    };
+  }
+  function pinWeights(s, b) {
+    const r = D.S[s].risk, pw = D.PIN_BY_BAND[b], w = [pw[0] * r * r, pw[1], pw[2] / r], t = w[0] + w[1] + w[2];
+    const sh = w.map((x) => x / t), mult = D.PINS.map((x) => x.pd), avg = sh.reduce((a, x, i) => a + x * mult[i], 0);
+    return { sh, k: mult.map((x) => x / avg) };
+  }
+  const PIN_IDX = { H: 0, M: 1, L: 2 };
+  function aggScoped(source, f) {
+    const key = source + '|' + JSON.stringify(f) + '|' + SCOPE.vintage + '|' + SCOPE.pin;
+    if (scopeCache.has(key)) return scopeCache.get(key);
+    const out = Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+    const months = f.m == null ? D.MONTHS : asList(f.m);
+    const bands = asList(f.b) || D.BANDS.map((x) => x.id), states = asList(f.s) || D.STATES.map((x) => x.id);
+    // vintage quality differs by product, so split the whole book by product (and band) for it
+    let pcs = bands.map((b) => ({ b }));
+    if (SCOPE.vintage && asList(f.p) == null) pcs = D.PRODUCTS.flatMap((p) => pcs.map((c) => Object.assign({ p: p.id }, c)));
+    else if (SCOPE.vintage && asList(f.p).length > 1) pcs = asList(f.p).flatMap((p) => pcs.map((c) => Object.assign({ p }, c)));
+    months.forEach((m) => {
+      // PIN tiers: for each band, how the chosen tier reshapes every measure, from that band's state mix
+      const pinF = {};
+      if (SCOPE.pin) bands.forEach((b) => {
+        const fb = Object.assign({}, f, { m, b }), base = aggRaw(source, fb), acc = Object.fromEntries(MEAS_KEYS.map((x) => [x, 0]));
+        const pi = PIN_IDX[SCOPE.pin];
+        states.forEach((st) => {
+          const r = aggRaw(source, Object.assign({}, fb, { s: st })), pw = pinWeights(st, b), w = pw.sh[pi], k = pw.k[pi];
+          acc.bal += r.bal * w; acc.acc += r.acc * w; acc.orig += r.orig * w;
+          acc.newAcc += (r.newAcc || 0) * w * (pi === 0 ? 1.12 : pi === 2 ? 0.94 : 1);
+          acc.d30 += r.d30 * w * k; acc.d90 += r.d90 * w * k; acc.d180 += r.d180 * w * k;
+          acc.cureN += r.cureN * w * Math.min(1.3, Math.pow(1 / k, 0.35)); acc.cureD += r.cureD * w;
+        });
+        pinF[b] = Object.fromEntries(MEAS_KEYS.map((x) => [x, base[x] ? acc[x] / base[x] : 0]));
+      });
+      pcs.forEach((pc) => {
+        const ff = Object.assign({}, f, { m }, pc);
+        const a = SCOPE.vintage ? vintageAgg(source, ff) : aggRaw(source, ff);
+        MEAS_KEYS.forEach((x) => (out[x] += (a[x] || 0) * (SCOPE.pin ? pinF[pc.b][x] : 1)));
+      });
+    });
+    scopeCache.set(key, out);
+    return out;
+  }
+  function agg(source, f) {
+    if (scoped() && (source === 'member' || source === 'industry')) return aggScoped(source, f || {});
+    if (SCOPE.pin && source === 'logins') {
+      if (!f || f.pin == null) return aggRaw(source, Object.assign({}, f, { pin: SCOPE.pin }));
+      if (f.pin !== SCOPE.pin) { const z = aggRaw(source, f); return Object.fromEntries(Object.keys(z).map((x) => [x, 0])); }
+    }
+    return aggRaw(source, f);
+  }
+  // peers carry fewer dimensions: under a scope, scale the peer value by how the same scope moves the industry
+  function peerScale(metric, f, m) {
+    if (!scoped()) return 1;
+    const ff = Object.assign({}, f, { m });
+    const a = metricOf(agg('industry', ff), metric), b = metricOf(aggRaw('industry', ff), metric);
+    return a != null && b ? a / b : 1;
+  }
   function series(source, metric, f) {
     return D.MONTHS.map((m) => ({ x: m, y: metricOf(agg(source, Object.assign({}, f, { m })), metric) }));
   }
@@ -112,7 +220,7 @@
     if (!chk.ok) return { suppressed: true, check: chk, points: [] };
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
     if (METRICS[metric].peerFromIndustry) return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('industry', Object.assign({}, f, { l: g.types, m })), metric) })) };
-    return { suppressed: false, check: chk, points: D.MONTHS.map((m) => ({ x: m, y: metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric) })) };
+    return { suppressed: false, check: chk, points: D.MONTHS.map((m) => { const y = metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m })), metric); return { x: m, y: y == null ? y : y * peerScale(metric, f, m) }; }) };
   }
   function peerValue(groupId, metric, f) {
     const g = groupOf(groupId);
@@ -120,7 +228,8 @@
     if (!chk.ok) return null;
     const ids = peerMembers(g.types, g.sizes).map((d) => d.id);
     if (METRICS[metric].peerFromIndustry) return metricOf(agg('industry', Object.assign({}, f, { l: g.types, m: (f && f.m) || latest() })), metric);
-    return metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: (f && f.m) || latest() })), metric);
+    const mm = (f && f.m) || latest(), y = metricOf(agg('peers', Object.assign(peerF(f), { peer: ids, m: mm })), metric);
+    return y == null ? y : y * peerScale(metric, f, mm);
   }
 
   // ---------------- "Why did it change?" decomposition ----------------
@@ -298,6 +407,7 @@
   let alertCache = null;
   function alerts() {
     if (alertCache) return alertCache;
+    if (scoped()) return withScope({}, alerts); // alerts always run on the full book
     const out = [];
     const t = latest(), t3 = monthsAgo(3);
     const memTot = value('member', 'bal', { m: t });
@@ -371,7 +481,7 @@
   }
 
   PIQ.sem = {
-    METRICS, DPD_METRICS, DATASETS, PEER_GROUPS, DEFAULT_ASSUMPTIONS, audit, log,
+    METRICS, DPD_METRICS, DATASETS, PEER_GROUPS, DEFAULT_ASSUMPTIONS, audit, log, setScope, getScope, withScope, scoped,
     filter, agg, metricOf, series, value, breakdown, latest, monthsAgo,
     peerMembers, peerCheck, peerSeries, peerValue,
     decompose, simulate, simulateCurve,

@@ -10,7 +10,7 @@
     pageHead(root, 'Industry Intelligence', 'What is happening in the market, by product, state, lender type and risk band. Use the standard view or switch to self-service to configure your own.', (r) => {
       seg(r, null, [{ id: 'standard', name: 'Standard view' }, { id: 'custom', name: 'Self-service' }], mode, (v) => { mode = v; PIQ.go('industry'); });
     });
-    const bar = productStateFilters(root, { dpd: mode !== 'custom', measure: mode !== 'custom' });
+    const bar = productStateFilters(root, { dpd: mode !== 'custom', measure: mode !== 'custom', scope: true });
     if (mode === 'custom') {
       select(bar, 'Metric', Object.values(S.METRICS).map((m) => ({ id: m.id, name: m.name })), metric, (v) => { metric = v; PIQ.go('industry'); });
       select(bar, 'Lender category', [{ id: 'ALL', name: 'All' }].concat(D.LENDERS.map((l) => ({ id: l.id, name: l.name }))), lender, (v) => { lender = v; PIQ.go('industry'); });
