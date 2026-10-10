@@ -1,0 +1,54 @@
+<section id="economics" data-transition="fade" style="background:#F6F3EC; color:#0F1B2D; font-family:'IBM Plex Sans', Arial, sans-serif; padding:112px 128px 160px; display:flex; flex-direction:column; gap:40px">
+<div style="display:flex; flex-direction:column; gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; letter-spacing:3px; text-transform:uppercase; color:#B4461A">Cost to serve · team estimates</p>
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif; font-size:72px; font-weight:600; line-height:1.08; letter-spacing:-1px; color:#0F1B2D">What it costs to run</h2>
+</div>
+<div style="display:flex; gap:32px">
+<div style="width:560px; display:flex; flex-direction:column; gap:20px; background:#0F1B2D; padding:40px; border-radius:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; color:#F2A541">WE DON'T TRAIN AN LLM</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif; font-size:72px; font-weight:700; line-height:1; color:#F2A541">₹2–5</p>
+<p style="font-size:28px; line-height:1.4; color:#F6F3EC">per AI question, on an approved LLM at today's API prices</p>
+<hr style="border-top:1px solid #2A3A55; width:480px">
+<p style="font-size:26px; line-height:1.4; color:#B8C4D6">Training a frontier model runs to hundreds of crores. We skip it: the LLM only picks governed tools and phrases the answer.</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:20px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; color:#1F5BC4">ANNUAL RUN COST, ₹ CR</p>
+<table style="width:1072px; font-size:26px; color:#0F1B2D">
+<tr style="background:#EAE4D6">
+<th style="width:58%; text-align:left">Line</th>
+<th style="width:21%; text-align:right">Year 1</th>
+<th style="width:21%; text-align:right">At scale</th>
+</tr>
+<tr style="background:#FFFDF8">
+<td>Team: 10–12 people</td>
+<td style="text-align:right">5.0</td>
+<td style="text-align:right">7.0</td>
+</tr>
+<tr>
+<td>Data refresh: monthly, weekly, daily</td>
+<td style="text-align:right">1.5</td>
+<td style="text-align:right">2.0</td>
+</tr>
+<tr style="background:#FFFDF8">
+<td>Hosting, security, DR</td>
+<td style="text-align:right">1.0</td>
+<td style="text-align:right">1.5</td>
+</tr>
+<tr>
+<td>LLM inference</td>
+<td style="text-align:right">0.1</td>
+<td style="text-align:right">1.0</td>
+</tr>
+<tr style="background:#0F1B2D">
+<td style="color:#F6F3EC">Total</td>
+<td style="text-align:right; color:#F2A541">≈ 8</td>
+<td style="text-align:right; color:#F2A541">≈ 12</td>
+</tr>
+</table>
+<p style="font-size:24px; line-height:1.4; color:#4A5568">Cheap because questions hit pre-built aggregates, never raw tradelines. The heavy compute runs once per refresh.</p>
+</div>
+</div>
+<p style="position:absolute; left:128px; bottom:64px; width:1300px; font-size:24px; color:#4A5568">Estimates · ₹85/US$ · LLM at Claude Sonnet 5.5 list price ($2 in / $10 out per M tokens, cached input $0.20)</p>
+<p style="position:absolute; right:128px; bottom:64px; width:200px; font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; text-align:right; color:#4A5568">18</p>
+<aside>Pre-empt the "AI is expensive" objection. We don't train a model: training a frontier LLM costs hundreds of crores and we gain nothing from it, because the numbers come from our own governed aggregates, not from the model's memory. The approved LLM does two small jobs per question: pick the right governed tool, and phrase the answer. That's roughly two calls of about 8,000 tokens in and 500 out; with prompt caching it comes to about ₹2 on a mid-tier model and ₹4–5 on a top-tier one. Even at roughly 2 million questions a year at scale, that's about ₹1 crore. The real costs are people (about 10–12, the biggest line) and data refresh: a full rebuild of industry and member aggregates monthly, incremental rebuilds weekly and fortnightly as submissions arrive, and daily login and enquiry feeds. Because every question reads pre-built aggregates, the cost of a question doesn't grow with the size of the bureau's data. Bureau data is huge; our per-question cost isn't. All figures are team estimates to validate with Technology and Finance.</aside>
+</section>

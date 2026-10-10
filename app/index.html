@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>PortfolioIQ — Credit Intelligence</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="side" id="side"></aside>
+    <div class="main">
+      <header class="top" id="top"></header>
+      <main class="content" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <button class="fab" id="fab" type="button" aria-label="Ask the AI analyst"><span>✦</span> Ask PortfolioIQ</button>
+  <aside class="drawer" id="drawer" aria-label="AI analyst"></aside>
+
+  <!-- order matters: config → data → semantic layer → UI → insights → charts → views → agent → app -->
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/semantic.js"></script>
+  <script src="js/cutoffs.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/insights.js"></script>
+  <script src="js/hifreq.js"></script>
+  <script src="js/overlap.js"></script>
+  <script src="js/sample.js"></script>
+  <script src="js/pr.js"></script>
+  <script src="js/actions.js"></script>
+  <script src="js/glossary.js"></script>
+  <script src="js/views/overview.js"></script>
+  <script src="js/views/industry.js"></script>
+  <script src="js/views/benchmark.js"></script>
+  <script src="js/views/why.js"></script>
+  <script src="js/views/simulator.js"></script>
+  <script src="js/views/logins.js"></script>
+  <script src="js/views/fresh.js"></script>
+  <script src="js/views/overlaps.js"></script>
+  <script src="js/views/upload.js"></script>
+  <script src="js/views/brief.js"></script>
+  <script src="js/views/governance.js"></script>
+  <script src="js/views/actions.js"></script>
+  <script src="js/agent/questions.js"></script>
+  <script src="js/agent/engine.js"></script>
+  <script src="js/agent/llm.js"></script>
+  <script src="js/views/analyst.js"></script>
+  <script src="js/tour.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
