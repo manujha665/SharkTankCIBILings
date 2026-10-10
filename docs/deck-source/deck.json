@@ -1,0 +1,66 @@
+{
+  "v": 4,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-09-29T04:10:00Z"
+  },
+  "title": "PortfolioIQ Shark Tank Pitch",
+  "order": [
+    "cover",
+    "monday",
+    "problem",
+    "cost",
+    "whynow",
+    "solution",
+    "demo-what",
+    "demo-why",
+    "demo-do",
+    "demo-early",
+    "demo-ticket",
+    "demo-overlap",
+    "demo-pr",
+    "demo-ai",
+    "moat",
+    "compare",
+    "model",
+    "economics",
+    "roi",
+    "roadmap",
+    "trust",
+    "ask",
+    "close"
+  ],
+  "sections": {
+    "s1": {
+      "description": "The problem: lenders get credit intelligence late, fragmented and unexplained",
+      "start": "cover"
+    },
+    "s2": {
+      "description": "The solution: PortfolioIQ, shown on the working prototype with synthetic data",
+      "start": "whynow"
+    },
+    "s3": {
+      "description": "Why only we can build it, and how it makes money",
+      "start": "moat"
+    },
+    "s4": {
+      "description": "The plan, the guardrails and the ask",
+      "start": "roadmap"
+    }
+  },
+  "faces": {
+    "space-grotesk": {
+      "family": "Space Grotesk",
+      "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&display=swap"
+    },
+    "ibm-plex-sans": {
+      "family": "IBM Plex Sans",
+      "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    },
+    "ibm-plex-mono": {
+      "family": "IBM Plex Mono",
+      "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&display=swap"
+    }
+  },
+  "designSystems": []
+}
