@@ -224,7 +224,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.01em; }
 .split-bar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; gap: 2px; margin: 8px 0 6px; }
 .split-bar > div { display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11.5px; font-weight: 600; min-width: 2px; }
 .split-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); }
-.split-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--c); vertical-align: -1px; }
+.split-legend > span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; background: var(--c); vertical-align: -1px; }
 .reco > :last-child { align-self: start; }
 .reco { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); margin-bottom: 10px; }
 .reco-n { width: 30px; height: 30px; border-radius: 8px; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 700; }
@@ -441,15 +441,6 @@ body.touring .fab { display: none; }
 .field select:disabled { opacity: 0.55; cursor: not-allowed; }
 
 /* ---------- glossary ---------- */
-.gl { border-bottom: 1px dotted color-mix(in oklab, currentColor 45%, transparent); cursor: help; }
-.gl:hover { color: var(--accent-ink); border-bottom-style: solid; }
-.bubble-gl { position: fixed; z-index: 2000; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,0.16); padding: 12px 14px; font-size: 13px; line-height: 1.45; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s linear 0.2s; pointer-events: none; }
-.bubble-gl.on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.15s ease, transform 0.15s ease; pointer-events: auto; }
-.bg-term { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--accent-ink); }
-.bg-def { color: var(--ink); }
-.bg-calc { margin-top: 6px; color: var(--ink-2); font-size: 12.5px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; }
-.bg-more { margin-top: 8px; background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
-.bg-more:hover { text-decoration: underline; }
 .gl-search { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; position: sticky; top: 0; z-index: 5; background: var(--page); padding: 8px 0; }
 .gl-search input { flex: 1; max-width: 520px; padding: 10px 14px; font: inherit; font-size: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink); }
 .gl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
@@ -458,3 +449,25 @@ body.touring .fab { display: none; }
 .gl-def { margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
 .gl-calc { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
 .gl-card.flash { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(42,120,214,0.3); }
+
+/* ---------- presentation-mode motion (js/motion.js): once per page change, never on filter clicks; M toggles ---------- */
+@keyframes mo-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes mo-fade { from { opacity: 0; } }
+@keyframes mo-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes mo-grow-x { from { transform: scaleX(0); } }
+@keyframes mo-grow-y { from { transform: scaleY(0); } }
+@keyframes mo-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes mo-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(208, 59, 59, 0); } 50% { box-shadow: 0 0 0 5px rgba(208, 59, 59, 0.16); } }
+.mo-in { animation: mo-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--mo-i, 0) * 30ms); }
+.alert-tile.critical.mo-in { animation: mo-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards, mo-glow 1.4s ease-in-out 2; animation-delay: calc(var(--mo-i, 0) * 30ms), 0.5s; }
+.viz-line.mo-draw { stroke-dasharray: 1; animation: mo-draw 0.9s cubic-bezier(0.4, 0, 0.2, 1) backwards; animation-delay: calc(var(--mo-i, 0) * 100ms); }
+.viz-bar.mo-grow-x { transform-box: fill-box; transform-origin: left center; animation: mo-grow-x 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--mo-i, 0) * 25ms); }
+.viz-bar.mo-grow-x.neg { transform-origin: right center; }
+.viz-bar.mo-grow-y { transform-box: fill-box; transform-origin: center bottom; animation: mo-grow-y 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--mo-i, 0) * 25ms); }
+.mo-late { animation: mo-fade 0.3s ease 0.7s backwards; }
+.split-bar.mo-wipe { animation: mo-wipe 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s backwards; }
+.stat-value, .hero { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) {
+  .mo-in, .mo-draw, .mo-grow-x, .mo-grow-y, .mo-late, .mo-wipe, .alert-tile.critical.mo-in { animation: none !important; }
+  .viz-line.mo-draw { stroke-dasharray: none; }
+}

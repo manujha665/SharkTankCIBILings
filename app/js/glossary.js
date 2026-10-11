@@ -1,7 +1,6 @@
 /*
  * Glossary: every term and calculation used in PortfolioIQ, in plain English.
  *  - PIQ.glossary.TERMS: the list (term, other names, group, meaning, how it is worked out)
- *  - PIQ.glossary.decorate(el): marks known terms inside el so hovering shows a short explanation bubble
  *  - the Glossary page (Trust section) lists everything, with search
  */
 (function () {
@@ -101,101 +100,15 @@
 
   // ---------- term lookup ----------
   const byKey = new Map();
-  const names = [];
-  TERMS.forEach((t, i) => { t.id = 'g' + i; [t.term].concat(t.alias).forEach((n) => { const k = n.toLowerCase(); if (!byKey.has(k)) { byKey.set(k, t); names.push(n); } }); });
-  // ambiguous short words only when written exactly (case-sensitive)
-  const EXACT = new Set(['PR', 'PD', 'MFI', 'PSU', 'PVT', 'NBFC', 'SFB', 'HFC', 'NPA', 'CMR', 'NTC', 'LGD', 'FPD', 'DPD', 'bps', 'RRB/DCCB']);
-  const SKIP_ALONE = new Set(['pp', 'ticket', 'balance', 'industry', 'peers', 'applications', 'login', 'disbursed', 'leveraged', 'established', 'prime', 'cure', 'cutoff', '30+', '90+', '180+', 'directors', 'promoters', 'vintage', 'the market', 'bounces', 'expected loss', 'enquiries', 'logins']);
-  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-  const ordered = names.filter((n) => !SKIP_ALONE.has(n.toLowerCase())).sort((a, b) => b.length - a.length);
-  const ci = ordered.filter((n) => !EXACT.has(n)), cs = ordered.filter((n) => EXACT.has(n));
-  const RE_CI = new RegExp('(?<![\\w+-])(' + ci.map(esc).join('|') + ')(?![\\w+-])', 'gi');
-  const RE_CS = new RegExp('(?<![\\w+/-])(' + cs.map(esc).join('|') + ')(?![\\w/-])', 'g');
+    TERMS.forEach((t, i) => { t.id = 'g' + i; [t.term].concat(t.alias).forEach((n) => { const k = n.toLowerCase(); if (!byKey.has(k)) byKey.set(k, t); }); });
   const lookup = (txt) => byKey.get(txt.toLowerCase());
-
-  // ---------- decorate: wrap known terms so hovering explains them ----------
-  const SKIP = 'button, a, input, textarea, select, option, svg, script, style, code, .gl, .nav, .side, .tour-box, .chat-input, .bubble-gl, .brand, .filters label, .glossary-page .gl-term, .gl-alias, .sev-label, .tag, .pill, .badge, .src-chip, .seg';
-  function decorate(root) {
-    if (!root) return;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (n) => (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest(SKIP)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT)
-    });
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach((node) => {
-      const text = node.nodeValue, ownCard = node.parentElement && node.parentElement.closest('.gl-card');
-      const hits = [];
-      [RE_CI, RE_CS].forEach((re) => { re.lastIndex = 0; let m; while ((m = re.exec(text))) hits.push({ i: m.index, s: m[0] }); });
-      if (!hits.length) return;
-      hits.sort((a, b) => a.i - b.i || b.s.length - a.s.length);
-      const frag = document.createDocumentFragment();
-      let pos = 0;
-      hits.forEach((h) => {
-        if (h.i < pos) return; // overlapping match
-        const t = lookup(h.s);
-        if (!t || (ownCard && ownCard.id === 'gl-' + t.id)) return; // no self-links inside a glossary card
-        if (h.i > pos) frag.appendChild(document.createTextNode(text.slice(pos, h.i)));
-        const span = document.createElement('span');
-        span.className = 'gl';
-        span.dataset.term = t.id;
-        span.textContent = h.s;
-        frag.appendChild(span);
-        pos = h.i + h.s.length;
-      });
-      if (!pos) return;
-      if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
-      node.parentNode.replaceChild(frag, node);
-    });
-  }
-
-  // ---------- hover bubble ----------
-  let bubble = null, hideTimer = null, current = null;
-  const byId = new Map(TERMS.map((t) => [t.id, t]));
-  function ensureBubble() {
-    if (bubble) return bubble;
-    bubble = document.createElement('div');
-    bubble.className = 'bubble-gl';
-    bubble.setAttribute('role', 'tooltip');
-    document.body.appendChild(bubble);
-    bubble.addEventListener('mouseenter', () => clearTimeout(hideTimer));
-    bubble.addEventListener('mouseleave', scheduleHide);
-    return bubble;
-  }
-  function show(el) {
-    const t = byId.get(el.dataset.term);
-    if (!t) return;
-    clearTimeout(hideTimer);
-    const b = ensureBubble();
-    b.innerHTML = '';
-    const h = document.createElement('div'); h.className = 'bg-term'; h.textContent = t.term; b.appendChild(h);
-    const p = document.createElement('div'); p.className = 'bg-def'; p.textContent = t.def; b.appendChild(p);
-    if (t.calc) { const c = document.createElement('div'); c.className = 'bg-calc'; c.textContent = 'How it\'s worked out: ' + t.calc; b.appendChild(c); }
-    const a = document.createElement('button'); a.type = 'button'; a.className = 'bg-more'; a.textContent = 'Open in glossary →';
-    a.addEventListener('click', () => { hide(true); PIQ.go('glossary', { term: t.id }); });
-    b.appendChild(a);
-    b.classList.add('on');
-    const r = el.getBoundingClientRect(), bw = Math.min(340, window.innerWidth - 24);
-    b.style.width = bw + 'px';
-    let left = r.left + r.width / 2 - bw / 2;
-    left = Math.max(12, Math.min(window.innerWidth - bw - 12, left));
-    b.style.left = left + 'px';
-    const below = r.bottom + 10, bh = b.offsetHeight;
-    b.style.top = (below + bh > window.innerHeight - 8 ? Math.max(8, r.top - bh - 10) : below) + 'px';
-    current = el;
-  }
-  function scheduleHide() { clearTimeout(hideTimer); hideTimer = setTimeout(() => hide(), 220); }
-  function hide(now) { if (!bubble) return; bubble.classList.remove('on'); current = null; if (now) clearTimeout(hideTimer); }
-  document.addEventListener('mouseover', (e) => { const el = e.target.closest && e.target.closest('.gl'); if (el && el !== current) show(el); else if (el) clearTimeout(hideTimer); });
-  document.addEventListener('mouseout', (e) => { const el = e.target.closest && e.target.closest('.gl'); if (el && !(e.relatedTarget && (e.relatedTarget.closest('.bubble-gl') || e.relatedTarget.closest('.gl') === el))) scheduleHide(); });
-  document.addEventListener('focusin', (e) => { if (e.target.classList && e.target.classList.contains('gl')) show(e.target); });
-  window.addEventListener('scroll', () => hide(true), true);
 
   // ---------- Glossary page ----------
   let query = '';
   function render(root, params) {
     const { h, pageHead } = PIQ.ui;
     query = '';
-    pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Hover over a dotted-underlined term anywhere in the app to see its meaning without leaving the page.');
+    pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Search for any term, or browse by topic.');
     const wrap = h('div', 'glossary-page', root);
     const bar = h('div', 'gl-search', wrap);
     const inp = h('input', null, bar);
@@ -219,7 +132,7 @@
           const card = h('div', 'card gl-card', g);
           card.id = 'gl-' + t.id;
           h('div', 'gl-term', card, t.term);
-          if (t.alias.length) h('div', 'small muted gl-alias', card, 'Also: ' + t.alias.join(', '));
+          if (t.alias.length) h('div', 'small muted', card, 'Also: ' + t.alias.join(', '));
           h('p', 'gl-def', card, t.def);
           if (t.calc) { const c2 = h('p', 'gl-calc', card); h('strong', null, c2, 'How it\'s worked out: '); c2.appendChild(document.createTextNode(t.calc)); }
         });
@@ -235,7 +148,7 @@
     }
   }
 
-  PIQ.glossary = { TERMS, decorate, lookup };
+  PIQ.glossary = { TERMS, lookup };
   PIQ.views = PIQ.views || {};
   PIQ.views.glossary = { title: 'Glossary', render };
 })();
