@@ -31,7 +31,7 @@
   }
   const P_PRODUCT = { type: 'string', enum: ['ALL'].concat(D.PRODUCTS.map((x) => x.id)), description: 'ALL = whole portfolio; ' + D.PRODUCTS.map((x) => x.id + ' = ' + x.long).join('; ') };
   const P_STATE = { type: 'string', enum: ['ALL'].concat(D.STATES.map((x) => x.id)), description: 'ALL or a state code: ' + D.STATES.map((x) => x.id + ' = ' + x.name).join('; ') };
-  const P_METRIC = { type: 'string', enum: Object.keys(S.METRICS), description: 'bal, acc, orig, dpd30, dpd90, cure' };
+  const P_METRIC = { type: 'string', enum: Object.keys(S.METRICS), description: Object.values(S.METRICS).map((m) => m.id + ' = ' + m.name).join('; ') };
 
   def('trend', 'Monthly trend of a metric for the industry and/or the member, optionally for one or more states, a risk band or a lender type.', {
     metric: P_METRIC, product: P_PRODUCT, states: { type: 'array', items: P_STATE }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] },

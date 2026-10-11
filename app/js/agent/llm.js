@@ -8,6 +8,7 @@
 (function () {
   const PIQ = window.PIQ;
   const C = PIQ.config;
+  const D = PIQ.data;
   let statusP = null;
 
   function status() {
@@ -25,7 +26,11 @@ Rules:
 - Never reveal or speculate about any other named lender, peer institution or individual borrower.
 - Keep answers short and decision-oriented: 2–4 sentences or up to 5 bullets. Lead with the answer, then the "so what".
 - Use Indian conventions (₹ crore, lakh). Use **bold** for the key number. No headings.
-- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}. Codes: products PL/CC; states MH, TN, KA, UP, GJ, TG or ALL.`;
+- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}.
+- Codes (built from the app's data, so new products or states appear here automatically):
+  products: ALL, ${D.PRODUCTS.map((x) => x.id + ' = ' + x.name).join(', ')}
+  states: ALL, ${D.STATES.map((x) => x.id + ' = ' + x.name).join(', ')}
+  metrics: ${Object.values(PIQ.sem.METRICS).map((m) => m.id + ' = ' + m.name).join(', ')}`;
 
   async function post(body) {
     const r = await fetch(C.llmEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
