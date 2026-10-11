@@ -194,6 +194,7 @@
   let query = '';
   function render(root, params) {
     const { h, pageHead } = PIQ.ui;
+    query = '';
     pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Hover over a dotted-underlined term anywhere in the app to see its meaning without leaving the page.');
     const wrap = h('div', 'glossary-page', root);
     const bar = h('div', 'gl-search', wrap);

@@ -31,7 +31,10 @@
       up: v('member', 'PL', 'UP'), upInd: v('industry', 'PL', 'UP'), tn: v('member', 'MSME', 'TN'), tnInd: v('industry', 'MSME', 'TN'),
       hf, monthlyUP: v('member', 'PL', 'UP'), lq, upSurge: up,
       simGain: simB.netCr - simA.netCr + simG1.netCr - simG0.netCr, simLoss: simA.expLossCr - simB.expLossCr + simG0.expLossCr - simG1.expLossCr,
-      ov, ms, cc: S.peerValue('mid-pvt', 'dpd30', { p: 'CC' }) - v('member', 'CC', 'ALL')
+      ov, ms, cc: S.peerValue('mid-pvt', 'dpd30', { p: 'CC' }) - v('member', 'CC', 'ALL'),
+      v6: S.withScope({ vintage: 6 }, () => ({ m: v('member', 'PL', 'ALL'), i: v('industry', 'PL', 'ALL') })),
+      v6h: S.withScope({ vintage: 6, pin: 'H' }, () => ({ m: v('member', 'PL', 'ALL'), i: v('industry', 'PL', 'ALL') })),
+      qs: PIQ.questions.reduce((a, c) => a + c.qs.length, 0)
     };
   }
 
@@ -42,7 +45,7 @@
     const upW0 = tk('member', { s: 'UP', b: W }, PIQ.config.policyChangeMonth), upW1 = tk('member', { s: 'UP', b: W }, tt), upWi = tk('industry', { s: 'UP', b: W }, tt);
     const wR = tk('member', { b: W }, tt) / tk('industry', { b: W }, tt);
     return [
-      { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30', measure: 'dpd' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
+      { view: 'overview', state: { p: 'ALL', s: 'ALL', dpd: 'dpd30', measure: 'dpd', vintage: 0, pin: 'ALL' }, target: () => q('.split-bar') && q('.split-bar').closest('.card'),
         title: 'The Monday-morning question',
         say: `"It's Monday, 9am. Priya, CRO of ${C.member.name}, opens one screen. Her whole ₹${Math.round(S.value('member', 'bal', { m: S.latest() })).toLocaleString('en-IN')} Cr book: 30+ DPD is ${pct(N.all.R1)}, up ${bps(N.all.delta)} since February, double the industry's ${bps(N.all.indDelta)}."`,
         tip: 'Start on the whole portfolio: all products, all states. That is the default view.' },
@@ -58,7 +61,11 @@
         title: 'Personal loans crossed the line',
         say: `"Switch to personal loans: ${pct(N.pl.R1)}, up ${bps(N.pl.delta)} vs ${bps(N.pl.indDelta)} for the industry. Sahyadri used to beat its peers comfortably. The blue line has now crossed above them (${pct(N.plPeer)}), and on 90+ it is already worse than the whole industry (${pct(N.pl90)} vs ${pct(N.ind90)})."`,
         tip: 'Point at where the blue line crosses the orange peer line after the dotted "PL cut-off loosened" marker.' },
-      { view: 'why', state: { p: 'PL', s: 'ALL' }, target: () => byTitle('DPD rate: from'),
+      { view: 'overview', state: { p: 'PL', vintage: 6, pin: 'ALL' }, target: () => q('#view .filters'),
+        title: 'Is it the new loans? One filter says yes',
+        say: `"Is the whole book sick, or just what she lent recently? Filter to loans disbursed in the last 6 months: ${pct(N.v6.m)} against ${pct(N.v6.i)} for the market's loans of the same age. Her new lending is worse than the market's. Add high-risk PIN codes and it's ${pct(N.v6h.m)} vs ${pct(N.v6h.i)}. Industry and peers are filtered the same way, so it stays like for like."`,
+        tip: 'Use the Recent disbursements (3 / 6 / 9 / 12 months) and PIN-code risk (low / medium / high) dropdowns. They work on Portfolio Pulse, Industry Intelligence, Peer Benchmarking and Logins Pulse. Alerts always use the whole book.' },
+      { view: 'why', state: { p: 'PL', s: 'ALL', vintage: 0, pin: 'ALL' }, target: () => byTitle('DPD rate: from'),
         title: 'Why did it change? The hero feature',
         say: `"Here's the waterfall. Start at ${pct(N.pl.R0)}. The riskier mix added ${bps(N.pl.mix)}, the market ${bps(N.pl.market)}, Sahyadri's own segments ${bps(N.pl.own)}. They add up exactly to ${pct(N.pl.R1)}. Only a bureau can calculate the market leg, because it sees every lender's loans in the same segment."`,
         tip: 'If asked "how": share × rate decomposition; market = industry change in the same product-state-band.' },
@@ -77,11 +84,11 @@
       { view: 'logins', state: { p: 'ALL', s: 'ALL' }, target: () => q('.callout.danger'),
         title: 'The next wave, visible today',
         say: `"Delinquency lags. Applications don't. Weak-band personal loan applications in Uttar Pradesh are up ${Math.round(N.upSurge.mem.change * 100)}% in five days vs ${Math.round(N.upSurge.ind.change * 100)}% for the market. Across the book, last week's logins carry an expected probability of default of ${pct(N.lq.mem.pd, 1)} vs ${pct(N.lq.memPrior.pd, 1)} before, driven by ${worstProf.x.name.split(' (')[0].toLowerCase()} applicants and high-risk PIN codes. Every one of these signals comes from bureau enquiry data, nothing extra to submit."`,
-        tip: 'Scroll to show same-day multiple enquiries, score banding, PD distribution, PIN-code risk tiers and the bureau credit-profile table. Switch the Logins dropdown to 15 or 30 days.' },
+        tip: 'This is the Logins Pulse. Scroll to show same-day multiple enquiries, score banding, PD distribution, PIN-code risk tiers and the bureau credit-profile table. Switch the Logins dropdown to 15 or 30 days.' },
       { view: 'overview', state: { p: 'PL', s: 'ALL', measure: 'ats' }, target: () => q('.ticket-risk') && q('.ticket-risk').closest('.card'),
         title: 'Bigger loans to riskier borrowers',
         say: `"Ticket size is the variable everyone forgets. Sahyadri's near-prime and subprime personal loans are ${wR.toFixed(2)}× the market's ticket size. In Uttar Pradesh they went from ${F.inr(upW0)} to ${F.inr(upW1)} since February, while the market sits at ${F.inr(upWi)}. Riskier borrowers, bigger loans: the loss per default goes up too."`,
-        tip: 'Ticket size is a measure, not a page: flip Measure → Ticket size in the filter bar on the Command Centre, Industry Intelligence or Peer Benchmarking. It also raises its own early-warning alerts.' },
+        tip: 'Ticket size is a measure, not a page: flip Measure → Ticket size in the filter bar on Portfolio Pulse, Industry Intelligence or Peer Benchmarking. It also raises its own early-warning alerts.' },
       { view: 'fresh', state: { p: 'PL', s: 'UP', measure: 'dpd' }, target: () => q('.callout'),
         title: 'Weekly beats monthly',
         say: `"The August monthly file says ${pct(N.monthlyUP)} in Uttar Pradesh. Weekly submissions say ${pct(N.hf.mem.now.dpd30)} as of last Sunday, with fresh EMI bounces at ${pct(N.hf.mem.now.bounce, 1)} and climbing. Next month's file is already written; weekly data lets you act now."`,
@@ -93,7 +100,7 @@
       { view: 'overlaps', setup: async () => { clickText('Commercial × Retail'); await wait(250); }, target: () => byTitle('promoters slipped'),
         title: 'MSME promoters slip first',
         say: `"Directors and partners borrow personally. In ${pct(N.ms.stats.precededPct, 0)} of MSME defaults, a promoter slipped on a personal loan or card first, about ${N.ms.stats.medianLeadMonths} months earlier. Tamil Nadu tops Sahyadri's watchlist, which is exactly where its MSME book broke."`,
-        tip: 'Connects back to the Tamil Nadu alert on the Command Centre.' },
+        tip: 'Connects back to the Tamil Nadu alert on Portfolio Pulse.' },
       { view: 'upload', setup: async () => { PIQ.views.upload.demo('custom'); await wait(300); }, target: () => q('.callout.danger'),
         title: 'Bring your own data',
         say: '"Which credit desk approved a loan isn\'t bureau data. The bank uploads it, the platform joins it to the market like-for-like, and there\'s the root cause for Gujarat: loans auto-approved with no manual review. The file never leaves the bank\'s tenant."',
@@ -103,7 +110,7 @@
         }, target: () => q('.chat-main'),
         title: 'Ask in plain English, safely',
         say: '"The analyst keeps context across follow-ups and shows the source, filters and tool behind every number. It never invents one. And when asked about another lender, it refuses: tenant isolation is enforced in the data layer, not just the screen."',
-        tip: 'Also available as ✦ Ask PortfolioIQ on every page. 67 ready-made questions on the right.' },
+        tip: `Also available as ✦ Ask PortfolioIQ on every page, by typing or 🎤 voice. ${N.qs} ready-made questions on the right.` },
       { view: 'actions', setup: () => { PIQ.insights.recommendations('ALL').slice(0, 3).forEach((r, i) => PIQ.actions.add(r.title, r.why, { view: r.action.view, viewTitle: 'Recommendation', priority: i < 2 ? 'High' : 'Medium' })); }, target: () => q('.action-board'),
         title: 'Insight to action in one click',
         say: '"Everything I pinned across the screens (📌 or right-click → Send to Action Board) lands here with where it came from. Assign an owner and a date, export it, and it flows into the board pack."',
@@ -112,6 +119,14 @@
         title: 'Trust is the product',
         say: '"Tenant isolation, peer-privacy rules (at least 5 institutions, none above 25%), no borrower-level data, one metric catalogue and a full audit trail of every query, human or AI."',
         tip: 'Answers the "can we trust AI with bureau data?" question before it is asked.' },
+      { view: 'glossary', setup: async () => {
+          const i = q('.gl-search input'); if (i) { i.value = 'cure'; i.dispatchEvent(new Event('input')); }
+          await wait(150);
+          const t = q('#view .gl-card .gl'); if (t) t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        }, target: () => q('#view .gl-card'),
+        title: 'No jargon left unexplained',
+        say: `"Cure rate, roll-forward, SMA-2, basis points: every term and every calculation is in a plain-English glossary, ${PIQ.glossary.TERMS.length} of them. And she never has to come here: hover over any dotted-underlined term on any screen and the explanation pops up, then fades away."`,
+        tip: 'Live: go back to Portfolio Pulse and hover over "30+ DPD" in an alert. "Open in glossary →" jumps to the full card.' },
       { view: 'brief', target: () => q('.brief'),
         title: 'Close',
         say: `"And the monthly deck writes itself. No new data: the same bureau data, made self-serve, explainable, governed and conversational, across every product, state and lender we already serve."`,
@@ -155,6 +170,7 @@
     if (st.state) Object.assign(PIQ.ui.state, st.state);
     PIQ.go(st.view, st.state || {});
     document.getElementById('drawer').classList.remove('open');
+    document.querySelectorAll('.bubble-gl.on').forEach((x) => x.classList.remove('on'));
     await wait(120);
     if (my !== seq) return;
     if (st.setup) await st.setup();

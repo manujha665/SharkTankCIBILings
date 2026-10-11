@@ -412,7 +412,7 @@ body.touring .fab { display: none; }
 .pr-head h3 { margin: 0 0 2px; }
 
 
-/* Command Centre: early-warning alerts are the hero of the page */
+/* Portfolio Pulse: early-warning alerts are the hero of the page */
 .alerts-hero { margin-bottom: 18px; border: 1px solid color-mix(in oklab, var(--st-critical) 35%, var(--border)); box-shadow: 0 6px 24px rgba(208, 59, 59, 0.08); }
 .alerts-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; }
 .alerts-head h2 { margin: 0 0 4px; font-size: 26px; letter-spacing: -0.02em; }

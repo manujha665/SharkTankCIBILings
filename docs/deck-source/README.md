@@ -1,6 +1,6 @@
 # Pitch deck source
 
-Source of the PortfolioIQ pitch deck (23 slides), published at
+Source of the PortfolioIQ pitch deck (25 slides), published at
 https://claude.ai/artifact/Xq8SFHVSKqGkcyeZdHwqQJ
 
 - `deck.json`: slide order
