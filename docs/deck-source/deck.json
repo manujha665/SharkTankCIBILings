@@ -7,10 +7,14 @@
   "title": "PortfolioIQ Shark Tank Pitch",
   "order": [
     "cover",
+    "context",
     "monday",
     "problem",
     "cost",
+    "objective",
     "whynow",
+    "approach",
+    "onetru",
     "solution",
     "demo-what",
     "demo-filter",
@@ -39,7 +43,7 @@
     },
     "s2": {
       "description": "The solution: PortfolioIQ, shown on the working prototype with synthetic data",
-      "start": "whynow"
+      "start": "objective"
     },
     "s3": {
       "description": "Why only we can build it, and how it makes money",
