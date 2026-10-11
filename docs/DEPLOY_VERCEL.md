@@ -6,11 +6,15 @@ The AI Analyst runs on the built-in governed engine when hosted this way.
 ## Option A — from GitHub (recommended, ~2 minutes)
 
 1. Go to **vercel.com → Add New… → Project** and import `manujha665/SharkTankCIBILings`.
-2. **Project Name:** `portfolioiqtucl` (Vercel project names are lowercase; the URL is not case-sensitive).
-   If the name is free you get `https://portfolioiqtucl.vercel.app`; if it is taken, Vercel shows it before you deploy and suggests a variant.
+2. **Project Name:** `cibilings`. If the name is free you get `https://cibilings.vercel.app`.
+   Vercel checks the name as you type it on this screen; if it is taken, it says so and the URL gets a suffix
+   (for example `cibilings-xyz.vercel.app`). Quick check before you start: open https://cibilings.vercel.app —
+   a Vercel "404: NOT_FOUND / DEPLOYMENT_NOT_FOUND" page means no project is using it yet.
 3. **Framework Preset:** `Other`. **Root Directory:** `app` (click *Edit* next to Root Directory).
    Leave Build Command and Install Command empty.
-4. **Production branch:** set to `claude/adoring-keller-t6et8b`, or merge it into `main` first.
+4. **Production branch:** the repo's default branch is `main`, which does not have the latest work yet.
+   After the first deploy, open **Settings → Git → Production Branch**, set it to `claude/adoring-keller-t6et8b`
+   and redeploy; or merge that branch into `main` first (a pull request), and Vercel deploys `main`.
 5. Click **Deploy**.
 
 ## Option B — Vercel CLI from your laptop
@@ -19,7 +23,8 @@ The AI Analyst runs on the built-in governed engine when hosted this way.
 git clone https://github.com/manujha665/SharkTankCIBILings && cd SharkTankCIBILings
 git checkout claude/adoring-keller-t6et8b
 npx vercel login
-npx vercel deploy app --prod --name portfolioiqtucl   # answer the prompts; root = app
+cd app && npx vercel link --project cibilings   # creates the project if the name is free
+npx vercel deploy --prod
 ```
 
 ## Keeping it private
