@@ -53,7 +53,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | **Action Board** ⭐ | Pin anything from any module (📌 buttons or right-click → "Send to Action Board"; highlight text to send just that). Each action keeps its source module and filters, gets priority, owner, due date, status and notes; export to CSV, print, feeds the Board Brief | Insight → action in one click |
 | **Board Brief** | Auto-generated, printable one-pager | Replaces the monthly deck |
 | **Governance & Trust** | Tenant isolation, peer privacy rules, metric catalogue, live audit trail | Answers the "can we trust AI?" question |
-| **Glossary** | About 80 terms and calculations in plain English (cure rate, roll-forward, SMA-2, ticket size, PIN-code risk…), with search. Hover over any dotted-underlined term anywhere in the app for a short explanation bubble that fades when you move away | Nobody gets lost in jargon |
+| **Glossary** | About 80 terms and calculations in plain English (cure rate, roll-forward, SMA-2, ticket size, PIN-code risk…), with search. | Nobody gets lost in jargon |
 
 ## The demo story (built into the synthetic data)
 
@@ -90,6 +90,7 @@ To connect the organisation's approved LLM, see [`docs/LLM_SETUP.md`](docs/LLM_S
 | `app/js/semantic.js` | The governed layer: every number goes through it. Metrics, peer privacy gate, decomposition, simulator, alerts, audit |
 | `app/js/insights.js` | Recommendation engine and narratives |
 | `app/js/charts.js` | Dependency-free SVG charts with hover tooltips and table twins |
+| `app/js/motion.js` | Presentation-mode motion: charts draw in, the "me vs market" bar wipes in, numbers count up, once per page change (never on filter clicks). Press **M** to switch off |
 | `app/js/agent/engine.js` | AI tools, guardrails, intent router, conversation context |
 | `app/js/agent/llm.js` | Approved-LLM tool-use loop |
 | `server.js` | Zero-dependency server + LLM gateway (Claude Messages API or any OpenAI-compatible gateway) |

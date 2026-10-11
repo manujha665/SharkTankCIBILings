@@ -7,20 +7,20 @@
     { id: 'overview', name: 'Portfolio Pulse', ico: '◎' },
     { id: 'industry', name: 'Industry Intelligence', ico: '▦' },
     { id: 'benchmark', name: 'Peer Benchmarking', ico: '⇆' },
-    { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷', tag: 'new' },
-    { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉', tag: 'new' },
+    { id: 'fresh', name: 'Fresh Signals (weekly)', ico: '◷' },
+    { id: 'overlaps', name: 'Overlap Intelligence', ico: '⧉' },
     { sec: 'Decide' },
-    { id: 'actions', name: 'Action Board', ico: '📌', tag: 'new' },
-    { id: 'why', name: 'Why did it change?', ico: '◈', tag: 'new' },
+    { id: 'actions', name: 'Action Board', ico: '📌' },
+    { id: 'why', name: 'Why did it change?', ico: '◈' },
     { id: 'simulator', name: 'Policy Simulator', ico: '⚙' },
-    { id: 'logins', name: 'Logins Pulse', ico: '⚡', tag: 'new' },
+    { id: 'logins', name: 'Logins Pulse', ico: '⚡' },
     { sec: 'Ask & extend' },
     { id: 'analyst', name: 'AI Analyst', ico: '✦' },
     { id: 'upload', name: 'Bring Your Data', ico: '⇪' },
     { id: 'brief', name: 'Board Brief', ico: '▤' },
     { sec: 'Trust' },
     { id: 'governance', name: 'Governance & Trust', ico: '⛨' },
-    { id: 'glossary', name: 'Glossary', ico: '📖', tag: 'new' }
+    { id: 'glossary', name: 'Glossary', ico: '📖' }
   ];
   let current = 'overview';
   const SCOPED = ['overview', 'industry', 'benchmark', 'logins'];
@@ -91,15 +91,10 @@
     PIQ.views[current].render(view, PIQ.routeParams || {});
   }
 
-  // Glossary hover: mark known terms in whatever the page (or the AI drawer) shows, including content drawn later
-  let glPending = false;
-  const glRun = () => { glPending = false; ['view', 'drawer'].forEach((id) => PIQ.glossary.decorate(document.getElementById(id))); };
-  const glObs = new MutationObserver(() => { if (!glPending) { glPending = true; requestAnimationFrame(glRun); } });
-  ['view', 'drawer'].forEach((id) => { const el = document.getElementById(id); if (el) glObs.observe(el, { childList: true, subtree: true }); });
-
   function go(id, params) {
     current = id;
     PIQ.currentView = id;
+    PIQ.navSeq = (PIQ.navSeq || 0) + 1; // motion.js animates once per navigation
     PIQ.routeParams = params || {};
     if (params && params.p) state.p = params.p;
     if (params && params.s) state.s = params.s;

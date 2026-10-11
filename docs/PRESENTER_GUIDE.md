@@ -40,7 +40,7 @@ All numbers below are from the synthetic demo data and are also computed live in
 | 16 | AI Analyst | Follow-ups keep context; the **HDFC question is refused**; type or 🎤 speak | "Plain English, safely." |
 | 17 | Action Board | Everything pinned, with owner and date | "Insight to action in one click." |
 | 18 | Governance | Tenant isolation, peer privacy, audit trail | "Trust is the product." |
-| 19 | Glossary + hover bubbles | **80 terms** in plain English; hover any dotted-underlined term anywhere for an explanation that fades away | "No jargon left unexplained." |
+| 19 | Glossary | **80 terms** in plain English, each with how it's worked out; search filters as you type | "No jargon left unexplained." |
 | 20 | Board Brief | Auto-written monthly pack | "The deck writes itself." |
 
 **Time guide:** steps 1–9 in about 4½ minutes is the core pitch. Steps 10–20 are for a longer demo or Q&A. Skip 13–15 if short on time; step 5 (the filters) is worth keeping, it's a 20-second wow.
@@ -94,6 +94,7 @@ The AI doesn't calculate or invent numbers. It chooses from a fixed set of appro
 ## 6. Presenting tips
 
 - Press **F11** for full screen; use light mode on projectors.
+- Charts draw themselves each time you open a page (filter clicks stay instant). Press **M** to switch motion off if the projector stutters.
 - Before presenting: open **Action Board** and clear it, so it fills up live as you pin things.
 - If anything goes wrong, press **▶ Demo tour** and let it carry you.
 - Keep a copy of `PortfolioIQ.html` on a USB stick and in your email.

@@ -122,11 +122,10 @@
       { view: 'glossary', setup: async () => {
           const i = q('.gl-search input'); if (i) { i.value = 'cure'; i.dispatchEvent(new Event('input')); }
           await wait(150);
-          const t = q('#view .gl-card .gl'); if (t) t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
         }, target: () => q('#view .gl-card'),
         title: 'No jargon left unexplained',
-        say: `"Cure rate, roll-forward, SMA-2, basis points: every term and every calculation is in a plain-English glossary, ${PIQ.glossary.TERMS.length} of them. And she never has to come here: hover over any dotted-underlined term on any screen and the explanation pops up, then fades away."`,
-        tip: 'Live: go back to Portfolio Pulse and hover over "30+ DPD" in an alert. "Open in glossary →" jumps to the full card.' },
+        say: `"Cure rate, roll-forward, SMA-2, basis points: every term and every calculation is in a plain-English glossary, ${PIQ.glossary.TERMS.length} of them, each with how it's worked out. A CRO, a business head or a board member can look anything up in seconds."`,
+        tip: 'Type any term in the search box; it filters as you type.' },
       { view: 'brief', target: () => q('.brief'),
         title: 'Close',
         say: `"And the monthly deck writes itself. No new data: the same bureau data, made self-serve, explainable, governed and conversational, across every product, state and lender we already serve."`,
@@ -170,7 +169,6 @@
     if (st.state) Object.assign(PIQ.ui.state, st.state);
     PIQ.go(st.view, st.state || {});
     document.getElementById('drawer').classList.remove('open');
-    document.querySelectorAll('.bubble-gl.on').forEach((x) => x.classList.remove('on'));
     await wait(120);
     if (my !== seq) return;
     if (st.setup) await st.setup();
@@ -194,6 +192,7 @@
     b('✕', stop).title = 'Exit tour (Esc)';
     box.style.display = 'block';
     place();
+    setTimeout(() => { if (my === seq) place(); }, 650); // after page-entry motion settles
     if (playing) timer = setTimeout(() => (idx < list.length - 1 ? next() : stop()), Math.max(PIQ.tourPace || 9000, st.say.length * (PIQ.tourMsPerChar || 55)));
   }
   const next = () => show(idx + 1);

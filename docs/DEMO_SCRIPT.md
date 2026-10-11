@@ -67,7 +67,7 @@ Point at the **Source / Filters / Tools** chips: *"Every number is traceable. Th
 
 ## 7:00 — Glossary (15 sec, optional)
 
-- Hover over **30+ DPD** in any alert: the explanation pops up and fades when you move away. *"Every term and every calculation, 80 of them, explained in plain English. Nobody gets lost in jargon."*
+- Open **Glossary** (Trust section) and type *cure*: *"Every term and every calculation, 80 of them, explained in plain English. Nobody gets lost in jargon."*
 
 ## 7:15 — Board Brief + close (35 sec)
 
