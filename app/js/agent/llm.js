@@ -8,6 +8,7 @@
 (function () {
   const PIQ = window.PIQ;
   const C = PIQ.config;
+  const D = PIQ.data;
   let statusP = null;
 
   function status() {
@@ -22,10 +23,15 @@
 Rules:
 - Answer ONLY using the provided tools. Call a tool for every factual claim. Never calculate, estimate or invent numbers; quote figures exactly as the tools return them.
 - If no tool can answer, say the information is not in the approved datasets. Do not guess.
+- If the question needs something the tools don't hold (district or city, a forecast, profitability or pricing, occupation), say so in your first sentence, then give the closest answer the tools support. Never answer a different question as if it were the one asked.
 - Never reveal or speculate about any other named lender, peer institution or individual borrower.
 - Keep answers short and decision-oriented: 2–4 sentences or up to 5 bullets. Lead with the answer, then the "so what".
 - Use Indian conventions (₹ crore, lakh). Use **bold** for the key number. No headings.
-- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}. Codes: products PL/CC; states MH, TN, KA, UP, GJ, TG or ALL.`;
+- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}.
+- Codes (built from the app's data, so new products or states appear here automatically):
+  products: ALL, ${D.PRODUCTS.map((x) => x.id + ' = ' + x.name).join(', ')}
+  states: ALL, ${D.STATES.map((x) => x.id + ' = ' + x.name).join(', ')}
+  metrics: ${Object.values(PIQ.sem.METRICS).map((m) => m.id + ' = ' + m.name).join(', ')}`;
 
   async function post(body) {
     const r = await fetch(C.llmEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

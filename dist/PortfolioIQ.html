@@ -1018,6 +1018,7 @@ body.touring .fab { display: none; }
     member: { name: 'Member Portfolio Dataset', grain: 'month × product × state × risk band', refresh: 'Monthly', asOf: C.dataAsOf },
     peers: { name: 'Anonymised Peer Aggregates', grain: 'peer group × month × product × state', refresh: 'Monthly', asOf: C.dataAsOf },
     logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band × PIN-code tier × bureau credit profile (amount requested included)', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
+    demographics: { name: 'Borrower Demographics (aggregated)', grain: 'month × product × state × gender / age band / income band (income as declared at application)', refresh: 'Monthly', asOf: C.dataAsOf },
     scores: { name: 'Application Score Distribution', grain: 'product × state × 20-pt score bin', refresh: 'Weekly', asOf: 'last 90 days' }
   };
 
@@ -1473,6 +1474,82 @@ body.touring .fab { display: none; }
     loginDaily, loginCompare, loginMix, loginQuality, loginQuality7, loginQualityWin, LOGIN_WINDOWS, PD_BUCKETS, alerts
   };
 })(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+  <script>/* js/demographics.js */
+/*
+ * Borrower demographics (aggregated): gender, age band and income band.
+ * For the AI analyst only (no dashboard). In production these come from fields already on bureau
+ * records: gender and date of birth on every tradeline, income as declared on the application/enquiry
+ * (self-declared, not verified). Here they are synthetic: each segment gets a share of the balance and
+ * a relative risk, and every split is normalised so the segments add back exactly to the total the
+ * dashboards show (same product, state, month and source).
+ */
+(function () {
+  const PIQ = window.PIQ;
+  const D = PIQ.data, S = PIQ.sem;
+
+  const DIMS = {
+    gender: { name: 'gender', segs: [{ id: 'F', name: 'Women' }, { id: 'M', name: 'Men' }] },
+    age: { name: 'age band', segs: ['18–25', '26–35', '36–45', '46–60', '60+'].map((x) => ({ id: x, name: x + ' yrs' })) },
+    income: { name: 'income band (annual, as declared)', segs: ['Under ₹3 L', '₹3–6 L', '₹6–12 L', '₹12–25 L', '₹25 L+'].map((x) => ({ id: x, name: x })) }
+  };
+
+  // balance share of each segment, by product (industry); default row for the rest
+  const SHARE = {
+    gender: { PL: [0.22], CC: [0.26], HL: [0.32], LAP: [0.18], AL: [0.14], TW: [0.2], GL: [0.38], MSME: [0.14], AGRI: [0.16], MFL: [0.97], _: [0.22] },
+    age: { PL: [0.14, 0.38, 0.27, 0.17, 0.04], CC: [0.12, 0.4, 0.26, 0.18, 0.04], HL: [0.02, 0.28, 0.38, 0.27, 0.05], GL: [0.06, 0.24, 0.28, 0.3, 0.12], MFL: [0.12, 0.34, 0.3, 0.2, 0.04], AGRI: [0.05, 0.22, 0.3, 0.32, 0.11], _: [0.08, 0.32, 0.3, 0.24, 0.06] },
+    income: { PL: [0.18, 0.3, 0.28, 0.16, 0.08], CC: [0.05, 0.2, 0.33, 0.26, 0.16], HL: [0.03, 0.15, 0.32, 0.3, 0.2], LAP: [0.04, 0.16, 0.3, 0.3, 0.2], GL: [0.4, 0.3, 0.18, 0.08, 0.04], AGRI: [0.55, 0.28, 0.12, 0.04, 0.01], TW: [0.35, 0.35, 0.2, 0.08, 0.02], MFL: [0.78, 0.18, 0.04, 0, 0], _: [0.15, 0.28, 0.3, 0.18, 0.09] }
+  };
+  // relative delinquency risk of each segment (normalised away later, so only the ratios matter)
+  const RISK = {
+    gender: { MFL: [1, 1], _: [0.84, 1] },
+    age: { HL: [1.3, 1.1, 0.95, 0.85, 1], _: [1.45, 1.15, 0.92, 0.82, 0.95] },
+    income: { _: [1.5, 1.2, 0.95, 0.75, 0.6] }
+  };
+  // relative ticket size (income drives it; gender and age only mildly)
+  const TICKET = { gender: [0.9, 1.03], age: [0.6, 0.95, 1.12, 1.08, 0.85], income: [0.45, 0.7, 1, 1.6, 2.6] };
+
+  const pick = (tbl, p) => tbl[p] || tbl._;
+  // small, stable state-to-state variation so every state isn't identical
+  const tilt = (s, k) => { if (!s || s === 'ALL') return 1; let h = 7; for (const c of s + k) h = (h * 31 + c.charCodeAt(0)) % 997; return 1 + ((h % 21) - 10) / 100; };
+
+  function shares(dim, p, s, source) {
+    let w = pick(SHARE[dim], p).slice();
+    if (dim === 'gender') w = [w[0] * tilt(s, 'g'), 1 - w[0] * tilt(s, 'g')];
+    else w = w.map((x, i) => x * tilt(s, dim + i));
+    // Sahyadri's personal loans and cards since the 2026 loosening: more young and lower-income borrowers
+    if (source === 'member' && (p === 'PL' || p === 'CC') && dim !== 'gender') w = w.map((x, i) => x * (i < 2 ? 1.15 : 0.93));
+    const t = w.reduce((a, x) => a + x, 0);
+    return w.map((x) => x / t);
+  }
+
+  // split one metric by a dimension: rates (dpd30/90/180), ticket size (ats) or balance share (bal)
+  function split(source, f, dim, metric) {
+    const m = (f && f.m) || S.latest(), s = (f && f.s) || 'ALL', segs = DIMS[dim].segs;
+    const prods = !f || !f.p || f.p === 'ALL' ? D.PRODUCTS.map((x) => x.id) : [f.p];
+    const num = segs.map(() => 0), den = segs.map(() => 0);
+    prods.forEach((p) => {
+      const ff = { p, s, m };
+      const bal = S.value(source, 'bal', ff);
+      if (!bal) return;
+      const w = shares(dim, p, s, source);
+      if (metric === 'ats') {
+        const acc = S.value(source, 'acc', ff), tot = S.value(source, 'ats', ff), t = TICKET[dim], norm = w.reduce((a, x, i) => a + x * t[i], 0);
+        w.forEach((x, i) => { num[i] += acc * x * (tot * t[i] / norm); den[i] += acc * x; });
+        return;
+      }
+      if (metric === 'bal') { w.forEach((x, i) => { den[i] += bal * x; }); return; }
+      const tot = S.value(source, metric, ff), k = metric === 'dpd30' ? 1 : 1.15;
+      const r = pick(RISK[dim], p).map((x) => Math.pow(x, k)), norm = w.reduce((a, x, i) => a + x * r[i], 0);
+      w.forEach((x, i) => { num[i] += bal * x * (tot * r[i] / norm); den[i] += bal * x; });
+    });
+    const dsum = den.reduce((a, x) => a + x, 0);
+    return segs.map((g, i) => ({ id: g.id, name: g.name, share: dsum ? den[i] / dsum : 0, value: metric === 'bal' ? (dsum ? den[i] / dsum : 0) : den[i] ? num[i] / den[i] : null }));
+  }
+
+  PIQ.demo = { DIMS, split };
+})();
 
 </script>
   <script>/* js/cutoffs.js */
@@ -5373,12 +5450,19 @@ body.touring .fab { display: none; }
       'How risky are my retail borrowers who also have MFI loans?',
       'Do MSME promoters\' retail loans give early warning?'
     ] },
+    { cat: 'Borrower profile (gender, age, income)', qs: [
+      'What is the delinquency for women borrowers in Bihar?',
+      'Is my personal loan book riskier for younger borrowers than the market?',
+      'Show 30+ DPD by income band for personal loans',
+      'Average ticket size by income in housing loans'
+    ] },
     { cat: 'Your data & definitions', qs: [
       'Which approval route is performing worst in my uploaded file?',
       'What does my uploaded PR say?',
       'What is 30+ DPD?',
       'How is the cure rate defined?',
-      'Which datasets can you answer from?'
+      'Which datasets can you answer from?',
+      'Which districts in UP are worst?'
     ] }
   ];
 })();
@@ -5409,7 +5493,7 @@ body.touring .fab { display: none; }
   // change in a metric: bps for delinquency, pp for cure rate, % for amounts
   const dfmt = (m, now, was) => (S.METRICS[m].unit !== 'pct' ? F().chg(now / was - 1) : m === 'cure' ? F().pp(now - was, 1) : F().bps(now - was));
   const fmtM = (m, v) => F().metric(m, v);
-  const src = (...k) => k.map((x) => S.DATASETS[x].name);
+  const src = (...k) => [...new Set(k)].map((x) => S.DATASETS[x].name);
 
   // ---------------- tools ----------------
   const tools = {};
@@ -5418,7 +5502,7 @@ body.touring .fab { display: none; }
   }
   const P_PRODUCT = { type: 'string', enum: ['ALL'].concat(D.PRODUCTS.map((x) => x.id)), description: 'ALL = whole portfolio; ' + D.PRODUCTS.map((x) => x.id + ' = ' + x.long).join('; ') };
   const P_STATE = { type: 'string', enum: ['ALL'].concat(D.STATES.map((x) => x.id)), description: 'ALL or a state code: ' + D.STATES.map((x) => x.id + ' = ' + x.name).join('; ') };
-  const P_METRIC = { type: 'string', enum: Object.keys(S.METRICS), description: 'bal, acc, orig, dpd30, dpd90, cure' };
+  const P_METRIC = { type: 'string', enum: Object.keys(S.METRICS), description: Object.values(S.METRICS).map((m) => m.id + ' = ' + m.name).join('; ') };
 
   def('trend', 'Monthly trend of a metric for the industry and/or the member, optionally for one or more states, a risk band or a lender type.', {
     metric: P_METRIC, product: P_PRODUCT, states: { type: 'array', items: P_STATE }, band: { type: 'string', enum: ['SP', 'PP', 'PR', 'NP', 'SB'] },
@@ -5965,12 +6049,71 @@ body.touring .fab { display: none; }
     };
   });
 
+  def('borrower_profile', 'Split delinquency, ticket size or balance share by borrower gender, age band or income band (gender and date of birth from bureau records; income as declared at application, not verified). Aggregates only, for portfolio monitoring, never for individual decisions.', {
+    product: P_PRODUCT, state: P_STATE, dimension: { type: 'string', enum: ['gender', 'age', 'income'] },
+    metric: { type: 'string', enum: ['dpd30', 'dpd90', 'dpd180', 'ats', 'bal'], description: 'dpd30/dpd90/dpd180 = delinquency rate; ats = average ticket size of new loans; bal = share of the balance' },
+    who: { type: 'string', enum: ['industry', 'member', 'both'] }
+  }, ['dimension'], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', dim = a.dimension, metric = a.metric || 'dpd30', who = a.who || 'industry', t = S.latest();
+    const DIM = PIQ.demo.DIMS[dim];
+    const ind = PIQ.demo.split('industry', { p, s, m: t }, dim, metric), mem = who === 'industry' ? null : PIQ.demo.split('member', { p, s, m: t }, dim, metric);
+    const main = who === 'member' ? mem : ind;
+    const isShare = metric === 'bal', fv = (v) => (v == null ? 'n/a' : isShare ? F().pct(v, 0) : fmtM(metric, v));
+    const label = isShare ? 'share of balance' : metric === 'ats' ? 'average ticket size' : S.METRICS[metric].short;
+    S.log('borrowerProfile', { p, s, dim, metric, who }, 'ai');
+    const head = `**${pTitle(p)} · ${sName(s)} · ${label} by ${DIM.name}** (${ml(t)})`;
+    const paras = [], bullets = [];
+    const seg = (r, i) => (mem && who === 'both' ? `${fv(mem[i].value)} for you vs ${fv(r.value)} for the market` : fv(r.value)) + (isShare ? '' : ` (${F().pct(r.share, 0)} of balance)`);
+    const nm = (r) => (dim === 'gender' ? r.name.toLowerCase() : r.name);
+    let summary = '';
+    if (!isShare) {
+      const ok = main.filter((r) => r.value != null), hi = ok.reduce((x, y) => (y.value > x.value ? y : x)), lo = ok.reduce((x, y) => (y.value < x.value ? y : x));
+      summary = metric === 'ats' ? `Tickets are biggest for ${nm(hi)} (${fv(hi.value)}) and smallest for ${nm(lo)} (${fv(lo.value)}).`
+        : `Delinquency is highest for ${nm(hi)} (${fv(hi.value)}) and lowest for ${nm(lo)} (${fv(lo.value)}), ${(hi.value / lo.value).toFixed(1)}× apart.`;
+    }
+    if (dim === 'gender') { paras.push(`${head}: women ${seg(main[0], 0)}; men ${seg(main[1], 1)}.`); if (summary) paras.push(summary); }
+    else { paras.push(head + '. ' + summary); main.forEach((r, i) => bullets.push(`**${r.name}:** ${seg(r, i)}`)); }
+    // across all products, a segment's rate can be driven by which products it borrows in (e.g. women and microfinance)
+    if (p === 'ALL' && !isShare && metric !== 'ats') {
+      const src0 = who === 'member' ? 'member' : 'industry', hiI = main.indexOf(main.reduce((x, y) => (y.value > x.value ? y : x)));
+      const byP = D.PRODUCTS.map((x) => ({ x, b: S.value(src0, 'bal', { p: x.id, s, m: t }) * (PIQ.demo.split(src0, { p: x.id, s, m: t }, dim, 'bal')[hiI] || { value: 0 }).value })).sort((u, v) => v.b - u.b);
+      const tot = byP.reduce((a2, y) => a2 + y.b, 0), top = byP[0];
+      if (tot && top.b / tot > 0.3) {
+        const within = PIQ.demo.split(src0, { p: top.x.id, s, m: t }, dim, metric), wHi = within.reduce((x, y) => (y.value > x.value ? y : x));
+        const mixNote = `Part of that is product mix: ${F().pct(top.b / tot, 0)} of the balance held by ${nm(main[hiI])} here is in ${top.x.name.toLowerCase()}s.`;
+        paras.push(wHi.id === main[hiI].id ? mixNote : `${mixNote} Within each product, ${nm(main[hiI])} are not the riskier group; filter to one product for a like-for-like view.`);
+      }
+    }
+    if (mem && who === 'both') {
+      const shareM = PIQ.demo.split('member', { p, s, m: t }, dim, 'bal'), shareI = PIQ.demo.split('industry', { p, s, m: t }, dim, 'bal');
+      const gap = shareM.map((r, i) => ({ r, d: r.value - shareI[i].value })).sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+      if (Math.abs(gap.d) >= 0.02) paras.push(`Your mix differs most in ${gap.r.name.toLowerCase()}: ${F().pct(gap.r.value, 0)} of your balance vs ${F().pct(shareI[shareM.indexOf(gap.r)].value, 0)} for the market.`);
+    }
+    const caveat = `Gender and age come from bureau records; income is as declared at application and isn't verified. Use this to monitor the book, not to decide on individual applicants.`;
+    if (bullets.length) bullets.push(caveat); else paras.push(caveat);
+    return {
+      answer: {
+        paras, bullets: bullets.length ? bullets : null,
+        chart: (el) => PIQ.charts.bars(el, { items: main.map((r, i) => (mem && who === 'both' ? { label: r.name, value: mem[i].value, ref: ind[i].value } : { label: r.name, value: r.value })), fmt: fv, color: 'var(--s1)', valueName: 'You', refName: mem && who === 'both' ? 'Industry' : undefined }),
+        sources: src('demographics', ...(mem ? ['member', 'industry'] : ['industry'])), filters: `${pLong(p)} · ${sName(s)} · by ${DIM.name} · ${ml(t)}`,
+        followups: dim === 'gender' ? ['Show delinquency by age band', 'Show delinquency by income band'] : dim === 'age' ? ['Show delinquency by gender', 'Show delinquency by income band'] : ['Show average ticket size by income', 'Show delinquency by age band']
+      },
+      facts: { dimension: dim, metric, rows: main.map((r, i) => ({ segment: r.name, value: fv(r.value), shareOfBalance: F().pct(r.share, 0), member: mem ? fv(mem[i].value) : undefined })) }
+    };
+  });
+
   // ---------------- guardrails ----------------
   const OTHER_LENDERS = /\b(hdfc|icici|sbi|state bank|axis|kotak|bajaj|idfc|yes bank|indusind|federal bank|bank of baroda|\bbob\b|pnb|punjab national|canara|au small|tata capital|paytm|kreditbee|navi|moneyview|competitor'?s?|name (the|my|your) peers|who are (my|the) peers|list (of |the )?peers|which (banks|lenders|nbfcs|institutions) are in)\b/i;
   const PERSONAL = /\b(pan( number)?|aadhaar|aadhar|borrower named|customer named|mobile number|phone number|account number|date of birth|address of)\b/i;
   const OUT_OF_SCOPE = /\b(share price|stock price|stocks?|nifty|sensex|repo rate|inflation|gdp|weather|cricket|bitcoin|crypto|forecast the rbi|election|mutual fund)\b/i;
 
+  const PROTECTED = /\b(religions?|religious|caste|castes|community|communities|ethnicity|ethnic|hindu|muslim|christian|sikh|dalit|tribal|sc\/st|obc)\b/i;
+
   function guard(q) {
+    if (PROTECTED.test(q)) return {
+      refusal: true, paras: ['I don\'t hold religion, caste or community, and they shouldn\'t be used to analyse credit performance, so I won\'t estimate them.', 'I can split by state, product, risk band, PIN-code risk tier, gender, age band or income band instead.'],
+      sources: ['Governance policy: no protected attributes'], filters: 'Request blocked', followups: ['What is the delinquency for women borrowers in Bihar?', 'Show 30+ DPD by income band for personal loans'], guard: 'protected-attribute'
+    };
     if (OTHER_LENDERS.test(q)) return {
       refusal: true, paras: ['I can\'t share data about any named or identifiable lender. Tenant isolation means you can only see **your own portfolio**, **anonymised peer aggregates** (at least 5 institutions, none above 25% of the group) and **industry totals**.', 'I can compare you with an anonymised peer group instead.'],
       sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with PVT mid-size peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
@@ -5984,6 +6127,30 @@ body.touring .fab { display: none; }
       sources: ['Scope control'], filters: 'Out of scope', followups: ['Which datasets can you answer from?', 'What is happening in personal loans?'], guard: 'scope'
     };
     return null;
+  }
+
+  // ---------------- honest limits: fields the approved data doesn't hold ----------------
+  // A near-miss question still gets the closest governed answer, but the gap is said first, never silently dropped.
+  const CITY = /\b(mumbai|pune|chennai|bengaluru|bangalore|ahmedabad|surat|hyderabad|lucknow|noida|gurgaon|gurugram|kolkata|jaipur|indore|bhopal|patna|nagpur|kochi|coimbatore|vizag|visakhapatnam)\b/i;
+  const LIMITS = [
+    { field: 'district or city', re: /\b(districts?|talukas?|tehsils?|villages?|towns?|cit(y|ies)|branch(es)?|branch.?wise|individual pin.?codes?|which pin.?codes)\b/i,
+      say: 'I can\'t split by district or city: the approved data goes down to state level (plus PIN-code risk tiers), with no district field.' },
+    { field: 'forecast', re: /\b(forecasts?|predict(ion|ed|s)?|projections?|projected|next (month|quarter|year|fy)|coming (months?|quarters?|year)|going to (be|rise|fall|go)|will (it|they|my|our|the|this|that)?\s?\w*\s?(be|rise|fall|go|reach|look|increase|decrease|end up))\b/i,
+      unless: /what if|simulat|cut.?off/i,
+      say: 'I don\'t forecast: the approved data holds actuals only, with no forecasting model, so I won\'t predict a future figure. Below are the latest actuals and their trend; the early-warning signals (weekly bounces, application quality) show where it is heading.' },
+    { field: 'profitability', re: /\b(roa|roe|return on (assets|equity|capital)|nim|net interest margin|yields?|profits?|profitab\w*|margins?|cost of funds|cost.to.income|interest income|fee income|provisions?|provisioning|credit costs?|ecl|expected credit loss|lgd|loss given default|pricing|interest rates?)\b/i,
+      say: 'I can\'t answer on profitability, returns, margins, yields, provisions or pricing: bureau data holds balances, accounts and repayment status, not income, costs or rates.' },
+    { field: 'occupation', re: /\b(occupations?|professions?|salaried|self.?employed|employers?|employment type|job type|sector.?wise|by sector)\b/i,
+      say: 'I can\'t split by occupation or employment type: it isn\'t in the approved bureau aggregates.' }
+  ];
+  function limits(q) {
+    const out = LIMITS.filter((l) => l.re.test(q) && !(l.unless && l.unless.test(q))).map((l) => ({ field: l.field, say: l.say }));
+    const c = q.match(CITY);
+    if (c && !out.find((x) => x.field === 'district or city')) {
+      const st = extract(q).states[0];
+      out.push({ field: 'city', say: `I don't hold city-level data, so ${c[0][0].toUpperCase() + c[0].slice(1).toLowerCase()} is answered at state level${st ? ' (' + D.S[st].name + ')' : ''}.` });
+    }
+    return out;
   }
 
   // ---------------- entity extraction ----------------
@@ -6059,6 +6226,15 @@ body.touring .fab { display: none; }
       const term = /cure/.test(t) ? 'cure' : /90/.test(t) ? 'dpd90' : /30|dpd/.test(t) ? 'dpd30' : /mix/.test(t) ? 'mix' : /market effect/.test(t) ? 'market' : /prime|band/.test(t) ? 'bands' : 'dpd30';
       return call('define', { term });
     }
+    const dim = /\b(wo)?men\b|\bfemales?\b|\bmales?\b|\bgender\b/.test(t) ? 'gender'
+      : /\bage\b|\baged\b|\bage.?(band|group|wise)|\byoung(er)?\b|\byouth\b|\bmillennials?\b|\bgen ?z\b|\bolder\b|\bseniors?\b|\belderly\b|\bunder \d\d\b|\bover \d\d\b|\b\d\d.?(years?|yrs?)\b/.test(t) ? 'age'
+      : /\bincomes?\b|\bsalar(y|ies)\b|\bearn(ing|ings|ers)?\b|\baffluent\b|\b(low|high|lower|higher).?income\b|\bpoor(er)?\b|\bricher\b|\bwealth(y|ier)?\b/.test(t) ? 'income' : null;
+    if (dim) {
+      const dm = S.DPD_METRICS.includes(metric) ? metric : /ticket|loan size|amount|how big/.test(t) ? 'ats' : /share|mix|proportion|how much of|split of|balance|book/.test(t) && !/delinquen|dpd|risk|default/.test(t) ? 'bal' : 'dpd30';
+      // "show delinquency by age band" after a profile answer keeps that answer's product and state
+      const keep = ctx.intent === 'borrower_profile' && !e.product && !e.states.length;
+      return call('borrower_profile', { product: keep ? ctx.product : p, state: keep ? ctx.state : st, dimension: dim, metric: dm, who: e.self ? 'both' : keep && ctx.args ? ctx.args.who : 'industry' });
+    }
     if (/upload|my file|approval route|credit hub|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
     if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
@@ -6129,15 +6305,32 @@ body.touring .fab { display: none; }
     const g = guard(q);
     if (g) { S.log('ai.guardrail', { rule: g.guard, q: q.slice(0, 80) }, 'ai'); return { answer: g, facts: { refused: g.guard } }; }
     const r = route(q);
+    const lim0 = limits(q);
+    if (!r && lim0.length) return {
+      answer: { paras: ['**I can\'t answer that from the approved data.** ' + lim0.map((l) => l.say).join(' ')], sources: ['Scope control'], filters: 'Not available: ' + lim0.map((l) => l.field).join(', '), followups: ['Which datasets can you answer from?', 'What is happening in personal loans?'], limits: lim0.map((l) => l.field) },
+      facts: { notAvailable: lim0.map((l) => l.field) }
+    };
     if (!r) return {
       answer: { paras: ['I\'m not sure I understood. I answer questions about industry credit trends, your portfolio, peer benchmarks, why metrics changed, policy simulations and application trends. Try one of these:'], sources: [], filters: '', followups: ['What should I worry about this week?', 'What is happening in personal loans?', 'Why did my personal loan delinquency go up?'] },
       facts: {}
     };
     if (r.name === 'nav') { PIQ.go(r.args.view); return { answer: { paras: ['Opening the full analysis…'], sources: [], filters: '' }, facts: {} }; }
-    return run(r.name, r.args, 'ai');
+    return withLimits(q, run(r.name, r.args, 'ai'));
   }
 
-  PIQ.agent = { tools, answer, run, guard, route, extract, ctx };
+  // say what can't be answered before the closest governed answer, and show it in the filter chip
+  function withLimits(q, out) {
+    const lim = limits(q);
+    if (!lim.length || !out || !out.answer || out.answer.refusal) return out;
+    const a = out.answer;
+    a.paras = ['**Not exactly what you asked.** ' + lim.map((l) => l.say).join(' ') + ' Closest answer from the approved data:'].concat(a.paras || []);
+    a.filters = (a.filters ? a.filters + ' · ' : '') + 'Not available: ' + lim.map((l) => l.field).join(', ');
+    a.limits = lim.map((l) => l.field);
+    out.facts = Object.assign({}, out.facts, { notAvailable: lim.map((l) => l.field) });
+    return out;
+  }
+
+  PIQ.agent = { tools, answer, run, guard, route, extract, limits, withLimits, ctx };
 })();
 
 </script>
@@ -6152,6 +6345,7 @@ body.touring .fab { display: none; }
 (function () {
   const PIQ = window.PIQ;
   const C = PIQ.config;
+  const D = PIQ.data;
   let statusP = null;
 
   function status() {
@@ -6166,10 +6360,15 @@ body.touring .fab { display: none; }
 Rules:
 - Answer ONLY using the provided tools. Call a tool for every factual claim. Never calculate, estimate or invent numbers; quote figures exactly as the tools return them.
 - If no tool can answer, say the information is not in the approved datasets. Do not guess.
+- If the question needs something the tools don't hold (district or city, a forecast, profitability or pricing, occupation), say so in your first sentence, then give the closest answer the tools support. Never answer a different question as if it were the one asked.
 - Never reveal or speculate about any other named lender, peer institution or individual borrower.
 - Keep answers short and decision-oriented: 2–4 sentences or up to 5 bullets. Lead with the answer, then the "so what".
 - Use Indian conventions (₹ crore, lakh). Use **bold** for the key number. No headings.
-- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}. Codes: products PL/CC; states MH, TN, KA, UP, GJ, TG or ALL.`;
+- Data is synthetic demo data as of ${C.dataAsOf}; applications to ${C.loginsAsOf}.
+- Codes (built from the app's data, so new products or states appear here automatically):
+  products: ALL, ${D.PRODUCTS.map((x) => x.id + ' = ' + x.name).join(', ')}
+  states: ALL, ${D.STATES.map((x) => x.id + ' = ' + x.name).join(', ')}
+  metrics: ${Object.values(PIQ.sem.METRICS).map((m) => m.id + ' = ' + m.name).join(', ')}`;
 
   async function post(body) {
     const r = await fetch(C.llmEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -6309,6 +6508,7 @@ Rules:
       console.warn('LLM unavailable, using governed engine:', e.message);
     }
     if (!result) result = PIQ.agent.answer(q).answer;
+    else if (result.llm && !result.limits) result = PIQ.agent.withLimits(q, { answer: result, facts: {} }).answer;
     if (PIQ.applyScope) PIQ.applyScope(); else PIQ.sem.setScope(prevScope);
     convo.pop();
     convo.push({ role: 'bot', a: result });

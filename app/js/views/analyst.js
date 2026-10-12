@@ -92,6 +92,7 @@
       console.warn('LLM unavailable, using governed engine:', e.message);
     }
     if (!result) result = PIQ.agent.answer(q).answer;
+    else if (result.llm && !result.limits) result = PIQ.agent.withLimits(q, { answer: result, facts: {} }).answer;
     if (PIQ.applyScope) PIQ.applyScope(); else PIQ.sem.setScope(prevScope);
     convo.pop();
     convo.push({ role: 'bot', a: result });

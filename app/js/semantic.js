@@ -33,6 +33,7 @@
     member: { name: 'Member Portfolio Dataset', grain: 'month × product × state × risk band', refresh: 'Monthly', asOf: C.dataAsOf },
     peers: { name: 'Anonymised Peer Aggregates', grain: 'peer group × month × product × state', refresh: 'Monthly', asOf: C.dataAsOf },
     logins: { name: 'Enquiry & Application Feed', grain: 'day × product × state × risk band × PIN-code tier × bureau credit profile (amount requested included)', refresh: 'Daily (T-1)', asOf: C.loginsAsOf },
+    demographics: { name: 'Borrower Demographics (aggregated)', grain: 'month × product × state × gender / age band / income band (income as declared at application)', refresh: 'Monthly', asOf: C.dataAsOf },
     scores: { name: 'Application Score Distribution', grain: 'product × state × 20-pt score bin', refresh: 'Weekly', asOf: 'last 90 days' }
   };
 
