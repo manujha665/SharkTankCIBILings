@@ -48,6 +48,8 @@
       'Is my cure rate falling in Uttar Pradesh?'
     ] },
     { cat: 'Benchmarking', qs: [
+      'Near-prime credit cards in Kerala: SFBs vs the market',
+      'How are my loans disbursed in the last 6 months doing in high-risk PIN codes?',
       'How do I compare with PVT mid-size peers?',
       'Compare my personal loan delinquency with the industry in Gujarat',
       'Where am I better than the market?',
