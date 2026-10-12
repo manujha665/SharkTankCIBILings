@@ -631,6 +631,84 @@
     };
   });
 
+  // ---------------- flexible governed query ----------------
+  // Any approved metric for any combination of filters, comparing the member, the market and lender categories.
+  // Every number still comes from the same governed aggregates as the dashboards (S.value / S.series).
+  const BAND_OPTS = ['ALL'].concat(D.BANDS.map((b) => b.id), ['NP+SB']);
+  const SERIES_OPTS = ['member', 'industry'].concat(D.LENDERS.map((l) => l.id));
+  const bandName = (b) => (!b || b === 'ALL' ? '' : b === 'NP+SB' ? 'near-prime & subprime' : D.BANDS.find((x) => x.id === b).name.toLowerCase());
+  const seriesName = (x) => (x === 'member' ? C.member.name : x === 'industry' ? 'the market (all lenders)' : D.LENDERS.find((l) => l.id === x).long);
+  const seriesShort = (x) => (x === 'member' ? 'You' : x === 'industry' ? 'Market' : D.LENDERS.find((l) => l.id === x).name);
+  def('query', 'Flexible governed query: any approved metric for any combination of product, state, risk band, lender category, recent-disbursement vintage (loans disbursed in the last 3/6/9/12 months) and PIN-code risk tier. Compares the member, the whole market and any lender categories side by side, optionally broken down by product, state, risk band or lender category. Use it when a question combines filters the specific tools do not cover.', {
+    metric: P_METRIC, product: P_PRODUCT, state: P_STATE,
+    band: { type: 'string', enum: BAND_OPTS, description: 'Risk band: ALL, ' + D.BANDS.map((b) => b.id + ' = ' + b.name).join(', ') + ', NP+SB = near-prime and subprime together' },
+    series: { type: 'array', items: { type: 'string', enum: SERIES_OPTS }, description: 'What to compare: member = the user\'s own book, industry = the whole market, or lender categories (' + D.LENDERS.map((l) => l.id + ' = ' + l.long).join('; ') + '). Lender categories are market data only.' },
+    group_by: { type: 'string', enum: ['none', 'product', 'state', 'band', 'lender'], description: 'Optional breakdown' },
+    vintage: { type: 'integer', enum: [0, 3, 6, 9, 12], description: 'Only loans disbursed in the last N months (0 = whole book)' },
+    pin: { type: 'string', enum: ['ALL', 'L', 'M', 'H'], description: 'PIN-code risk tier: L = low, M = medium, H = high' }
+  }, ['metric'], (a) => {
+    const gb = a.group_by && a.group_by !== 'none' ? a.group_by : null;
+    // breaking down by a dimension covers all of it (by band: all the bands asked for)
+    const metric = a.metric || 'dpd30', p = gb === 'product' ? 'ALL' : a.product || 'ALL', s = gb === 'state' ? 'ALL' : a.state || 'ALL', band = a.band || 'ALL', vintage = +a.vintage || 0, pin = a.pin && a.pin !== 'ALL' ? a.pin : null;
+    let series = (a.series && a.series.length ? a.series : ['industry']).filter((x, i, arr) => SERIES_OPTS.includes(x) && arr.indexOf(x) === i);
+    const notes = [];
+    if (gb === 'lender' && series.includes('member')) { series = series.filter((x) => x !== 'member'); notes.push('Lender categories are market data, so your own book is not in the lender breakdown.'); }
+    if (!series.length) series = ['industry'];
+    const t = S.latest(), t12 = S.monthsAgo(12);
+    const base = { p, s }; if (band !== 'ALL') base.b = band === 'NP+SB' ? ['NP', 'SB'] : band;
+    const fOf = (x, extra) => Object.assign({}, base, x === 'member' || x === 'industry' ? {} : { l: x }, extra || {});
+    const srcOf = (x) => (x === 'member' ? 'member' : 'industry');
+    const scope = { vintage, pin };
+    const val = (x, extra) => S.withScope(scope, () => S.value(srcOf(x), metric, fOf(x, extra)));
+    const bal = (x, extra) => S.withScope(scope, () => S.value(srcOf(x), 'bal', fOf(x, extra)));
+    S.log('query', Object.assign({ metric, series, group_by: gb }, base, scope), 'ai');
+
+    const scopeTxt = [vintage ? `loans disbursed in the last ${vintage} months` : '', pin ? { L: 'low', M: 'medium', H: 'high' }[pin] + '-risk PIN codes' : ''].filter(Boolean);
+    const what = [bandName(band), pName(p) === 'total portfolio' ? 'all products' : pName(p) + 's'].filter(Boolean).join(' ') + ' in ' + sName(s) + (scopeTxt.length ? ', ' + scopeTxt.join(', ') : '');
+    const paras = [], bullets = [];
+    const rows = series.map((x) => { const now = val(x, { m: t }), was = val(x, { m: t12 }), b0 = bal(x, { m: t }); return { x, now, was, bal: b0 }; });
+    const usable = rows.filter((r) => r.bal && r.now != null);
+    if (!usable.length) {
+      return { answer: { paras: [`There is no balance for ${what} in the approved data${series.length ? ' for ' + series.map(seriesShort).join(', ') : ''}, so there is nothing to report.`], sources: src('industry'), filters: what, followups: ['What is happening in personal loans?'] }, facts: { empty: true } };
+    }
+    const lbl = (x) => (x === 'member' ? C.member.name : x === 'industry' ? 'market (all lenders)' : D.LENDERS.find((l) => l.id === x).long);
+    paras.push(`**${mName(metric)} · ${what}** (${ml(t)}): ` + rows.map((r) => (r.bal && r.now != null ? `${lbl(r.x)} **${fmtM(metric, r.now)}** (${dfmt(metric, r.now, r.was)} in 12 months)` : `${lbl(r.x)}: no balance in this segment`)).join('; ') + '.');
+    if (usable.length >= 2) {
+      const [r1, r2] = usable, M = S.METRICS[metric];
+      if (M.unit === 'pct') {
+        const d = r1.now - r2.now, worse = M.bad ? d > 0 : d < 0;
+        paras.push(`${r1.x === 'member' ? 'You are' : seriesName(r1.x).replace(/^the /, 'The ') + (r1.x === 'industry' ? ' is' : ' are')} **${F().bps(Math.abs(d)).replace(/^[+−-]/, '')} ${Math.abs(d) < 0.00005 ? 'level with' : worse ? 'worse than' : 'better than'}** ${seriesName(r2.x)} on ${M.short}.`);
+      } else if (r2.now) paras.push(`${r1.x === 'member' ? 'Yours is' : seriesName(r1.x).replace(/^the /, 'The ') + (r1.x === 'industry' ? ' runs at' : ' run at')} **${(r1.now / r2.now).toFixed(2)}×** ${seriesName(r2.x)} on ${metric === 'ats' ? 'ticket size' : mLow(metric)}.`);
+    }
+    if (gb) {
+      const bandSet = band === 'ALL' ? null : band === 'NP+SB' ? ['NP', 'SB'] : [band];
+      const list = { product: D.PRODUCTS, state: D.STATES, band: D.BANDS.filter((x) => !bandSet || bandSet.includes(x.id)), lender: D.LENDERS }[gb], key = { product: 'p', state: 's', band: 'b', lender: 'l' }[gb];
+      const first = usable[0].x, second = usable[1] ? usable[1].x : null;
+      const g = list.map((it) => ({ name: it.name, v: val(first, { m: t, [key]: it.id }), r: second ? val(second, { m: t, [key]: it.id }) : null, b: bal(first, { m: t, [key]: it.id }) }))
+        .filter((r) => r.b && r.v != null).sort((u, w) => (S.METRICS[metric].bad ? w.v - u.v : u.v - w.v));
+      var gbIntro = `By ${gb === 'band' ? 'risk band' : gb === 'lender' ? 'lender category' : gb}, ${S.METRICS[metric].bad ? 'worst first' : 'lowest first'}:`;
+      g.slice(0, 12).forEach((r) => bullets.push(`**${r.name}:** ${fmtM(metric, r.v)}${second && r.r != null ? ` vs ${fmtM(metric, r.r)} (${seriesShort(second)})` : ''}`));
+      if (g.length > 12) bullets.push(`…and ${g.length - 12} more`);
+      var chartFn = (el) => PIQ.charts.bars(el, { items: g.slice(0, 12).map((r) => ({ label: r.name, value: r.v, ref: r.r == null ? undefined : r.r })), fmt: (v) => fmtM(metric, v), color: 'var(--s1)', valueName: seriesShort(first), refName: second ? seriesShort(second) : undefined });
+    } else {
+      const colors = ['var(--s1)', 'var(--s3)', 'var(--s2)', 'var(--s4)', 'var(--s5)', 'var(--s7)'];
+      var chartFn = (el) => PIQ.charts.line(el, { series: usable.map((r, i) => ({ name: seriesShort(r.x), color: r.x === 'member' ? 'var(--s1)' : r.x === 'industry' ? 'var(--s3)' : colors[(i + 2) % colors.length], points: S.withScope(scope, () => S.series(srcOf(r.x), metric, fOf(r.x))) })), xLabel: ml, yFmt: (v) => fmtM(metric, v) });
+    }
+    if (scopeTxt.length) notes.push('Recent-disbursement and PIN-tier views are modelled in the prototype; in production they read the disbursal month and PIN code lenders already report.');
+    if (series.some((x) => x !== 'member' && x !== 'industry')) notes.push('Lender categories are anonymised market aggregates; no single lender can be seen.');
+    paras.push(...notes);
+    if (gb) paras.push(gbIntro);
+    const used = ['industry'].concat(series.includes('member') ? ['member'] : []);
+    return {
+      answer: {
+        paras, bullets, chart: chartFn, sources: src(...used),
+        filters: [pTitle(p), sName(s), band !== 'ALL' ? bandName(band) : '', ...scopeTxt, ml(t)].filter(Boolean).join(' · '),
+        followups: ['Break that down by state', 'Now compare it with my portfolio', 'Why did it change?']
+      },
+      facts: { metric, filters: Object.assign({}, base, scope), rows: rows.map((r) => ({ series: seriesName(r.x), value: r.now == null ? null : fmtM(metric, r.now), change12m: r.now == null || r.was == null ? null : dfmt(metric, r.now, r.was) })) }
+    };
+  });
+
   // ---------------- guardrails ----------------
   const OTHER_LENDERS = /\b(hdfc|icici|sbi|state bank|axis|kotak|bajaj|idfc|yes bank|indusind|federal bank|bank of baroda|\bbob\b|pnb|punjab national|canara|au small|tata capital|paytm|kreditbee|navi|moneyview|competitor'?s?|name (the|my|your) peers|who are (my|the) peers|list (of |the )?peers|which (banks|lenders|nbfcs|institutions) are in)\b/i;
   const PERSONAL = /\b(pan( number)?|aadhaar|aadhar|borrower named|customer named|mobile number|phone number|account number|date of birth|address of)\b/i;
@@ -813,6 +891,47 @@
     return null;
   }
 
+  // ---------------- never drop a filter: hand combinations the picked tool can't honour to `query` ----------------
+  const WORDN = { three: 3, six: 6, nine: 9, twelve: 12 };
+  function scopeOf(t) {
+    let vintage = 0, pin = null;
+    const m = t.match(/(?:disburs\w*|booked|originat\w*|sanction\w*|lent)[^.?]*?(?:last|past) (\d+|three|six|nine|twelve) months/) || t.match(/(?:last|past) (\d+|three|six|nine|twelve) months'? ?(?:disburs\w*|vintages?|loans|lending)/);
+    if (m) { const n = +m[1] || WORDN[m[1]]; vintage = [3, 6, 9, 12].reduce((x, y) => (Math.abs(y - n) < Math.abs(x - n) ? y : x)); }
+    else if (/recent (vintages?|disburs\w*|lending)|new(er)? loans|fresh (loans|lending)/.test(t)) vintage = 6;
+    const pm = t.match(/\b(high|medium|low)\b[\w\s-]{0,6}risk (pin.?codes?|pins|localit\w*|areas|geograph\w*)/) || t.match(/pin.?codes? (?:that are |with |of )?(high|medium|low)/);
+    if (pm) pin = { high: 'H', medium: 'M', low: 'L' }[pm[1]];
+    else if (/riskier (pin.?codes?|localit\w*|areas|geograph\w*)/.test(t)) pin = 'H';
+    return { vintage, pin };
+  }
+  const QUERYABLE = ['trend', 'rank_states', 'benchmark', 'ticket_size', 'lender_types', 'market_share', 'login_quality'];
+  function upgrade(q, r) {
+    const t = q.toLowerCase(), e = extract(q), sc = scopeOf(t);
+    const gbm = t.match(/(?:by|across|per|break (?:that|it|this) down by|split (?:that|it|this) by)\s+(states?|regions?|risk bands?|bands?|products?|lenders?|lender (?:types?|categories)|lender type)/);
+    const groupBy = gbm ? (/state|region/.test(gbm[1]) ? 'state' : /band/.test(gbm[1]) ? 'band' : /product/.test(gbm[1]) ? 'product' : 'lender') : null;
+    // follow-ups on a query keep its filters
+    if (ctx.intent === 'query' && ctx.args && !(e.product && e.product !== 'ALL') && !e.states.length && (groupBy || /compare (it|that|this) with my|with my portfolio|against mine|vs me\b/.test(t))) {
+      const prev = Object.assign({}, ctx.args);
+      if (groupBy) prev.group_by = groupBy;
+      if (/with my|against mine|vs me\b/.test(t)) prev.series = ['member'].concat((prev.series || ['industry']).filter((x) => x !== 'member'));
+      return { name: 'query', args: prev };
+    }
+    if (r && !QUERYABLE.includes(r.name)) return r;
+    const band = e.band || (e.bandPair ? 'NP+SB' : null), lenders = e.lenders, vs = /\bvs\.?\b|versus|against|compared?|than/.test(t);
+    const appWords = /applica|login|enquir|inquir|applicant/.test(t);
+    if (r && r.name === 'login_quality' && !(sc.vintage || (sc.pin && !appWords))) return r;
+    const name = r ? r.name : null;
+    const dropsBand = band && !['trend', 'rank_states'].includes(name);
+    const dropsLender = lenders.length && (['ticket_size', 'rank_states', 'market_share', 'login_quality'].includes(name) || (name === 'benchmark' && !(r.args && r.args.peer_group)) || (name === 'trend' && (lenders.length > 1 || vs)) || (name === 'lender_types' && band));
+    const dropsScope = sc.vintage || (sc.pin && !appWords);
+    const dropsGroup = groupBy && name !== 'lender_types' && name !== 'rank_states';
+    if (!(dropsBand || dropsLender || dropsScope || (dropsGroup && (band || lenders.length || sc.vintage || sc.pin)))) return r;
+    const a0 = (r && r.args) || {};
+    const metric = name === 'ticket_size' || /ticket|loan size|average loan/.test(t) ? 'ats' : a0.metric || e.metric || 'dpd30';
+    const series = (e.self ? ['member'] : []).concat(lenders);
+    if (!lenders.length || (lenders.length === 1 && (vs || /market|industry|all lenders/.test(t))) || (name === 'benchmark' && !series.includes('industry'))) series.push('industry');
+    return { name: 'query', args: { metric, product: e.product || a0.product || 'ALL', state: e.states[0] || a0.state || (a0.states && a0.states[0]) || 'ALL', band: band || 'ALL', series: series.filter((x, i, arr) => arr.indexOf(x) === i), group_by: groupBy || 'none', vintage: sc.vintage, pin: sc.pin || 'ALL' } };
+  }
+
   // ---------------- public API ----------------
   function run(name, args, by) {
     const tool = tools[name];
@@ -833,7 +952,7 @@
   function answer(q) {
     const g = guard(q);
     if (g) { S.log('ai.guardrail', { rule: g.guard, q: q.slice(0, 80) }, 'ai'); return { answer: g, facts: { refused: g.guard } }; }
-    const r = route(q);
+    const r = upgrade(q, route(q));
     const lim0 = limits(q);
     if (!r && lim0.length) return {
       answer: { paras: ['**I can\'t answer that from the approved data.** ' + lim0.map((l) => l.say).join(' ')], sources: ['Scope control'], filters: 'Not available: ' + lim0.map((l) => l.field).join(', '), followups: ['Which datasets can you answer from?', 'What is happening in personal loans?'], limits: lim0.map((l) => l.field) },
@@ -859,5 +978,5 @@
     return out;
   }
 
-  PIQ.agent = { tools, answer, run, guard, route, extract, limits, withLimits, ctx };
+  PIQ.agent = { tools, answer, run, guard, route, upgrade, extract, limits, withLimits, ctx };
 })();
