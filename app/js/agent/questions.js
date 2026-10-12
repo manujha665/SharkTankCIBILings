@@ -90,12 +90,19 @@
       'How risky are my retail borrowers who also have MFI loans?',
       'Do MSME promoters\' retail loans give early warning?'
     ] },
+    { cat: 'Borrower profile (gender, age, income)', qs: [
+      'What is the delinquency for women borrowers in Bihar?',
+      'Is my personal loan book riskier for younger borrowers than the market?',
+      'Show 30+ DPD by income band for personal loans',
+      'Average ticket size by income in housing loans'
+    ] },
     { cat: 'Your data & definitions', qs: [
       'Which approval route is performing worst in my uploaded file?',
       'What does my uploaded PR say?',
       'What is 30+ DPD?',
       'How is the cure rate defined?',
-      'Which datasets can you answer from?'
+      'Which datasets can you answer from?',
+      'Which districts in UP are worst?'
     ] }
   ];
 })();

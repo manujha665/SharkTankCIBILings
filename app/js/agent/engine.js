@@ -22,7 +22,7 @@
   // change in a metric: bps for delinquency, pp for cure rate, % for amounts
   const dfmt = (m, now, was) => (S.METRICS[m].unit !== 'pct' ? F().chg(now / was - 1) : m === 'cure' ? F().pp(now - was, 1) : F().bps(now - was));
   const fmtM = (m, v) => F().metric(m, v);
-  const src = (...k) => k.map((x) => S.DATASETS[x].name);
+  const src = (...k) => [...new Set(k)].map((x) => S.DATASETS[x].name);
 
   // ---------------- tools ----------------
   const tools = {};
@@ -578,12 +578,71 @@
     };
   });
 
+  def('borrower_profile', 'Split delinquency, ticket size or balance share by borrower gender, age band or income band (gender and date of birth from bureau records; income as declared at application, not verified). Aggregates only, for portfolio monitoring, never for individual decisions.', {
+    product: P_PRODUCT, state: P_STATE, dimension: { type: 'string', enum: ['gender', 'age', 'income'] },
+    metric: { type: 'string', enum: ['dpd30', 'dpd90', 'dpd180', 'ats', 'bal'], description: 'dpd30/dpd90/dpd180 = delinquency rate; ats = average ticket size of new loans; bal = share of the balance' },
+    who: { type: 'string', enum: ['industry', 'member', 'both'] }
+  }, ['dimension'], (a) => {
+    const p = a.product || 'ALL', s = a.state || 'ALL', dim = a.dimension, metric = a.metric || 'dpd30', who = a.who || 'industry', t = S.latest();
+    const DIM = PIQ.demo.DIMS[dim];
+    const ind = PIQ.demo.split('industry', { p, s, m: t }, dim, metric), mem = who === 'industry' ? null : PIQ.demo.split('member', { p, s, m: t }, dim, metric);
+    const main = who === 'member' ? mem : ind;
+    const isShare = metric === 'bal', fv = (v) => (v == null ? 'n/a' : isShare ? F().pct(v, 0) : fmtM(metric, v));
+    const label = isShare ? 'share of balance' : metric === 'ats' ? 'average ticket size' : S.METRICS[metric].short;
+    S.log('borrowerProfile', { p, s, dim, metric, who }, 'ai');
+    const head = `**${pTitle(p)} · ${sName(s)} · ${label} by ${DIM.name}** (${ml(t)})`;
+    const paras = [], bullets = [];
+    const seg = (r, i) => (mem && who === 'both' ? `${fv(mem[i].value)} for you vs ${fv(r.value)} for the market` : fv(r.value)) + (isShare ? '' : ` (${F().pct(r.share, 0)} of balance)`);
+    const nm = (r) => (dim === 'gender' ? r.name.toLowerCase() : r.name);
+    let summary = '';
+    if (!isShare) {
+      const ok = main.filter((r) => r.value != null), hi = ok.reduce((x, y) => (y.value > x.value ? y : x)), lo = ok.reduce((x, y) => (y.value < x.value ? y : x));
+      summary = metric === 'ats' ? `Tickets are biggest for ${nm(hi)} (${fv(hi.value)}) and smallest for ${nm(lo)} (${fv(lo.value)}).`
+        : `Delinquency is highest for ${nm(hi)} (${fv(hi.value)}) and lowest for ${nm(lo)} (${fv(lo.value)}), ${(hi.value / lo.value).toFixed(1)}× apart.`;
+    }
+    if (dim === 'gender') { paras.push(`${head}: women ${seg(main[0], 0)}; men ${seg(main[1], 1)}.`); if (summary) paras.push(summary); }
+    else { paras.push(head + '. ' + summary); main.forEach((r, i) => bullets.push(`**${r.name}:** ${seg(r, i)}`)); }
+    // across all products, a segment's rate can be driven by which products it borrows in (e.g. women and microfinance)
+    if (p === 'ALL' && !isShare && metric !== 'ats') {
+      const src0 = who === 'member' ? 'member' : 'industry', hiI = main.indexOf(main.reduce((x, y) => (y.value > x.value ? y : x)));
+      const byP = D.PRODUCTS.map((x) => ({ x, b: S.value(src0, 'bal', { p: x.id, s, m: t }) * (PIQ.demo.split(src0, { p: x.id, s, m: t }, dim, 'bal')[hiI] || { value: 0 }).value })).sort((u, v) => v.b - u.b);
+      const tot = byP.reduce((a2, y) => a2 + y.b, 0), top = byP[0];
+      if (tot && top.b / tot > 0.3) {
+        const within = PIQ.demo.split(src0, { p: top.x.id, s, m: t }, dim, metric), wHi = within.reduce((x, y) => (y.value > x.value ? y : x));
+        const mixNote = `Part of that is product mix: ${F().pct(top.b / tot, 0)} of the balance held by ${nm(main[hiI])} here is in ${top.x.name.toLowerCase()}s.`;
+        paras.push(wHi.id === main[hiI].id ? mixNote : `${mixNote} Within each product, ${nm(main[hiI])} are not the riskier group; filter to one product for a like-for-like view.`);
+      }
+    }
+    if (mem && who === 'both') {
+      const shareM = PIQ.demo.split('member', { p, s, m: t }, dim, 'bal'), shareI = PIQ.demo.split('industry', { p, s, m: t }, dim, 'bal');
+      const gap = shareM.map((r, i) => ({ r, d: r.value - shareI[i].value })).sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
+      if (Math.abs(gap.d) >= 0.02) paras.push(`Your mix differs most in ${gap.r.name.toLowerCase()}: ${F().pct(gap.r.value, 0)} of your balance vs ${F().pct(shareI[shareM.indexOf(gap.r)].value, 0)} for the market.`);
+    }
+    const caveat = `Gender and age come from bureau records; income is as declared at application and isn't verified. Use this to monitor the book, not to decide on individual applicants.`;
+    if (bullets.length) bullets.push(caveat); else paras.push(caveat);
+    return {
+      answer: {
+        paras, bullets: bullets.length ? bullets : null,
+        chart: (el) => PIQ.charts.bars(el, { items: main.map((r, i) => (mem && who === 'both' ? { label: r.name, value: mem[i].value, ref: ind[i].value } : { label: r.name, value: r.value })), fmt: fv, color: 'var(--s1)', valueName: 'You', refName: mem && who === 'both' ? 'Industry' : undefined }),
+        sources: src('demographics', ...(mem ? ['member', 'industry'] : ['industry'])), filters: `${pLong(p)} · ${sName(s)} · by ${DIM.name} · ${ml(t)}`,
+        followups: dim === 'gender' ? ['Show delinquency by age band', 'Show delinquency by income band'] : dim === 'age' ? ['Show delinquency by gender', 'Show delinquency by income band'] : ['Show average ticket size by income', 'Show delinquency by age band']
+      },
+      facts: { dimension: dim, metric, rows: main.map((r, i) => ({ segment: r.name, value: fv(r.value), shareOfBalance: F().pct(r.share, 0), member: mem ? fv(mem[i].value) : undefined })) }
+    };
+  });
+
   // ---------------- guardrails ----------------
   const OTHER_LENDERS = /\b(hdfc|icici|sbi|state bank|axis|kotak|bajaj|idfc|yes bank|indusind|federal bank|bank of baroda|\bbob\b|pnb|punjab national|canara|au small|tata capital|paytm|kreditbee|navi|moneyview|competitor'?s?|name (the|my|your) peers|who are (my|the) peers|list (of |the )?peers|which (banks|lenders|nbfcs|institutions) are in)\b/i;
   const PERSONAL = /\b(pan( number)?|aadhaar|aadhar|borrower named|customer named|mobile number|phone number|account number|date of birth|address of)\b/i;
   const OUT_OF_SCOPE = /\b(share price|stock price|stocks?|nifty|sensex|repo rate|inflation|gdp|weather|cricket|bitcoin|crypto|forecast the rbi|election|mutual fund)\b/i;
 
+  const PROTECTED = /\b(religions?|religious|caste|castes|community|communities|ethnicity|ethnic|hindu|muslim|christian|sikh|dalit|tribal|sc\/st|obc)\b/i;
+
   function guard(q) {
+    if (PROTECTED.test(q)) return {
+      refusal: true, paras: ['I don\'t hold religion, caste or community, and they shouldn\'t be used to analyse credit performance, so I won\'t estimate them.', 'I can split by state, product, risk band, PIN-code risk tier, gender, age band or income band instead.'],
+      sources: ['Governance policy: no protected attributes'], filters: 'Request blocked', followups: ['What is the delinquency for women borrowers in Bihar?', 'Show 30+ DPD by income band for personal loans'], guard: 'protected-attribute'
+    };
     if (OTHER_LENDERS.test(q)) return {
       refusal: true, paras: ['I can\'t share data about any named or identifiable lender. Tenant isolation means you can only see **your own portfolio**, **anonymised peer aggregates** (at least 5 institutions, none above 25% of the group) and **industry totals**.', 'I can compare you with an anonymised peer group instead.'],
       sources: ['Governance policy: tenant isolation'], filters: 'Request blocked', followups: ['How do I compare with PVT mid-size peers?', 'Where am I worse than the market?'], guard: 'tenant-isolation'
@@ -597,6 +656,30 @@
       sources: ['Scope control'], filters: 'Out of scope', followups: ['Which datasets can you answer from?', 'What is happening in personal loans?'], guard: 'scope'
     };
     return null;
+  }
+
+  // ---------------- honest limits: fields the approved data doesn't hold ----------------
+  // A near-miss question still gets the closest governed answer, but the gap is said first, never silently dropped.
+  const CITY = /\b(mumbai|pune|chennai|bengaluru|bangalore|ahmedabad|surat|hyderabad|lucknow|noida|gurgaon|gurugram|kolkata|jaipur|indore|bhopal|patna|nagpur|kochi|coimbatore|vizag|visakhapatnam)\b/i;
+  const LIMITS = [
+    { field: 'district or city', re: /\b(districts?|talukas?|tehsils?|villages?|towns?|cit(y|ies)|branch(es)?|branch.?wise|individual pin.?codes?|which pin.?codes)\b/i,
+      say: 'I can\'t split by district or city: the approved data goes down to state level (plus PIN-code risk tiers), with no district field.' },
+    { field: 'forecast', re: /\b(forecasts?|predict(ion|ed|s)?|projections?|projected|next (month|quarter|year|fy)|coming (months?|quarters?|year)|going to (be|rise|fall|go)|will (it|they|my|our|the|this|that)?\s?\w*\s?(be|rise|fall|go|reach|look|increase|decrease|end up))\b/i,
+      unless: /what if|simulat|cut.?off/i,
+      say: 'I don\'t forecast: the approved data holds actuals only, with no forecasting model, so I won\'t predict a future figure. Below are the latest actuals and their trend; the early-warning signals (weekly bounces, application quality) show where it is heading.' },
+    { field: 'profitability', re: /\b(roa|roe|return on (assets|equity|capital)|nim|net interest margin|yields?|profits?|profitab\w*|margins?|cost of funds|cost.to.income|interest income|fee income|provisions?|provisioning|credit costs?|ecl|expected credit loss|lgd|loss given default|pricing|interest rates?)\b/i,
+      say: 'I can\'t answer on profitability, returns, margins, yields, provisions or pricing: bureau data holds balances, accounts and repayment status, not income, costs or rates.' },
+    { field: 'occupation', re: /\b(occupations?|professions?|salaried|self.?employed|employers?|employment type|job type|sector.?wise|by sector)\b/i,
+      say: 'I can\'t split by occupation or employment type: it isn\'t in the approved bureau aggregates.' }
+  ];
+  function limits(q) {
+    const out = LIMITS.filter((l) => l.re.test(q) && !(l.unless && l.unless.test(q))).map((l) => ({ field: l.field, say: l.say }));
+    const c = q.match(CITY);
+    if (c && !out.find((x) => x.field === 'district or city')) {
+      const st = extract(q).states[0];
+      out.push({ field: 'city', say: `I don't hold city-level data, so ${c[0][0].toUpperCase() + c[0].slice(1).toLowerCase()} is answered at state level${st ? ' (' + D.S[st].name + ')' : ''}.` });
+    }
+    return out;
   }
 
   // ---------------- entity extraction ----------------
@@ -672,6 +755,15 @@
       const term = /cure/.test(t) ? 'cure' : /90/.test(t) ? 'dpd90' : /30|dpd/.test(t) ? 'dpd30' : /mix/.test(t) ? 'mix' : /market effect/.test(t) ? 'market' : /prime|band/.test(t) ? 'bands' : 'dpd30';
       return call('define', { term });
     }
+    const dim = /\b(wo)?men\b|\bfemales?\b|\bmales?\b|\bgender\b/.test(t) ? 'gender'
+      : /\bage\b|\baged\b|\bage.?(band|group|wise)|\byoung(er)?\b|\byouth\b|\bmillennials?\b|\bgen ?z\b|\bolder\b|\bseniors?\b|\belderly\b|\bunder \d\d\b|\bover \d\d\b|\b\d\d.?(years?|yrs?)\b/.test(t) ? 'age'
+      : /\bincomes?\b|\bsalar(y|ies)\b|\bearn(ing|ings|ers)?\b|\baffluent\b|\b(low|high|lower|higher).?income\b|\bpoor(er)?\b|\bricher\b|\bwealth(y|ier)?\b/.test(t) ? 'income' : null;
+    if (dim) {
+      const dm = S.DPD_METRICS.includes(metric) ? metric : /ticket|loan size|amount|how big/.test(t) ? 'ats' : /share|mix|proportion|how much of|split of|balance|book/.test(t) && !/delinquen|dpd|risk|default/.test(t) ? 'bal' : 'dpd30';
+      // "show delinquency by age band" after a profile answer keeps that answer's product and state
+      const keep = ctx.intent === 'borrower_profile' && !e.product && !e.states.length;
+      return call('borrower_profile', { product: keep ? ctx.product : p, state: keep ? ctx.state : st, dimension: dim, metric: dm, who: e.self ? 'both' : keep && ctx.args ? ctx.args.who : 'industry' });
+    }
     if (/upload|my file|approval route|credit hub|\bpr\b|portfolio review/.test(t)) return call('uploaded_insight', {});
     if (/action board|my actions|to.?do list|open actions|action items/.test(t)) return call('action_board', {});
     if (/overlap|also (have|hold)|director|promoter|related part|commercial.*retail|retail.*(microfinance|mfi)|(microfinance|mfi).*(retail|also)/.test(t))
@@ -742,13 +834,30 @@
     const g = guard(q);
     if (g) { S.log('ai.guardrail', { rule: g.guard, q: q.slice(0, 80) }, 'ai'); return { answer: g, facts: { refused: g.guard } }; }
     const r = route(q);
+    const lim0 = limits(q);
+    if (!r && lim0.length) return {
+      answer: { paras: ['**I can\'t answer that from the approved data.** ' + lim0.map((l) => l.say).join(' ')], sources: ['Scope control'], filters: 'Not available: ' + lim0.map((l) => l.field).join(', '), followups: ['Which datasets can you answer from?', 'What is happening in personal loans?'], limits: lim0.map((l) => l.field) },
+      facts: { notAvailable: lim0.map((l) => l.field) }
+    };
     if (!r) return {
       answer: { paras: ['I\'m not sure I understood. I answer questions about industry credit trends, your portfolio, peer benchmarks, why metrics changed, policy simulations and application trends. Try one of these:'], sources: [], filters: '', followups: ['What should I worry about this week?', 'What is happening in personal loans?', 'Why did my personal loan delinquency go up?'] },
       facts: {}
     };
     if (r.name === 'nav') { PIQ.go(r.args.view); return { answer: { paras: ['Opening the full analysis…'], sources: [], filters: '' }, facts: {} }; }
-    return run(r.name, r.args, 'ai');
+    return withLimits(q, run(r.name, r.args, 'ai'));
   }
 
-  PIQ.agent = { tools, answer, run, guard, route, extract, ctx };
+  // say what can't be answered before the closest governed answer, and show it in the filter chip
+  function withLimits(q, out) {
+    const lim = limits(q);
+    if (!lim.length || !out || !out.answer || out.answer.refusal) return out;
+    const a = out.answer;
+    a.paras = ['**Not exactly what you asked.** ' + lim.map((l) => l.say).join(' ') + ' Closest answer from the approved data:'].concat(a.paras || []);
+    a.filters = (a.filters ? a.filters + ' · ' : '') + 'Not available: ' + lim.map((l) => l.field).join(', ');
+    a.limits = lim.map((l) => l.field);
+    out.facts = Object.assign({}, out.facts, { notAvailable: lim.map((l) => l.field) });
+    return out;
+  }
+
+  PIQ.agent = { tools, answer, run, guard, route, extract, limits, withLimits, ctx };
 })();
