@@ -1,4 +1,4 @@
-# Demo script: PortfolioIQ (target: 7–8 minutes)
+# Demo script: TruFolio (target: 7–8 minutes)
 
 Before you start: open the app, press **F11** for full screen, stay in light mode (projectors wash out dark), and close the AI drawer. If you're using the server, check the header pill shows the AI mode you expect.
 
@@ -45,7 +45,7 @@ Before you start: open the app, press **F11** for full screen, stay in light mod
 
 ## 4:45 — AI Analyst (75 sec)
 
-Click **✦ Ask PortfolioIQ** (the drawer works from any page) and ask, in order:
+Click **✦ Ask TruFolio** (the drawer works from any page) and ask, in order:
 1. *"What is happening in personal loans?"*
 2. *"Compare that with Gujarat."* (remembers context)
 3. *"Now compare it with my portfolio."* (switches to the member benchmark)

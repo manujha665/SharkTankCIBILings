@@ -1,4 +1,4 @@
-# Deploying PortfolioIQ to Vercel (private team link)
+# Deploying TruFolio to Vercel (private team link)
 
 The prototype is a static site in `app/` — no build step, no dependencies, no secrets.
 The AI Analyst runs on the built-in governed engine when hosted this way.
@@ -42,7 +42,7 @@ Check the current options on your plan in the Vercel dashboard — they change o
 ## Updating
 
 Every push to the production branch redeploys automatically (Option A).
-The single-file version (`dist/PortfolioIQ.html`) is still the best offline backup for pitch day.
+The single-file version (`dist/TruFolio.html`) is still the best offline backup for pitch day.
 
 ## Optional: approved LLM on Vercel
 

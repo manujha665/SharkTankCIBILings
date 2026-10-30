@@ -4,7 +4,7 @@
     "v": 1,
     "at": "2026-09-29T04:10:00Z"
   },
-  "title": "PortfolioIQ Shark Tank Pitch",
+  "title": "TruFolio Shark Tank Pitch",
   "order": [
     "cover",
     "context",
@@ -31,10 +31,12 @@
     "model",
     "economics",
     "roi",
+    "breakeven",
     "roadmap",
     "trust",
     "ask",
-    "close"
+    "close",
+    "method-split"
   ],
   "sections": {
     "s1": {
@@ -42,7 +44,7 @@
       "start": "cover"
     },
     "s2": {
-      "description": "The solution: PortfolioIQ, shown on the working prototype with synthetic data",
+      "description": "The solution: TruFolio, shown on the working prototype with synthetic data",
       "start": "objective"
     },
     "s3": {
@@ -52,6 +54,10 @@
     "s4": {
       "description": "The plan, the guardrails and the ask",
       "start": "roadmap"
+    },
+    "s5": {
+      "description": "Backup: how the numbers are calculated",
+      "start": "method-split"
     }
   },
   "faces": {
