@@ -6648,19 +6648,23 @@ Rules:
     mic.type = 'button';
     mic.title = 'Speak your question';
     mic.setAttribute('aria-label', 'Speak your question');
-    const toast = (m) => (PIQ.actions && PIQ.actions.toast ? PIQ.actions.toast(m, true) : alert(m));
     const placeholder = inp.placeholder;
-    const reset = () => { mic.classList.remove('on'); mic.textContent = '🎤'; mic.title = 'Speak your question'; inp.placeholder = placeholder; activeRec = null; };
-    mic.addEventListener('click', () => {
-      if (!SR) { toast('Voice input needs Chrome, Edge or Safari. You can keep typing your question.'); return; }
-      if (activeRec) { activeRec.stop(); return; }
+    // say what went wrong in the toast AND in the text box, so it can't be missed
+    const tell = (m) => { if (PIQ.actions && PIQ.actions.toast) PIQ.actions.toast(m, true); inp.placeholder = m; setTimeout(() => { if (!activeRec && inp.placeholder === m) inp.placeholder = placeholder; }, 8000); };
+    const reset = (keepMsg) => { mic.classList.remove('on'); mic.textContent = '🎤'; mic.title = 'Speak your question'; if (!keepMsg) inp.placeholder = placeholder; activeRec = null; };
+    const isBrave = !!(navigator.brave && navigator.brave.isBrave);
+    const offline = location.protocol === 'file:';
+    function listen(lang) {
       const rec = new SR();
-      rec.lang = 'en-IN';
+      rec.lang = lang;
       rec.interimResults = true;
       rec.continuous = false;
       rec.maxAlternatives = 1;
-      let finalText = '', failed = false;
+      let finalText = '', failed = false, heard = false, retried = false;
+      // if the browser's speech service never answers (blocked network, no mic), stop and say so
+      const watchdog = setTimeout(() => { if (!heard && activeRec === rec) { failed = true; try { rec.abort(); } catch (e) { /* already stopped */ } tell('Didn\'t hear anything. Check the microphone, or your network may block the browser\'s speech service. You can type instead.'); } }, 9000);
       rec.onresult = (e) => {
+        heard = true;
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
           if (e.results[i].isFinal) finalText += e.results[i][0].transcript;
@@ -6670,27 +6674,37 @@ Rules:
       };
       rec.onerror = (e) => {
         failed = true;
+        if (e.error === 'language-not-supported' && lang !== 'en-US') { retried = true; return; }
+        if (e.error === 'aborted') return;
         const msg = {
-          'not-allowed': 'Microphone access is blocked. Allow the microphone for this site in your browser settings.',
-          'service-not-allowed': 'Voice input isn\'t available on this page. Open the app over https or localhost.',
-          'no-speech': 'Didn\'t catch that. Tap 🎤 and try again.',
-          'audio-capture': 'No microphone found.',
-          network: 'Voice recognition needs an internet connection in this browser.'
-        }[e.error] || 'Voice input stopped (' + e.error + ').';
-        toast(msg);
+          'not-allowed': offline ? 'The browser blocks the microphone on a local file. Use the https link (cibilings.vercel.app), or type your question.' : 'Microphone access is blocked. Click the lock icon in the address bar, allow the microphone, then try again.',
+          'service-not-allowed': 'This browser won\'t allow voice input here. Use Chrome or Edge on the https link, or type your question.',
+          'no-speech': 'Didn\'t catch that. Tap 🎤 and speak right away.',
+          'audio-capture': 'No microphone found. Check that one is connected and selected in your system settings.',
+          network: 'Voice needs the browser\'s speech service, which your network seems to block (common on office networks). Try another network, or type your question.'
+        }[e.error] || 'Voice input stopped (' + e.error + '). You can type your question instead.';
+        tell(msg);
       };
       rec.onend = () => {
-        reset();
+        clearTimeout(watchdog);
+        if (retried) { activeRec = null; listen('en-US'); return; }
+        reset(failed); // keep the explanation visible in the box
         const q = finalText.trim() || inp.value.trim();
         if (!failed && q) { inp.value = ''; ask(q); }
       };
-      try { rec.start(); } catch (err) { toast('Couldn\'t start voice input: ' + err.message); return; }
+      try { rec.start(); } catch (err) { clearTimeout(watchdog); reset(); tell('Couldn\'t start voice input: ' + err.message); return; }
       activeRec = rec;
       mic.classList.add('on');
       mic.textContent = '■';
       mic.title = 'Stop listening';
       inp.value = '';
       inp.placeholder = 'Listening… speak your question';
+    }
+    mic.addEventListener('click', () => {
+      if (!SR) { tell('Voice input needs Chrome, Edge or Safari. Firefox doesn\'t support it. You can keep typing.'); return; }
+      if (isBrave) { tell('Brave blocks the speech service voice input relies on. Use Chrome or Edge, or type your question.'); return; }
+      if (activeRec) { activeRec.stop(); return; }
+      listen('en-IN');
       if (PIQ.sem) PIQ.sem.log('voice.input', {});
     });
     return mic;
