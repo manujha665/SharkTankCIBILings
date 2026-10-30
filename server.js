@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * PortfolioIQ demo server — zero dependencies (Node 18+).
+ * TruFolio demo server — zero dependencies (Node 18+).
  *
  *  - Serves the prototype from ./app
  *  - Exposes /api/llm: a thin gateway to the organisation's APPROVED LLM. The API key stays on the
@@ -135,6 +135,6 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`PortfolioIQ running at http://${HOST}:${PORT}`);
+  console.log(`TruFolio running at http://${HOST}:${PORT}`);
   console.log(configured() ? `AI Analyst: approved LLM via ${PROVIDER} (${MODEL || 'default model'})` : 'AI Analyst: built-in governed engine (no LLM configured — see docs/LLM_SETUP.md)');
 });

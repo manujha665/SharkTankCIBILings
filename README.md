@@ -1,10 +1,10 @@
-# SharkTankCIBILings — PortfolioIQ
+# SharkTankCIBILings — TruFolio
 
 Our short-term idea of four CIBILians: an AI platform that gives lenders end-to-end portfolio monitoring, industry intelligence, benchmarking and a conversational analyst, in one place.
 
 > **One platform for understanding what is happening in the industry, what is happening in the member's own portfolio, why the two differ, and what to do about it.**
 
-The concept note is in [`portfolio_intelligence_ai_platform.md`](portfolio_intelligence_ai_platform.md). The working prototype is in [`app/`](app/). **To learn the demo, open the app and press ▶ Demo tour** (a guided, auto-playable walkthrough), then read [`docs/PRESENTER_GUIDE.md`](docs/PRESENTER_GUIDE.md) for how to explain it to different audiences. The timed talk track is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). A recorded run of the tour is in [`docs/demo/PortfolioIQ-tour.webm`](docs/demo/PortfolioIQ-tour.webm) (opens in Chrome/Edge/VLC).
+The concept note is in [`portfolio_intelligence_ai_platform.md`](portfolio_intelligence_ai_platform.md). The working prototype is in [`app/`](app/). **To learn the demo, open the app and press ▶ Demo tour** (a guided, auto-playable walkthrough), then read [`docs/PRESENTER_GUIDE.md`](docs/PRESENTER_GUIDE.md) for how to explain it to different audiences. The timed talk track is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). A recorded run of the tour is in [`docs/demo/TruFolio-tour.webm`](docs/demo/TruFolio-tour.webm) (opens in Chrome/Edge/VLC).
 
 ⚠️ **All data in this prototype is synthetic.** No real bureau, member or borrower data is used anywhere.
 
@@ -12,7 +12,7 @@ The concept note is in [`portfolio_intelligence_ai_platform.md`](portfolio_intel
 
 ## Run the prototype
 
-**Option 0: one file.** [`dist/PortfolioIQ.html`](dist/PortfolioIQ.html) is the whole prototype in a single self-contained HTML file (≈420 KB, no internet needed). Email it, put it on a USB stick, double-click to open. Rebuild it after changes with `node scripts/build-single-html.js`.
+**Option 0: one file.** [`dist/TruFolio.html`](dist/TruFolio.html) is the whole prototype in a single self-contained HTML file (≈420 KB, no internet needed). Email it, put it on a USB stick, double-click to open. Rebuild it after changes with `node scripts/build-single-html.js`.
 
 **Option 1: no installation (works on locked-down laptops).** Double-click `app/index.html`. Everything works, including the AI Analyst, which runs on the built-in governed engine.
 

@@ -1,6 +1,6 @@
 # Pitch deck source
 
-Source of the PortfolioIQ pitch deck (29 slides), published at
+Source of the TruFolio pitch deck (31 slides), published at
 https://claude.ai/artifact/Xq8SFHVSKqGkcyeZdHwqQJ
 
 - `deck.json`: slide order

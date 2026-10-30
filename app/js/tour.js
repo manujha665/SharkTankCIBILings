@@ -110,7 +110,7 @@
         }, target: () => q('.chat-main'),
         title: 'Ask in plain English, safely',
         say: '"The analyst keeps context across follow-ups and shows the source, filters and tool behind every number. It never invents one. And when asked about another lender, it refuses: tenant isolation is enforced in the data layer, not just the screen."',
-        tip: `Also available as ✦ Ask PortfolioIQ on every page, by typing or 🎤 voice. ${N.qs} ready-made questions on the right.` },
+        tip: `Then try a combination: "Near-prime credit cards in Kerala: SFBs vs the market", and "Break that down by state". Also on every page as ✦ Ask TruFolio, by typing or 🎤 voice; ${N.qs} ready-made questions on the right.` },
       { view: 'actions', setup: () => { PIQ.insights.recommendations('ALL').slice(0, 3).forEach((r, i) => PIQ.actions.add(r.title, r.why, { view: r.action.view, viewTitle: 'Recommendation', priority: i < 2 ? 'High' : 'Medium' })); }, target: () => q('.action-board'),
         title: 'Insight to action in one click',
         say: '"Everything I pinned across the screens (📌 or right-click → Send to Action Board) lands here with where it came from. Assign an owner and a date, export it, and it flows into the board pack."',

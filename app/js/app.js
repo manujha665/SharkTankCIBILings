@@ -32,7 +32,7 @@
     const side = document.getElementById('side');
     side.innerHTML = '';
     const b = h('div', 'brand', side);
-    h('div', 'brand-mark', b, 'IQ');
+    h('div', 'brand-mark', b, 'TF');
     const t = h('div', null, b);
     h('div', 'brand-name', t, C.productName);
     h('div', 'brand-tag', t, C.tagline);

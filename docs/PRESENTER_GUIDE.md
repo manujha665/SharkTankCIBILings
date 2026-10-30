@@ -1,8 +1,8 @@
-# How to demo and explain PortfolioIQ
+# How to demo and explain TruFolio
 
-**Start here:** open `PortfolioIQ.html` (double-click, no internet needed) and press **▶ Demo tour** in the top bar.
+**Start here:** open `TruFolio.html` (double-click, no internet needed) and press **▶ Demo tour** in the top bar.
 The tour clicks through the whole story, spotlights what to look at and shows what to say. Keys: **→** next, **←** back, **P** auto-play, **Esc** exit.
-To learn the demo, run the tour two or three times on auto-play, then present it yourself. No laptop handy? Watch the recorded run: `docs/demo/PortfolioIQ-tour.webm` (about 4 minutes; open in Chrome, Edge or VLC).
+To learn the demo, run the tour two or three times on auto-play, then present it yourself. No laptop handy? Watch the recorded run: `docs/demo/TruFolio-tour.webm` (about 4 minutes; open in Chrome, Edge or VLC).
 
 All numbers below are from the synthetic demo data and are also computed live inside the tour.
 
@@ -10,7 +10,7 @@ All numbers below are from the synthetic demo data and are also computed live in
 
 ## 1. The 30-second explanation (use this with anyone)
 
-> "Lenders have plenty of credit data but get their intelligence as static Excel files and decks, weeks late. PortfolioIQ turns the bureau's data into one self-serve platform that answers three questions every CRO asks: **What changed? Is it me or the market? What should I do?** It has an AI analyst that answers in plain English, only from approved data, and it can't leak another lender's numbers."
+> "Lenders have plenty of credit data but get their intelligence as static Excel files and decks, weeks late. TruFolio turns the bureau's data into one self-serve platform that answers three questions every CRO asks: **What changed? Is it me or the market? What should I do?** It has an AI analyst that answers in plain English, only from approved data, and it can't leak another lender's numbers."
 
 **Why only a bureau can build it:** the "is it me or the market" answer needs *every lender's* loans in the same segment, and so do overlaps like microfinance × retail. That's the moat.
 
@@ -97,5 +97,5 @@ The AI doesn't calculate or invent numbers. It chooses from a fixed set of appro
 - Charts draw themselves each time you open a page (filter clicks stay instant). Press **M** to switch motion off if the projector stutters.
 - Before presenting: open **Action Board** and clear it, so it fills up live as you pin things.
 - If anything goes wrong, press **▶ Demo tour** and let it carry you.
-- Keep a copy of `PortfolioIQ.html` on a USB stick and in your email.
+- Keep a copy of `TruFolio.html` on a USB stick and in your email.
 - Practise the 30-second pitch until you can say it without the screen.

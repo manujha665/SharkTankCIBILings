@@ -15,7 +15,7 @@
     const rows = list.map((x) => [x.text, x.detail, x.priority, x.status, x.owner, x.due, x.note, x.viewTitle || x.view, prodName(x.p), stateName(x.s), x.created].map(esc).join(','));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([cols.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' }));
-    a.download = 'portfolioiq_action_board.csv';
+    a.download = 'trufolio_action_board.csv';
     a.click();
   }
   function select(parent, options, value, onChange, cls) {

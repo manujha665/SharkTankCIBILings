@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Bundles app/ into one self-contained HTML file: dist/PortfolioIQ.html
+ * Bundles app/ into one self-contained HTML file: dist/TruFolio.html
  * (all CSS and JS inlined, no external requests). Run: node scripts/build-single-html.js
  */
 'use strict';
@@ -9,7 +9,7 @@ const path = require('path');
 
 const APP = path.join(__dirname, '..', 'app');
 const OUT_DIR = path.join(__dirname, '..', 'dist');
-const OUT = path.join(OUT_DIR, 'PortfolioIQ.html');
+const OUT = path.join(OUT_DIR, 'TruFolio.html');
 
 let html = fs.readFileSync(path.join(APP, 'index.html'), 'utf8');
 const read = (rel) => fs.readFileSync(path.join(APP, rel), 'utf8');
@@ -22,7 +22,7 @@ html = html.replace(/<script src="([^"]+)"><\/script>/g, (_, src) => {
   count++;
   return `<script>/* ${src} */\n${safe(read(src))}\n</script>`;
 });
-html = html.replace('<meta charset="utf-8" />', '<meta charset="utf-8" />\n  <meta name="description" content="PortfolioIQ prototype: credit & lending intelligence with a governed AI analyst. Synthetic demo data." />');
+html = html.replace('<meta charset="utf-8" />', '<meta charset="utf-8" />\n  <meta name="description" content="TruFolio prototype: credit & lending intelligence with a governed AI analyst. Synthetic demo data." />');
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 fs.writeFileSync(OUT, html);

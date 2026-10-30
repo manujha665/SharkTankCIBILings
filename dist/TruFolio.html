@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="description" content="PortfolioIQ prototype: credit & lending intelligence with a governed AI analyst. Synthetic demo data." />
+  <meta name="description" content="TruFolio prototype: credit & lending intelligence with a governed AI analyst. Synthetic demo data." />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>PortfolioIQ — Credit Intelligence</title>
+  <title>TruFolio — Credit Intelligence</title>
   <style>
 /* ---------- tokens ---------- */
 :root {
@@ -491,7 +491,7 @@ body.touring .fab { display: none; }
       <main class="content" id="view" tabindex="-1"></main>
     </div>
   </div>
-  <button class="fab" id="fab" type="button" aria-label="Ask the AI analyst"><span>✦</span> Ask PortfolioIQ</button>
+  <button class="fab" id="fab" type="button" aria-label="Ask the AI analyst"><span>✦</span> Ask TruFolio</button>
   <aside class="drawer" id="drawer" aria-label="AI analyst"></aside>
 
   <!-- order matters: config → data → semantic layer → UI → insights → charts → views → agent → app -->
@@ -500,7 +500,7 @@ body.touring .fab { display: none; }
 (function (root) {
   root.PIQ = root.PIQ || {};
   root.PIQ.config = {
-    productName: 'PortfolioIQ',
+    productName: 'TruFolio',
     tagline: 'Credit & Lending Intelligence',
     member: {
       id: 'SAHYADRI',
@@ -3287,7 +3287,7 @@ body.touring .fab { display: none; }
 </script>
   <script>/* js/glossary.js */
 /*
- * Glossary: every term and calculation used in PortfolioIQ, in plain English.
+ * Glossary: every term and calculation used in TruFolio, in plain English.
  *  - PIQ.glossary.TERMS: the list (term, other names, group, meaning, how it is worked out)
  *  - the Glossary page (Trust section) lists everything, with search
  */
@@ -3396,7 +3396,7 @@ body.touring .fab { display: none; }
   function render(root, params) {
     const { h, pageHead } = PIQ.ui;
     query = '';
-    pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Search for any term, or browse by topic.');
+    pageHead(root, 'Glossary', 'Every term and calculation used in TruFolio, in plain English. Search for any term, or browse by topic.');
     const wrap = h('div', 'glossary-page', root);
     const bar = h('div', 'gl-search', wrap);
     const inp = h('input', null, bar);
@@ -4145,7 +4145,7 @@ body.touring .fab { display: none; }
     const c = card(parent, {
       title: 'Feasibility: taking in the member\'s real cut-offs',
       sub: 'Can every product and state carry its own current cut-off? Yes. Here is how it gets in, and what it takes.',
-      source: 'Assessment by the PortfolioIQ team · prototype implements routes 1 and 2'
+      source: 'Assessment by the TruFolio team · prototype implements routes 1 and 2'
     });
     c.el.style.marginTop = '16px';
     const t = h('table', 'tbl', h('div', 'table-wrap', c.viz));
@@ -5258,7 +5258,7 @@ body.touring .fab { display: none; }
     const rows = list.map((x) => [x.text, x.detail, x.priority, x.status, x.owner, x.due, x.note, x.viewTitle || x.view, prodName(x.p), stateName(x.s), x.created].map(esc).join(','));
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([cols.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' }));
-    a.download = 'portfolioiq_action_board.csv';
+    a.download = 'trufolio_action_board.csv';
     a.click();
   }
   function select(parent, options, value, onChange, cls) {
@@ -6853,7 +6853,7 @@ Rules:
         }, target: () => q('.chat-main'),
         title: 'Ask in plain English, safely',
         say: '"The analyst keeps context across follow-ups and shows the source, filters and tool behind every number. It never invents one. And when asked about another lender, it refuses: tenant isolation is enforced in the data layer, not just the screen."',
-        tip: `Also available as ✦ Ask PortfolioIQ on every page, by typing or 🎤 voice. ${N.qs} ready-made questions on the right.` },
+        tip: `Then try a combination: "Near-prime credit cards in Kerala: SFBs vs the market", and "Break that down by state". Also on every page as ✦ Ask TruFolio, by typing or 🎤 voice; ${N.qs} ready-made questions on the right.` },
       { view: 'actions', setup: () => { PIQ.insights.recommendations('ALL').slice(0, 3).forEach((r, i) => PIQ.actions.add(r.title, r.why, { view: r.action.view, viewTitle: 'Recommendation', priority: i < 2 ? 'High' : 'Medium' })); }, target: () => q('.action-board'),
         title: 'Insight to action in one click',
         say: '"Everything I pinned across the screens (📌 or right-click → Send to Action Board) lands here with where it came from. Assign an owner and a date, export it, and it flows into the board pack."',
@@ -6989,7 +6989,7 @@ Rules:
     const side = document.getElementById('side');
     side.innerHTML = '';
     const b = h('div', 'brand', side);
-    h('div', 'brand-mark', b, 'IQ');
+    h('div', 'brand-mark', b, 'TF');
     const t = h('div', null, b);
     h('div', 'brand-name', t, C.productName);
     h('div', 'brand-tag', t, C.tagline);

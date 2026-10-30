@@ -84,7 +84,7 @@
     const c = card(parent, {
       title: 'Feasibility: taking in the member\'s real cut-offs',
       sub: 'Can every product and state carry its own current cut-off? Yes. Here is how it gets in, and what it takes.',
-      source: 'Assessment by the PortfolioIQ team · prototype implements routes 1 and 2'
+      source: 'Assessment by the TruFolio team · prototype implements routes 1 and 2'
     });
     c.el.style.marginTop = '16px';
     const t = h('table', 'tbl', h('div', 'table-wrap', c.viz));

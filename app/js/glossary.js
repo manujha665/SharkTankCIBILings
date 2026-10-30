@@ -1,5 +1,5 @@
 /*
- * Glossary: every term and calculation used in PortfolioIQ, in plain English.
+ * Glossary: every term and calculation used in TruFolio, in plain English.
  *  - PIQ.glossary.TERMS: the list (term, other names, group, meaning, how it is worked out)
  *  - the Glossary page (Trust section) lists everything, with search
  */
@@ -108,7 +108,7 @@
   function render(root, params) {
     const { h, pageHead } = PIQ.ui;
     query = '';
-    pageHead(root, 'Glossary', 'Every term and calculation used in PortfolioIQ, in plain English. Search for any term, or browse by topic.');
+    pageHead(root, 'Glossary', 'Every term and calculation used in TruFolio, in plain English. Search for any term, or browse by topic.');
     const wrap = h('div', 'glossary-page', root);
     const bar = h('div', 'gl-search', wrap);
     const inp = h('input', null, bar);

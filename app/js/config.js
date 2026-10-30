@@ -2,7 +2,7 @@
 (function (root) {
   root.PIQ = root.PIQ || {};
   root.PIQ.config = {
-    productName: 'PortfolioIQ',
+    productName: 'TruFolio',
     tagline: 'Credit & Lending Intelligence',
     member: {
       id: 'SAHYADRI',

@@ -1,0 +1,63 @@
+<section id="method-split" data-transition="fade" style="background:#F6F3EC; color:#0F1B2D; font-family:'IBM Plex Sans', Arial, sans-serif; padding:112px 128px 160px; display:flex; flex-direction:column; gap:40px">
+<div style="display:flex; flex-direction:column; gap:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; letter-spacing:3px; text-transform:uppercase; color:#B4461A">Backup · method</p>
+<h2 style="font-family:'Space Grotesk', Arial, sans-serif; font-size:72px; font-weight:600; line-height:1.08; letter-spacing:-1px; color:#0F1B2D">How "me vs the market" is calculated</h2>
+</div>
+<div style="display:flex; gap:32px">
+<div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FFFDF8; padding:36px; border:1px solid #E1DACB; border-radius:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; color:#1F5BC4">MIX · YOU (POLICY)</p>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif; font-size:32px; font-weight:600; line-height:1.2">Did you change what you lend to?</h3>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; line-height:1.4; color:#4A5568">change in share × average rate</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif; font-size:56px; font-weight:700; line-height:1; color:#1F5BC4">+49 bps</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#FFFDF8; padding:36px; border:1px solid #E1DACB; border-radius:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; color:#9A5B00">MARKET · NOT YOU</p>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif; font-size:32px; font-weight:600; line-height:1.2">Did the same borrowers get worse everywhere?</h3>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; line-height:1.4; color:#4A5568">your Feb rate × market's % change × average share</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif; font-size:56px; font-weight:700; line-height:1; color:#9A5B00">+22.5 bps</p>
+</div>
+<div style="flex:1; display:flex; flex-direction:column; gap:14px; background:#0F1B2D; padding:36px; border-radius:16px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; color:#F2A541">OWN · YOU (EXECUTION)</p>
+<h3 style="font-family:'Space Grotesk', Arial, sans-serif; font-size:32px; font-weight:600; line-height:1.2; color:#F6F3EC">Did your loans do worse than the market's?</h3>
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; line-height:1.4; color:#B8C4D6">(change in rate × average share) − market</p>
+<p style="font-family:'Space Grotesk', Arial, sans-serif; font-size:56px; font-weight:700; line-height:1; color:#F2A541">+42.5 bps</p>
+</div>
+</div>
+<table style="width:1664px; font-size:26px; color:#0F1B2D">
+<tr style="background:#EAE4D6">
+<th style="width:40%; text-align:left">Segments: product × state × score band</th>
+<th style="width:12%; text-align:right">Change</th>
+<th style="width:10%; text-align:right">Mix</th>
+<th style="width:10%; text-align:right">Market</th>
+<th style="width:10%; text-align:right">Own</th>
+<th style="width:18%; text-align:right">Verdict</th>
+</tr>
+<tr style="background:#FFFDF8">
+<td>Worked example · 2 segments, 2.80% → 3.94%</td>
+<td style="text-align:right">+114 bps</td>
+<td style="text-align:right">+49</td>
+<td style="text-align:right">+22.5</td>
+<td style="text-align:right">+42.5</td>
+<td style="text-align:right">Mostly you</td>
+</tr>
+<tr>
+<td>Demo · Sahyadri PL, Gujarat, 2.11% → 6.16%</td>
+<td style="text-align:right">+405 bps</td>
+<td style="text-align:right">+144</td>
+<td style="text-align:right">+13</td>
+<td style="text-align:right">+248</td>
+<td style="text-align:right">Mostly you · 61% own</td>
+</tr>
+<tr style="background:#FFFDF8">
+<td>Demo · Sahyadri PL, all states, 2.36% → 3.96%</td>
+<td style="text-align:right">+160 bps</td>
+<td style="text-align:right">+60</td>
+<td style="text-align:right">+23</td>
+<td style="text-align:right">+77</td>
+<td style="text-align:right">Mostly you</td>
+</tr>
+</table>
+<p style="position:absolute; left:128px; bottom:64px; width:1400px; font-size:24px; color:#4A5568">Averages of the Feb and Aug values make the three parts add up exactly · demo rows from synthetic data · workbook: TruFolio_Me_vs_Market_Split.xlsx</p>
+<p style="position:absolute; right:128px; bottom:64px; width:200px; font-family:'IBM Plex Mono', 'Courier New', monospace; font-size:24px; text-align:right; color:#4A5568">Backup</p>
+<aside>Use this only if a judge asks how the split works. Step zero: cut the book into segments of loans that should behave alike, product by state by score band. Mix asks whether you changed what you lend to: for each segment, the change in its share of your book times its average rate. In the example you moved 10% of the book from prime to subprime, which alone added 49 basis points. Market asks whether the same borrowers got worse for every lender: your starting rate in each segment times the market's percentage change in that same segment. Subprime got 10% worse everywhere, so your 6% should have become 6.6%; that's 22.5 basis points across the book, and it isn't your fault. Own is what's left of the rate change: your subprime actually went to 8%, not 6.6%, so the gap is execution, 42.5 basis points. The three parts add to the 114 basis point change exactly, because each uses the average of the two dates. The verdict is "mostly the market" only when the market part is bigger than mix and own combined. In the demo, Gujarat personal loans rose 405 basis points and only 13 came from the market: 61% is the bank's own. Mix and rate are standard attribution any lender can do on its own book; the market leg needs every other lender's rate in the same segment, which only the bureau has. The workbook lets anyone change the inputs and watch the parts move.</aside>
+</section>
